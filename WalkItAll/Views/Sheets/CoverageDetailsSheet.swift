@@ -1,0 +1,90 @@
+import SwiftUI
+
+struct CoverageDetailsSheet: View {
+    let model: AppModel
+    @State private var confirmRebuild = false
+
+    var body: some View {
+        List {
+            if let coverage = model.coverage {
+                Section("Manhattan Island") {
+                    LabeledContent("Covered") {
+                        Text(coverage.completionFraction, format: .percent.precision(.fractionLength(1)))
+                    }
+                    LabeledContent("Distance walked", value: distance(coverage.coveredDistanceMeters))
+                    LabeledContent("Distance remaining", value: distance(coverage.remainingDistanceMeters))
+                    LabeledContent("Completed map segments", value: coverage.completedSegmentIDs.count.formatted())
+                }
+            }
+
+            Section("Apple Health") {
+                LabeledContent("Status", value: model.importPhase.title)
+                LabeledContent("Mapped workouts", value: model.workoutRecords.count.formatted())
+                if let date = model.lastSuccessfulImport {
+                    LabeledContent("Last refreshed", value: date.formatted(date: .abbreviated, time: .shortened))
+                }
+                Button("Refresh from Apple Health", systemImage: "arrow.clockwise") {
+                    model.refresh()
+                }
+                .disabled(model.importPhase.isWorking)
+                Button("Rebuild all coverage", systemImage: "arrow.triangle.2.circlepath") {
+                    confirmRebuild = true
+                }
+                .disabled(model.importPhase.isWorking)
+            }
+
+            if model.workoutRecords.isEmpty {
+                Section {
+                    ContentUnavailableView(
+                        "No mappable routes found",
+                        systemImage: "figure.walk",
+                        description: Text("You may not have recorded outdoor workouts, Health access may be limited, or older Health history may still be syncing.")
+                    )
+                }
+            }
+
+            Section {
+                Button("Workout history", systemImage: "clock.arrow.circlepath") {
+                    model.presentedSheet = .workouts
+                }
+                Button("How coverage works", systemImage: "point.topleft.down.to.point.bottomright.curvepath") {
+                    model.presentedSheet = .methodology
+                }
+                Button("Privacy and data", systemImage: "hand.raised.fill") {
+                    model.presentedSheet = .privacy
+                }
+            }
+
+            #if DEBUG
+            if model.debugLastRoute != nil {
+                Section("Development") {
+                    Button("Inspect last route match", systemImage: "ladybug") {
+                        model.presentedSheet = .debugInspector
+                    }
+                }
+            }
+            #endif
+        }
+        .navigationTitle("Coverage")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { SheetCloseButton() }
+        .confirmationDialog(
+            "Rebuild from Apple Health?",
+            isPresented: $confirmRebuild,
+            titleVisibility: .visible
+        ) {
+            Button("Rebuild coverage", role: .destructive) {
+                model.rebuildFromHealth()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the rebuildable local cache and imports your authorized Apple Health routes again.")
+        }
+    }
+
+    private func distance(_ meters: Double) -> String {
+        Measurement(value: meters, unit: UnitLength.meters)
+            .converted(to: .miles)
+            .formatted(.measurement(width: .wide, usage: .road).precision(.fractionLength(1)))
+    }
+}

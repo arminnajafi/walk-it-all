@@ -1,0 +1,102 @@
+name: WalkItAll
+
+options:
+  bundleIdPrefix: com.arminnajafi
+  deploymentTarget:
+    iOS: "17.0"
+  generateEmptyDirectories: true
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    CLANG_ENABLE_MODULES: YES
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+
+packages:
+  WalkItAllCore:
+    path: Packages/WalkItAllCore
+
+targets:
+  WalkItAll:
+    type: application
+    platform: iOS
+    sources:
+      - path: WalkItAll
+        excludes:
+          - Resources/OfflineMaps/README.md
+    resources:
+      - path: WalkItAll/Resources
+    dependencies:
+      - package: WalkItAllCore
+      - sdk: HealthKit.framework
+      - sdk: MapKit.framework
+      - sdk: CoreLocation.framework
+      - sdk: libsqlite3.tbd
+    entitlements:
+      path: Config/WalkItAll.entitlements
+    info:
+      path: Config/Info.plist
+      properties:
+        CFBundleDisplayName: Walk It All
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        NSHealthShareUsageDescription: Walk It All reads your walking and hiking workout routes to calculate which streets and paths you have covered. Your routes stay on this device.
+        UIRequiresFullScreen: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arminnajafi.walkitall
+        PRODUCT_NAME: WalkItAll
+        TARGETED_DEVICE_FAMILY: 1
+        SUPPORTS_MACCATALYST: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    scheme:
+      testTargets:
+        - WalkItAllTests
+        - WalkItAllUITests
+
+  WalkItAllTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - WalkItAllTests
+    dependencies:
+      - target: WalkItAll
+      - package: WalkItAllCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arminnajafi.walkitall.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  WalkItAllUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - WalkItAllUITests
+    dependencies:
+      - target: WalkItAll
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.arminnajafi.walkitall.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: WalkItAll
+
+schemes:
+  WalkItAll:
+    build:
+      targets:
+        WalkItAll: all
+        WalkItAllTests: [test]
+        WalkItAllUITests: [test]
+    test:
+      targets:
+        - WalkItAllTests
+        - WalkItAllUITests
+      gatherCoverageData: true

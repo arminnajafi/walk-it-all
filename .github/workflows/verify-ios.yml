@@ -1,0 +1,46 @@
+name: Verify iOS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tool versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install build tools
+        run: brew install xcodegen uv
+
+      - name: Verify matching core
+        working-directory: Packages/WalkItAllCore
+        run: swift run WalkItAllCoreChecks
+
+      - name: Verify offline-map builder
+        working-directory: Tools/CityPackBuilder
+        run: |
+          uv sync --dev
+          uv run pytest -q
+
+      - name: Verify bundled Manhattan database
+        run: |
+          sqlite3 WalkItAll/Resources/OfflineMaps/manhattan-v1.sqlite 'PRAGMA integrity_check; SELECT count(*) FROM segments;'
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Compile app and tests
+        run: |
+          xcodebuild \
+            -project WalkItAll.xcodeproj \
+            -scheme WalkItAll \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build-for-testing
+
