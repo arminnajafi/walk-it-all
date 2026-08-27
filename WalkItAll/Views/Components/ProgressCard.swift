@@ -84,7 +84,6 @@ struct ProgressCard: View {
 
     private func distance(_ meters: Double) -> String {
         let miles = Measurement(value: meters, unit: UnitLength.meters).converted(to: .miles)
-        return miles.formatted(.measurement(width: .abbreviated, usage: .road).precision(.fractionLength(1)))
+        return "\(miles.value.formatted(.number.precision(.fractionLength(1)))) mi"
     }
 }
-

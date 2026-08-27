@@ -83,8 +83,7 @@ struct CoverageDetailsSheet: View {
     }
 
     private func distance(_ meters: Double) -> String {
-        Measurement(value: meters, unit: UnitLength.meters)
-            .converted(to: .miles)
-            .formatted(.measurement(width: .wide, usage: .road).precision(.fractionLength(1)))
+        let miles = Measurement(value: meters, unit: UnitLength.meters).converted(to: .miles)
+        return "\(miles.value.formatted(.number.precision(.fractionLength(1)))) miles"
     }
 }
