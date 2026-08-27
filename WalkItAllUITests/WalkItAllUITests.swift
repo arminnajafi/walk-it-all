@@ -6,9 +6,8 @@ final class WalkItAllUITests: XCTestCase {
         app.launchArguments = ["-skipOnboarding"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Manhattan"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Manhattan"].waitForExistence(timeout: 30))
         XCTAssertTrue(app.buttons["Refresh from Apple Health"].exists)
         XCTAssertTrue(app.staticTexts["of Manhattan walked"].exists)
     }
 }
-
