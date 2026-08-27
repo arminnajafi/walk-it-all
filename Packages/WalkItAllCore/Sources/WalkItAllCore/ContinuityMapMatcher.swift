@@ -53,7 +53,7 @@ public struct ContinuityMapMatcher: MapMatcher {
 
     private enum CachedPath: Sendable {
         case found(GraphPath)
-        case missing
+        case missing(searchedThroughMeters: Double)
     }
 
     public let configuration: Configuration
@@ -68,11 +68,13 @@ public struct ContinuityMapMatcher: MapMatcher {
     }
 
     public func match(points: [RoutePoint], in pack: any CityCoveragePack) async throws -> MatchResult {
-        let chunks = chunker.chunks(from: points)
+        let chunking = chunker.process(points)
+        let chunks = chunking.chunks
         var intervals: [SegmentInterval] = []
-        var unmatched: [UnmatchedPortion] = []
+        var unmatched = chunking.unmatchedPortions
         var acceptedPoints = 0
         var confidenceValues: [Double] = []
+        var candidateSegmentIDs = Set<SegmentID>()
         var pathCache: [NodePair: CachedPath] = [:]
 
         for chunk in chunks {
@@ -82,9 +84,9 @@ public struct ContinuityMapMatcher: MapMatcher {
             unmatched.append(contentsOf: chunkResult.unmatched)
             acceptedPoints += chunkResult.acceptedPoints
             confidenceValues.append(contentsOf: chunkResult.confidences)
+            candidateSegmentIDs.formUnion(chunkResult.candidateSegmentIDs)
         }
 
-        let rejectedByFiltering = max(0, points.count - chunks.reduce(0) { $0 + $1.count })
         let rejectedByMatching = max(0, chunks.reduce(0) { $0 + $1.count } - acceptedPoints)
         let averageConfidence = confidenceValues.isEmpty
             ? 0
@@ -94,8 +96,9 @@ public struct ContinuityMapMatcher: MapMatcher {
             intervals: intervals,
             unmatchedPortions: unmatched,
             acceptedPointCount: acceptedPoints,
-            rejectedPointCount: rejectedByFiltering + rejectedByMatching,
-            averageConfidence: averageConfidence
+            rejectedPointCount: chunking.rejectedPointCount + rejectedByMatching,
+            averageConfidence: averageConfidence,
+            candidateSegmentIDs: candidateSegmentIDs
         )
     }
 
@@ -103,8 +106,15 @@ public struct ContinuityMapMatcher: MapMatcher {
         _ points: [RoutePoint],
         in pack: any CityCoveragePack,
         pathCache: inout [NodePair: CachedPath]
-    ) -> (intervals: [SegmentInterval], unmatched: [UnmatchedPortion], acceptedPoints: Int, confidences: [Double]) {
+    ) -> (
+        intervals: [SegmentInterval],
+        unmatched: [UnmatchedPortion],
+        acceptedPoints: Int,
+        confidences: [Double],
+        candidateSegmentIDs: Set<SegmentID>
+    ) {
         let candidateSets = points.map { candidates(for: $0, in: pack) }
+        let candidateSegmentIDs = Set(candidateSets.flatMap { $0.map(\.segment.id) })
         var intervals: [SegmentInterval] = []
         var unmatched: [UnmatchedPortion] = []
         var confidences: [Double] = []
@@ -149,7 +159,7 @@ public struct ContinuityMapMatcher: MapMatcher {
             start = max(end, start + 1)
         }
 
-        return (intervals, unmatched, acceptedPoints, confidences)
+        return (intervals, unmatched, acceptedPoints, confidences, candidateSegmentIDs)
     }
 
     private func candidates(for point: RoutePoint, in pack: any CityCoveragePack) -> [Candidate] {
@@ -157,7 +167,9 @@ public struct ContinuityMapMatcher: MapMatcher {
             configuration.maximumCandidateRadiusMeters,
             max(configuration.minimumCandidateRadiusMeters, point.horizontalAccuracy * 2)
         )
-        let sigma = max(5, point.horizontalAccuracy)
+        // HealthKit accuracy is an estimate, while the eligible network follows a
+        // street centerline. A modest floor avoids penalizing a good sidewalk fix.
+        let sigma = max(12, point.horizontalAccuracy)
         return pack.segments(near: point.coordinate, radiusMeters: radius)
             .compactMap { segment -> Candidate? in
                 guard let projection = GeoMath.project(point.coordinate, onto: segment.coordinates) else { return nil }
@@ -168,7 +180,12 @@ public struct ContinuityMapMatcher: MapMatcher {
                     emissionScore: -0.5 * normalizedDistance * normalizedDistance
                 )
             }
-            .sorted { $0.projection.distanceMeters < $1.projection.distanceMeters }
+            .sorted {
+                if $0.projection.distanceMeters == $1.projection.distanceMeters {
+                    return $0.segment.id.rawValue < $1.segment.id.rawValue
+                }
+                return $0.projection.distanceMeters < $1.projection.distanceMeters
+            }
             .prefix(configuration.maximumCandidatesPerPoint)
             .map { $0 }
     }
@@ -200,6 +217,7 @@ public struct ContinuityMapMatcher: MapMatcher {
                         from: previous,
                         to: current,
                         in: pack,
+                        maximumDistanceMeters: observedDistance * 4 + 100,
                         pathCache: &pathCache
                     ) else { continue }
                     let transitionScore = scoreTransition(
@@ -301,7 +319,11 @@ public struct ContinuityMapMatcher: MapMatcher {
         }
 
         let confidenceValues = rows.indices.map { rowIndex in
-            confidence(selectedIndex: selectedIndices[rowIndex], states: rows[rowIndex])
+            confidence(
+                selectedIndex: selectedIndices[rowIndex],
+                states: rows[rowIndex],
+                candidates: candidateSets[rowIndex]
+            )
         }
         var intervals: [SegmentInterval] = []
         var unmatched: [UnmatchedPortion] = []
@@ -323,6 +345,10 @@ public struct ContinuityMapMatcher: MapMatcher {
                 from: previous,
                 to: current,
                 in: pack,
+                maximumDistanceMeters: GeoMath.distance(
+                    points[index - 1].coordinate,
+                    points[index].coordinate
+                ) * 4 + 100,
                 pathCache: &pathCache
             ) else {
                 unmatched.append(UnmatchedPortion(
@@ -344,19 +370,33 @@ public struct ContinuityMapMatcher: MapMatcher {
             accepted.insert(index)
         }
 
-        return (intervals, unmatched, accepted.count, confidenceValues)
+        let acceptedConfidences = accepted.sorted().map { confidenceValues[$0] }
+        return (intervals, unmatched, accepted.count, acceptedConfidences)
     }
 
-    private func confidence(selectedIndex: Int, states: [State]) -> Double {
+    private func confidence(
+        selectedIndex: Int,
+        states: [State],
+        candidates: [Candidate]
+    ) -> Double {
         let selected = states[selectedIndex].score
         let alternative = states.indices
             .filter { $0 != selectedIndex }
             .map { states[$0].score }
             .filter(\.isFinite)
             .max()
-        guard let alternative else { return 1 }
-        let margin = max(0, selected - alternative)
-        return min(1, max(0, 1 - exp(-margin)))
+        let marginConfidence: Double
+        if let alternative {
+            let margin = max(0, selected - alternative)
+            marginConfidence = min(1, max(0, 1 - exp(-margin)))
+        } else {
+            marginConfidence = 1
+        }
+
+        // A single candidate is not automatically trustworthy: its absolute
+        // distance from the GPS fix still matters.
+        let absoluteConfidence = exp(candidates[selectedIndex].emissionScore)
+        return min(1, max(0, absoluteConfidence * (0.5 + 0.5 * marginConfidence)))
     }
 
     private func scoreTransition(networkDistance: Double, observedDistance: Double) -> Double {
@@ -371,6 +411,7 @@ public struct ContinuityMapMatcher: MapMatcher {
         from start: Candidate,
         to end: Candidate,
         in pack: any CityCoveragePack,
+        maximumDistanceMeters: Double,
         pathCache: inout [NodePair: CachedPath]
     ) -> Travel? {
         if start.segment.id == end.segment.id {
@@ -433,21 +474,36 @@ public struct ContinuityMapMatcher: MapMatcher {
         var best: Travel?
         for startEndpoint in startEndpoints {
             for endEndpoint in endEndpoints {
-                let directBudget = 2_000.0
+                let graphBudget = maximumDistanceMeters - startEndpoint.1 - endEndpoint.1
+                guard graphBudget >= 0 else { continue }
                 let key = NodePair(startEndpoint.0, endEndpoint.0)
                 let graphPath: GraphPath?
                 if let cached = pathCache[key] {
                     switch cached {
-                    case let .found(path): graphPath = path
-                    case .missing: graphPath = nil
+                    case let .found(path):
+                        graphPath = path.distanceMeters <= graphBudget ? path : nil
+                    case let .missing(searchedThroughMeters):
+                        if searchedThroughMeters >= graphBudget {
+                            graphPath = nil
+                        } else {
+                            let resolved = pack.shortestPath(
+                                from: startEndpoint.0,
+                                to: endEndpoint.0,
+                                maximumDistanceMeters: graphBudget
+                            )
+                            pathCache[key] = resolved.map(CachedPath.found)
+                                ?? .missing(searchedThroughMeters: graphBudget)
+                            graphPath = resolved
+                        }
                     }
                 } else {
                     let resolved = pack.shortestPath(
                         from: startEndpoint.0,
                         to: endEndpoint.0,
-                        maximumDistanceMeters: directBudget
+                        maximumDistanceMeters: graphBudget
                     )
-                    pathCache[key] = resolved.map(CachedPath.found) ?? .missing
+                    pathCache[key] = resolved.map(CachedPath.found)
+                        ?? .missing(searchedThroughMeters: graphBudget)
                     graphPath = resolved
                 }
                 guard let graphPath else { continue }

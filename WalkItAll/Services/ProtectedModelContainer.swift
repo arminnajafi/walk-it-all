@@ -24,6 +24,7 @@ enum ProtectedModelContainer {
         let schema = Schema([
             PersistedWorkoutCoverage.self,
             PersistedAppState.self,
+            PersistedWorkoutImportState.self,
         ])
         let configuration = ModelConfiguration(
             "WalkItAllLocalCache",
@@ -35,4 +36,3 @@ enum ProtectedModelContainer {
         return try ModelContainer(for: schema, configurations: [configuration])
     }
 }
-

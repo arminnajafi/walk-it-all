@@ -108,6 +108,66 @@ final class ContinuityMapMatcherTests: XCTestCase {
         XCTAssertTrue(result.unmatchedPortions.contains { $0.reason == .implausibleTransition })
     }
 
+    func testDoesNotCreditGraphOnlyCrossingConnector() async throws {
+        let connector = WalkableSegment(
+            id: "crossing",
+            startNode: NodeID(1),
+            endNode: NodeID(2),
+            coordinates: [
+                GeoCoordinate(latitude: 40.7500, longitude: -73.9900),
+                GeoCoordinate(latitude: 40.7502, longitude: -73.9900),
+            ],
+            kind: .connector,
+            countsTowardCoverage: false
+        )
+        let pack = InMemoryCityCoveragePack(metadata: .fixture, segments: [connector])
+        let start = Date(timeIntervalSince1970: 4_000)
+
+        let result = try await ContinuityMapMatcher().match(
+            points: [
+                routePoint(40.7500, -73.9900, start),
+                routePoint(40.7502, -73.9900, start.addingTimeInterval(20)),
+            ],
+            in: pack
+        )
+
+        XCTAssertTrue(result.intervals.isEmpty)
+        XCTAssertTrue(result.unmatchedPortions.allSatisfy { $0.reason == .noNearbyWalkableWay })
+    }
+
+    func testRejectsAOnlyCandidateWhenItIsTooFarFromTheTrace() async throws {
+        let street = WalkableSegment(
+            id: "distant-street",
+            startNode: NodeID(1),
+            endNode: NodeID(2),
+            coordinates: [
+                GeoCoordinate(latitude: 40.7500, longitude: -73.9900),
+                GeoCoordinate(latitude: 40.7520, longitude: -73.9900),
+            ],
+            kind: .street
+        )
+        let pack = InMemoryCityCoveragePack(metadata: .fixture, segments: [street])
+        let start = Date(timeIntervalSince1970: 5_000)
+        let points = [
+            RoutePoint(
+                coordinate: GeoCoordinate(latitude: 40.7502, longitude: -73.98965),
+                timestamp: start,
+                horizontalAccuracy: 20
+            ),
+            RoutePoint(
+                coordinate: GeoCoordinate(latitude: 40.7505, longitude: -73.98965),
+                timestamp: start.addingTimeInterval(20),
+                horizontalAccuracy: 20
+            ),
+        ]
+
+        let result = try await ContinuityMapMatcher().match(points: points, in: pack)
+
+        XCTAssertTrue(result.intervals.isEmpty)
+        XCTAssertEqual(result.acceptedPointCount, 0)
+        XCTAssertTrue(result.unmatchedPortions.contains { $0.reason == .lowConfidence })
+    }
+
     private func routePoint(_ latitude: Double, _ longitude: Double, _ timestamp: Date) -> RoutePoint {
         RoutePoint(
             coordinate: GeoCoordinate(latitude: latitude, longitude: longitude),

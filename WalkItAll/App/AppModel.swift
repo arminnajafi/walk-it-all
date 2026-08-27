@@ -5,9 +5,6 @@ import WalkItAllCore
 
 enum AppSheet: Identifiable, Hashable {
     case details
-    case workouts
-    case methodology
-    case privacy
     #if DEBUG
     case debugInspector
     #endif
@@ -15,9 +12,6 @@ enum AppSheet: Identifiable, Hashable {
     var id: String {
         switch self {
         case .details: "details"
-        case .workouts: "workouts"
-        case .methodology: "methodology"
-        case .privacy: "privacy"
         #if DEBUG
         case .debugInspector: "debug-inspector"
         #endif
@@ -77,6 +71,7 @@ final class AppModel {
     var selectedWorkoutID: UUID?
     var presentedSheet: AppSheet?
     var lastSuccessfulImport: Date?
+    var coverageRenderRevision = 0
     #if DEBUG
     var debugLastRoute: WorkoutRoute?
     var debugLastMatch: MatchResult?
@@ -91,6 +86,7 @@ final class AppModel {
     @ObservationIgnored private let matcher: any MapMatcher
     @ObservationIgnored private let coverageCalculator: CoverageCalculator
     @ObservationIgnored private let routeSimplifier: RouteSimplifier
+    @ObservationIgnored private let routeChunker: RouteChunker
     @ObservationIgnored private var importTask: Task<Void, Never>?
 
     private(set) var cityPack: (any CityCoveragePack)?
@@ -102,8 +98,13 @@ final class AppModel {
         matcher = dependencies.matcher
         coverageCalculator = dependencies.coverageCalculator
         routeSimplifier = dependencies.routeSimplifier
+        routeChunker = dependencies.routeChunker
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-resetOnboarding") {
+            UserDefaults.standard.removeObject(forKey: Self.onboardingKey)
+        }
         hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Self.onboardingKey)
-            || ProcessInfo.processInfo.arguments.contains("-skipOnboarding")
+            || arguments.contains("-skipOnboarding")
     }
 
     var selectedWorkout: WorkoutCoverageRecord? {
@@ -116,6 +117,10 @@ final class AppModel {
         do {
             let pack = try await cityPackLoader.loadBundledManhattan()
             cityPack = pack
+            try await repository.prepareForPack(
+                identifier: pack.metadata.identifier,
+                version: pack.metadata.version
+            )
 
             if let cached = try await repository.loadSnapshot(),
                cached.packIdentifier == pack.metadata.identifier,
@@ -136,9 +141,11 @@ final class AppModel {
                     contributions: workoutRecords.map(\.contribution)
                 )
             }
+            lastSuccessfulImport = try await repository.loadLastSuccessfulImport()
+            coverageRenderRevision &+= 1
             launchState = .ready
         } catch {
-            logger.error("Bootstrap failed: \(error.localizedDescription, privacy: .public)")
+            logger.error("Bootstrap failed: \(error.localizedDescription, privacy: .private)")
             launchState = .failed(error.localizedDescription)
         }
     }
@@ -146,38 +153,38 @@ final class AppModel {
     func connectHealthAndImport() {
         guard !importPhase.isWorking else { return }
         hasCompletedOnboarding = true
+        beginAuthorizedImport(resetFirst: false)
+    }
+
+    func refresh() {
+        guard !importPhase.isWorking else { return }
+        beginAuthorizedImport(resetFirst: false)
+    }
+
+    func rebuildFromHealth() {
+        guard !importPhase.isWorking else { return }
+        beginAuthorizedImport(resetFirst: true)
+    }
+
+    private func beginAuthorizedImport(resetFirst: Bool) {
         importTask = Task { [weak self] in
             guard let self else { return }
             importPhase = .requestingHealthAccess
             do {
                 try await routeSource.requestReadAuthorization()
+                if resetFirst {
+                    try await repository.resetDerivedCoverage()
+                    workoutRecords = []
+                    selectedWorkoutID = nil
+                    lastSuccessfulImport = nil
+                    if let cityPack { coverage = .empty(pack: cityPack) }
+                    coverageRenderRevision &+= 1
+                }
                 await performImport()
             } catch is CancellationError {
                 importPhase = .idle
             } catch {
-                logger.error("Health authorization failed: \(error.localizedDescription, privacy: .public)")
-                importPhase = .failed(error.localizedDescription)
-            }
-        }
-    }
-
-    func refresh() {
-        guard !importPhase.isWorking else { return }
-        importTask = Task { [weak self] in
-            await self?.performImport()
-        }
-    }
-
-    func rebuildFromHealth() {
-        guard !importPhase.isWorking else { return }
-        importTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await repository.resetDerivedCoverage()
-                workoutRecords = []
-                if let cityPack { coverage = .empty(pack: cityPack) }
-                await performImport()
-            } catch {
+                logger.error("Health import setup failed: \(error.localizedDescription, privacy: .private)")
                 importPhase = .failed(error.localizedDescription)
             }
         }
@@ -203,7 +210,11 @@ final class AppModel {
         importPhase = .findingWorkouts
         do {
             let checkpoint = try await repository.loadCheckpoint()
-            let batches = await routeSource.routeBatches(since: checkpoint)
+            let processedWorkoutIDs = try await repository.loadProcessedWorkoutIDs()
+            let batches = await routeSource.routeBatches(
+                since: checkpoint,
+                excluding: processedWorkoutIDs
+            )
             var imported = 0
             var unmatched = 0
 
@@ -234,7 +245,9 @@ final class AppModel {
                         start: route.start,
                         end: route.end,
                         sourceName: route.sourceName,
-                        simplifiedRoute: routeSimplifier.simplify(route.points.map(\.coordinate)),
+                        simplifiedRouteParts: routeChunker.chunks(from: route.points).map {
+                            routeSimplifier.simplify($0.map(\.coordinate))
+                        },
                         contribution: contribution,
                         unmatchedPortions: result.unmatchedPortions
                     )
@@ -249,6 +262,9 @@ final class AppModel {
                     imported += 1
                     unmatched += result.unmatchedPortions.count
                 }
+                for processed in batch.processedWorkouts {
+                    try await repository.markWorkoutProcessed(id: processed.id, end: processed.end)
+                }
                 if let checkpoint = batch.checkpoint {
                     try await repository.saveCheckpoint(checkpoint)
                 }
@@ -261,11 +277,22 @@ final class AppModel {
             )
             if let coverage { try await repository.replaceSnapshot(coverage) }
             lastSuccessfulImport = Date()
+            coverageRenderRevision &+= 1
             importPhase = .complete(imported: imported, unmatched: unmatched)
         } catch is CancellationError {
+            coverage = coverageCalculator.snapshot(
+                pack: pack,
+                contributions: workoutRecords.map(\.contribution)
+            )
+            coverageRenderRevision &+= 1
             importPhase = .idle
         } catch {
-            logger.error("Import failed: \(error.localizedDescription, privacy: .public)")
+            coverage = coverageCalculator.snapshot(
+                pack: pack,
+                contributions: workoutRecords.map(\.contribution)
+            )
+            coverageRenderRevision &+= 1
+            logger.error("Import failed: \(error.localizedDescription, privacy: .private)")
             importPhase = .failed(error.localizedDescription)
         }
     }

@@ -1,50 +1,53 @@
 {
   "connectivity": {
-    "component_count": 3232,
-    "largest_component_goal_length_miles": 598.7473789346957,
-    "largest_component_goal_percent": 78.50273264527097,
-    "largest_component_goal_segment_count": 25038,
-    "largest_component_total_segment_count": 28359
+    "component_count": 3230,
+    "largest_component_goal_length_miles": 597.1368654354918,
+    "largest_component_goal_percent": 78.47919034039238,
+    "largest_component_goal_segment_count": 24957,
+    "largest_component_total_segment_count": 28277
   },
   "excluded_ways": {
-    "conditional_without_public_foot": 296003,
+    "conditional_without_public_foot": 275424,
     "construction": 634,
-    "indoor_or_area": 5130,
-    "insignificant_path": 28851,
+    "indoor_or_area": 5047,
+    "insignificant_path": 28797,
     "missing_highway": 5398462,
     "non_public_access": 186181,
-    "service_only": 307950,
-    "sidewalk_proxy": 249294,
-    "unsupported_highway": 36479
+    "restricted_access": 29947,
+    "service_only": 300540,
+    "sidewalk_proxy": 249186,
+    "unsupported_highway": 36451
   },
   "goal_length_miles_by_kind": {
-    "connector": 19.663488300349385,
+    "connector": 19.62973974360683,
     "greenway": 11.772213133221054,
-    "parkPath": 207.09136594244026,
-    "pedestrian": 11.966586673740427,
-    "steps": 8.765557696911047,
-    "street": 503.44975233519426
+    "parkPath": 206.18017799598476,
+    "pedestrian": 11.419064433216661,
+    "steps": 8.754374941764764,
+    "street": 503.1300388486999
   },
-  "graph_only_segment_count": 3555,
+  "graph_only_segment_count": 3561,
   "kinds": {
-    "connector": 3810,
+    "connector": 3815,
     "greenway": 265,
-    "parkPath": 8536,
-    "pedestrian": 411,
-    "steps": 1842,
-    "street": 22050
+    "parkPath": 8494,
+    "pedestrian": 379,
+    "steps": 1839,
+    "street": 22036
   },
   "metadata": {
     "attribution": "\u00a9 OpenStreetMap contributors, ODbL 1.0",
+    "boundary_sha256": "feef754118497ae619cb56be543d1e30145b00bdc5ee0f84f5ea16ac1a301ae9",
+    "boundary_url": "https://data.cityofnewyork.us/resource/gthc-hcne.geojson?%24where=boroname%3D%27Manhattan%27",
     "display_name": "Manhattan Island",
-    "generated_at": "2026-08-27T05:01:02Z",
+    "generated_at": "2026-08-27T06:10:34Z",
     "identifier": "manhattan-island",
     "source_date": "2026-08-25T20:21:40Z",
     "source_sha256": "82cf8de4e5aa00e2b8c4d9fd442075a9454254112154900dea53bf741929391c",
-    "source_url": "https://download.geofabrik.de/north-america/us/new-york.html",
+    "source_url": "https://download.geofabrik.de/north-america/us/new-york-260825.osm.pbf",
     "version": "1"
   },
-  "segment_count": 36914,
-  "total_length_meters": 1227461.095091351,
-  "total_length_miles": 762.7089640818564
+  "segment_count": 36828,
+  "total_length_meters": 1224526.689685788,
+  "total_length_miles": 760.8856090964939
 }

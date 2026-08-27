@@ -7,16 +7,58 @@ actor SwiftDataCoverageRepository: CoverageRepository {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
+    func prepareForPack(identifier: String, version: Int) async throws {
+        let state = try primaryState()
+        let hasCoverageRecords = !(try modelContext.fetch(
+            FetchDescriptor<PersistedWorkoutCoverage>()
+        )).isEmpty
+        let hasImportRecords = !(try modelContext.fetch(
+            FetchDescriptor<PersistedWorkoutImportState>()
+        )).isEmpty
+        let hasDerivedState = state.checkpoint != nil
+            || state.snapshotData != nil
+            || hasCoverageRecords
+            || hasImportRecords
+        let isCompatible = state.packIdentifier == identifier && state.packVersion == version
+
+        guard !hasDerivedState || isCompatible else {
+            try await resetDerivedCoverage()
+            return
+        }
+
+        state.packIdentifier = identifier
+        state.packVersion = version
+        try modelContext.save()
+    }
+
     func loadWorkoutRecords(
         packIdentifier: String,
         packVersion: Int
     ) async throws -> [WorkoutCoverageRecord] {
         let descriptor = FetchDescriptor<PersistedWorkoutCoverage>(
+            predicate: #Predicate {
+                $0.packIdentifier == packIdentifier && $0.packVersion == packVersion
+            },
             sortBy: [SortDescriptor(\.start, order: .reverse)]
         )
         return try modelContext.fetch(descriptor)
-            .filter { $0.packIdentifier == packIdentifier && $0.packVersion == packVersion }
             .compactMap(decode)
+    }
+
+    func loadProcessedWorkoutIDs() async throws -> Set<UUID> {
+        Set(try modelContext.fetch(FetchDescriptor<PersistedWorkoutImportState>()).map(\.workoutID))
+    }
+
+    func markWorkoutProcessed(id: UUID, end: Date) async throws {
+        let descriptor = FetchDescriptor<PersistedWorkoutImportState>(
+            predicate: #Predicate { $0.workoutID == id }
+        )
+        if let existing = try modelContext.fetch(descriptor).first {
+            existing.end = end
+        } else {
+            modelContext.insert(PersistedWorkoutImportState(workoutID: id, end: end))
+        }
+        try modelContext.save()
     }
 
     func save(
@@ -24,11 +66,14 @@ actor SwiftDataCoverageRepository: CoverageRepository {
         packIdentifier: String,
         packVersion: Int
     ) async throws {
-        let routeData = try encoder.encode(record.simplifiedRoute)
+        let routeData = try encoder.encode(record.simplifiedRouteParts)
         let contributionData = try encoder.encode(record.contribution)
         let unmatchedData = try encoder.encode(record.unmatchedPortions)
-        let descriptor = FetchDescriptor<PersistedWorkoutCoverage>()
-        let existing = try modelContext.fetch(descriptor).first { $0.workoutID == record.id }
+        let id = record.id
+        let descriptor = FetchDescriptor<PersistedWorkoutCoverage>(
+            predicate: #Predicate { $0.workoutID == id }
+        )
+        let existing = try modelContext.fetch(descriptor).first
 
         if let existing {
             existing.start = record.start
@@ -57,11 +102,19 @@ actor SwiftDataCoverageRepository: CoverageRepository {
 
     func remove(workoutIDs: [UUID]) async throws {
         guard !workoutIDs.isEmpty else { return }
-        let ids = Set(workoutIDs)
-        for record in try modelContext.fetch(FetchDescriptor<PersistedWorkoutCoverage>())
-            where ids.contains(record.workoutID)
-        {
-            modelContext.delete(record)
+        for id in workoutIDs {
+            let coverageDescriptor = FetchDescriptor<PersistedWorkoutCoverage>(
+                predicate: #Predicate { $0.workoutID == id }
+            )
+            if let record = try modelContext.fetch(coverageDescriptor).first {
+                modelContext.delete(record)
+            }
+            let importDescriptor = FetchDescriptor<PersistedWorkoutImportState>(
+                predicate: #Predicate { $0.workoutID == id }
+            )
+            if let state = try modelContext.fetch(importDescriptor).first {
+                modelContext.delete(state)
+            }
         }
         try modelContext.save()
     }
@@ -70,6 +123,8 @@ actor SwiftDataCoverageRepository: CoverageRepository {
         let state = try primaryState()
         state.snapshotData = try encoder.encode(snapshot)
         state.lastSuccessfulImport = Date()
+        state.packIdentifier = snapshot.packIdentifier
+        state.packVersion = snapshot.packVersion
         try modelContext.save()
     }
 
@@ -82,6 +137,10 @@ actor SwiftDataCoverageRepository: CoverageRepository {
         try primaryState().checkpoint
     }
 
+    func loadLastSuccessfulImport() async throws -> Date? {
+        try primaryState().lastSuccessfulImport
+    }
+
     func saveCheckpoint(_ checkpoint: Data?) async throws {
         let state = try primaryState()
         state.checkpoint = checkpoint
@@ -92,10 +151,15 @@ actor SwiftDataCoverageRepository: CoverageRepository {
         for record in try modelContext.fetch(FetchDescriptor<PersistedWorkoutCoverage>()) {
             modelContext.delete(record)
         }
+        for state in try modelContext.fetch(FetchDescriptor<PersistedWorkoutImportState>()) {
+            modelContext.delete(state)
+        }
         let state = try primaryState()
         state.snapshotData = nil
         state.checkpoint = nil
         state.lastSuccessfulImport = nil
+        state.packIdentifier = nil
+        state.packVersion = nil
         try modelContext.save()
     }
 
@@ -109,8 +173,16 @@ actor SwiftDataCoverageRepository: CoverageRepository {
     }
 
     private func decode(_ persisted: PersistedWorkoutCoverage) -> WorkoutCoverageRecord? {
-        guard let route = try? decoder.decode([GeoCoordinate].self, from: persisted.routeData),
-              let contribution = try? decoder.decode(
+        let routeParts: [[GeoCoordinate]]
+        if let decoded = try? decoder.decode([[GeoCoordinate]].self, from: persisted.routeData) {
+            routeParts = decoded
+        } else if let legacy = try? decoder.decode([GeoCoordinate].self, from: persisted.routeData) {
+            routeParts = [legacy]
+        } else {
+            return nil
+        }
+
+        guard let contribution = try? decoder.decode(
                   WorkoutCoverageContribution.self,
                   from: persisted.contributionData
               ),
@@ -125,10 +197,9 @@ actor SwiftDataCoverageRepository: CoverageRepository {
             start: persisted.start,
             end: persisted.end,
             sourceName: persisted.sourceName,
-            simplifiedRoute: route,
+            simplifiedRouteParts: routeParts,
             contribution: contribution,
             unmatchedPortions: unmatched
         )
     }
 }
-

@@ -44,14 +44,20 @@ struct CoverageDetailsSheet: View {
             }
 
             Section {
-                Button("Workout history", systemImage: "clock.arrow.circlepath") {
-                    model.presentedSheet = .workouts
+                NavigationLink {
+                    WorkoutHistorySheet(model: model)
+                } label: {
+                    Label("Workout history", systemImage: "clock.arrow.circlepath")
                 }
-                Button("How coverage works", systemImage: "point.topleft.down.to.point.bottomright.curvepath") {
-                    model.presentedSheet = .methodology
+                NavigationLink {
+                    MethodologySheet(model: model)
+                } label: {
+                    Label("How coverage works", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
                 }
-                Button("Privacy and data", systemImage: "hand.raised.fill") {
-                    model.presentedSheet = .privacy
+                NavigationLink {
+                    PrivacySheet(model: model)
+                } label: {
+                    Label("Privacy and data", systemImage: "hand.raised.fill")
                 }
             }
 

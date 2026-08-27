@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let model: AppModel
     @State private var page = 0
 
@@ -25,20 +26,24 @@ struct OnboardingView: View {
                 }
                 .padding()
 
-                Spacer()
-
-                Group {
-                    if page == 0 {
-                        valuePage
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                    } else {
-                        healthPage
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                GeometryReader { proxy in
+                    ScrollView {
+                        Group {
+                            if page == 0 {
+                                valuePage
+                                    .transition(reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity))
+                            } else {
+                                healthPage
+                                    .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: proxy.size.height)
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 20)
                     }
+                    .scrollBounceBehavior(.basedOnSize)
                 }
-                .padding(.horizontal, 28)
-
-                Spacer()
 
                 HStack(spacing: 8) {
                     Capsule()
@@ -48,7 +53,13 @@ struct OnboardingView: View {
                         .fill(page == 1 ? Color.indigo : Color.secondary.opacity(0.3))
                         .frame(width: page == 1 ? 24 : 8, height: 8)
                 }
-                .animation(.snappy, value: page)
+                .animation(reduceMotion ? nil : .snappy, value: page)
+                .accessibilityHidden(true)
+
+                Text("Step \(page + 1) of 2")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityAddTraits(.isHeader)
 
                 action
                     .padding(24)
@@ -67,6 +78,7 @@ struct OnboardingView: View {
                 Text("See what you’ve covered.")
                     .font(.largeTitle.bold())
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text("Turn the walks already in Apple Health into a lifetime map of Manhattan—then walk what remains.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
@@ -85,12 +97,13 @@ struct OnboardingView: View {
                 Text("Your history stays yours.")
                     .font(.largeTitle.bold())
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text("Walk It All reads walking and hiking routes from Apple Health. Matching happens on this iPhone, with no account, ads, or tracking.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
-            Label("For future walks, start an Outdoor Walk workout on Apple Watch or iPhone.", systemImage: "applewatch")
+            Label("For future walks, record an outdoor walk with Apple Watch or another Health-compatible app that saves a route.", systemImage: "applewatch")
                 .font(.subheadline)
                 .padding(14)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -100,8 +113,11 @@ struct OnboardingView: View {
     @ViewBuilder
     private var action: some View {
         if page == 0 {
-            Button("Continue") {
-                withAnimation(.snappy) { page = 1 }
+            Button {
+                withAnimation(reduceMotion ? nil : .snappy) { page = 1 }
+            } label: {
+                Text("Continue")
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -129,4 +145,3 @@ struct OnboardingView: View {
         }
     }
 }
-

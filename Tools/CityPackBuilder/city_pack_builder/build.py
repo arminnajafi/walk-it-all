@@ -29,6 +29,7 @@ ALWAYS_INCLUDED_HIGHWAYS = {
 CONDITIONAL_HIGHWAYS = {"cycleway", "track", "service"}
 PUBLIC_FOOT_VALUES = {"yes", "designated", "permissive", "official"}
 PROHIBITED_ACCESS = {"no", "private"}
+RESTRICTED_ACCESS = {"customers", "delivery", "destination", "permit"}
 MINIMUM_PATH_LENGTH_METERS = 12.0
 
 
@@ -64,6 +65,8 @@ def classify_way(tags: dict[str, str]) -> Eligibility:
         return Eligibility(False, None, "construction")
     if access in PROHIBITED_ACCESS or foot in PROHIBITED_ACCESS:
         return Eligibility(False, None, "non_public_access")
+    if access in RESTRICTED_ACCESS or foot in RESTRICTED_ACCESS:
+        return Eligibility(False, None, "restricted_access")
     if tags.get("indoor") == "yes" or tags.get("area") == "yes":
         return Eligibility(False, None, "indoor_or_area")
     if tags.get("footway") == "sidewalk":
@@ -379,6 +382,7 @@ def build(args: argparse.Namespace) -> None:
     collector = SegmentCollector(boundary, intersections)
     collector.apply_file(str(args.input_pbf), locations=True, idx="flex_mem")
     source_checksum = hashlib.sha256(args.input_pbf.read_bytes()).hexdigest()
+    boundary_checksum = hashlib.sha256(args.boundary.read_bytes()).hexdigest()
     source_date = args.source_date or pbf_source_date(args.input_pbf)
     metadata = {
         "identifier": args.identifier,
@@ -387,6 +391,8 @@ def build(args: argparse.Namespace) -> None:
         "source_date": source_date,
         "source_url": args.source_url,
         "source_sha256": source_checksum,
+        "boundary_url": args.boundary_url,
+        "boundary_sha256": boundary_checksum,
         "attribution": "© OpenStreetMap contributors, ODbL 1.0",
         "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
@@ -425,6 +431,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-pbf", type=Path, required=True)
     parser.add_argument("--boundary", type=Path, required=True)
+    parser.add_argument(
+        "--boundary-url",
+        default="https://data.cityofnewyork.us/resource/gthc-hcne.geojson",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--identifier", default="manhattan-island")
@@ -432,7 +442,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version", type=int, default=1)
     parser.add_argument(
         "--source-url",
-        default="https://download.geofabrik.de/north-america/us/new-york.html",
+        default="https://download.geofabrik.de/north-america/us/new-york-260825.osm.pbf",
     )
     parser.add_argument("--source-date")
     return parser.parse_args()

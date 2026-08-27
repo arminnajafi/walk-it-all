@@ -38,6 +38,8 @@ targets:
       - sdk: libsqlite3.tbd
     entitlements:
       path: Config/WalkItAll.entitlements
+      properties:
+        com.apple.developer.healthkit: true
     info:
       path: Config/Info.plist
       properties:
@@ -48,6 +50,9 @@ targets:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         NSHealthShareUsageDescription: Walk It All reads your walking and hiking workout routes to calculate which streets and paths you have covered. Your routes stay on this device.
+        UIRequiredDeviceCapabilities:
+          - healthkit
+        ITSAppUsesNonExemptEncryption: false
         UIRequiresFullScreen: true
     settings:
       base:

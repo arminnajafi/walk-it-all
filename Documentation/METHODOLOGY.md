@@ -9,13 +9,13 @@ Version 1 uses the largest polygon in NYC Open Data’s Manhattan borough bounda
 Included OpenStreetMap geometry:
 
 - Primary through residential streets where pedestrian access is not prohibited
-- Living streets, pedestrian streets, and plazas
+- Living streets, pedestrian streets, and linear walking ways through plazas
 - Public footways, paths, greenways, steps, and meaningful connectors
 - Service, cycle, and track geometry only when public foot access is explicit
 
 Excluded geometry:
 
-- `access=private/no` or `foot=private/no`
+- Private, permit-only, customer-only, destination-only, or delivery-only access
 - Motorways and unsupported vehicle-only highways
 - Construction, indoor ways, areas, parking aisles, driveways, and drive-throughs
 - Explicit sidewalk ways, because the street centerline is the completion proxy
@@ -31,12 +31,12 @@ The filtering report is generated beside each map-package version. These rules a
 2. Reject invalid coordinates and horizontal accuracy worse than 50 meters.
 3. Split rather than bridge gaps exceeding the configured time, distance, or walking-speed limits.
 4. Search the offline spatial grid for nearby eligible ways.
-5. Score candidates by coordinate distance relative to reported accuracy.
+5. Score candidates by absolute coordinate distance relative to reported accuracy; a lone nearby candidate is not automatically trusted.
 6. Use heading and graph-path continuity in a Viterbi sequence.
 7. Reject transitions that imply a path far longer than observed movement.
 8. Credit only transitions whose confidence clears the conservative threshold.
 
-Shortest-path results are cached within each workout match. No route or coordinate is sent to a server.
+Shortest-path searches use a transition-sized distance budget and are cached within each workout match. Graph-only crossings can connect eligible ways but cannot themselves become GPS candidates or earn coverage. No route or coordinate is sent to a server.
 
 ## Progress
 

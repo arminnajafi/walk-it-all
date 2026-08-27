@@ -9,6 +9,7 @@ struct AppDependencies {
     let matcher: any MapMatcher
     let coverageCalculator: CoverageCalculator
     let routeSimplifier: RouteSimplifier
+    let routeChunker: RouteChunker
 
     static func live() throws -> AppDependencies {
         let container = try ProtectedModelContainer.make()
@@ -18,8 +19,8 @@ struct AppDependencies {
             cityPackLoader: SQLiteCityPackLoader(),
             matcher: ContinuityMapMatcher(),
             coverageCalculator: CoverageCalculator(),
-            routeSimplifier: RouteSimplifier()
+            routeSimplifier: RouteSimplifier(),
+            routeChunker: RouteChunker()
         )
     }
 }
-

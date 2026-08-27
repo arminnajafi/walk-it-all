@@ -42,17 +42,33 @@ final class PersistedAppState {
     var checkpoint: Data?
     @Attribute(.externalStorage) var snapshotData: Data?
     var lastSuccessfulImport: Date?
+    var packIdentifier: String?
+    var packVersion: Int?
 
     init(
         key: String = "primary",
         checkpoint: Data? = nil,
         snapshotData: Data? = nil,
-        lastSuccessfulImport: Date? = nil
+        lastSuccessfulImport: Date? = nil,
+        packIdentifier: String? = nil,
+        packVersion: Int? = nil
     ) {
         self.key = key
         self.checkpoint = checkpoint
         self.snapshotData = snapshotData
         self.lastSuccessfulImport = lastSuccessfulImport
+        self.packIdentifier = packIdentifier
+        self.packVersion = packVersion
     }
 }
 
+@Model
+final class PersistedWorkoutImportState {
+    @Attribute(.unique) var workoutID: UUID
+    var end: Date
+
+    init(workoutID: UUID, end: Date) {
+        self.workoutID = workoutID
+        self.end = end
+    }
+}

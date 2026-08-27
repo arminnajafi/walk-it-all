@@ -6,6 +6,8 @@ struct CoverageMapView: UIViewRepresentable {
     let pack: any CityCoveragePack
     let coverage: CoverageSnapshot?
     let selectedWorkout: WorkoutCoverageRecord?
+    let coverageRevision: Int
+    let bottomMapInset: CGFloat
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -18,6 +20,7 @@ struct CoverageMapView: UIViewRepresentable {
         mapView.isRotateEnabled = false
         mapView.showsCompass = false
         mapView.showsScale = false
+        mapView.layoutMargins = UIEdgeInsets(top: 72, left: 0, bottom: bottomMapInset, right: 0)
         let configuration = MKStandardMapConfiguration(elevationStyle: .flat, emphasisStyle: .muted)
         configuration.showsTraffic = false
         mapView.preferredConfiguration = configuration
@@ -26,55 +29,78 @@ struct CoverageMapView: UIViewRepresentable {
             pack: pack,
             coverage: coverage,
             selectedWorkout: selectedWorkout,
+            coverageRevision: coverageRevision,
             shouldSetInitialRegion: true
         )
         return mapView
     }
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        mapView.layoutMargins = UIEdgeInsets(top: 72, left: 0, bottom: bottomMapInset, right: 0)
         context.coordinator.update(
             mapView: mapView,
             pack: pack,
             coverage: coverage,
             selectedWorkout: selectedWorkout,
+            coverageRevision: coverageRevision,
             shouldSetInitialRegion: false
         )
     }
 
+    @MainActor
     final class Coordinator: NSObject, MKMapViewDelegate {
         private var signature: Signature?
+        private var overlayTask: Task<Void, Never>?
+
+        deinit {
+            overlayTask?.cancel()
+        }
 
         func update(
             mapView: MKMapView,
             pack: any CityCoveragePack,
             coverage: CoverageSnapshot?,
             selectedWorkout: WorkoutCoverageRecord?,
+            coverageRevision: Int,
             shouldSetInitialRegion: Bool
         ) {
             let nextSignature = Signature(
                 packVersion: pack.metadata.version,
-                coveredMeters: coverage?.coveredDistanceMeters ?? 0,
+                coverageRevision: coverageRevision,
                 workoutID: selectedWorkout?.id
             )
             guard nextSignature != signature else { return }
             signature = nextSignature
+            overlayTask?.cancel()
             mapView.removeOverlays(mapView.overlays)
 
-            let network = CoverageNetworkOverlay(pack: pack, coverage: coverage)
-            mapView.addOverlay(network, level: .aboveRoads)
-            if let selectedWorkout, selectedWorkout.simplifiedRoute.count >= 2 {
-                let coordinates = selectedWorkout.simplifiedRoute.map {
-                    CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
-                }
-                mapView.addOverlay(MKPolyline(coordinates: coordinates, count: coordinates.count), level: .aboveRoads)
-            }
+            let expectedSignature = nextSignature
+            overlayTask = Task.detached(priority: .userInitiated) { [weak mapView, weak self] in
+                let network = CoverageNetworkOverlay(pack: pack, coverage: coverage)
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    guard let self, let mapView, self.signature == expectedSignature else { return }
+                    mapView.addOverlay(network, level: .aboveRoads)
+                    if let selectedWorkout {
+                        for part in selectedWorkout.simplifiedRouteParts where part.count >= 2 {
+                            let coordinates = part.map {
+                                CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                            }
+                            mapView.addOverlay(
+                                MKPolyline(coordinates: coordinates, count: coordinates.count),
+                                level: .aboveRoads
+                            )
+                        }
+                    }
 
-            if shouldSetInitialRegion, !network.boundingMapRect.isNull {
-                mapView.setVisibleMapRect(
-                    network.boundingMapRect,
-                    edgePadding: UIEdgeInsets(top: 96, left: 24, bottom: 190, right: 24),
-                    animated: false
-                )
+                    if shouldSetInitialRegion, !network.boundingMapRect.isNull {
+                        var region = MKCoordinateRegion(network.boundingMapRect)
+                        region.span.latitudeDelta *= 1.12
+                        region.span.longitudeDelta *= 1.35
+                        region.center.latitude -= region.span.latitudeDelta * 0.10
+                        mapView.setRegion(region, animated: false)
+                    }
+                }
             }
         }
 
@@ -97,7 +123,6 @@ struct CoverageMapView: UIViewRepresentable {
 
 private struct Signature: Equatable {
     let packVersion: Int
-    let coveredMeters: Double
+    let coverageRevision: Int
     let workoutID: UUID?
 }
-

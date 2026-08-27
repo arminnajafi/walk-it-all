@@ -8,19 +8,27 @@ output_root="$builder_root/output"
 mkdir -p "$data_root" "$output_root"
 
 boundary_url="https://data.cityofnewyork.us/resource/gthc-hcne.geojson?%24where=boroname%3D%27Manhattan%27"
-pbf_url="https://download.geofabrik.de/north-america/us/new-york-latest.osm.pbf"
-md5_url="$pbf_url.md5"
+boundary_sha256="feef754118497ae619cb56be543d1e30145b00bdc5ee0f84f5ea16ac1a301ae9"
+pbf_url="https://download.geofabrik.de/north-america/us/new-york-260825.osm.pbf"
+pbf_md5="0034ba33daca633e783443e384ac22a1"
 boundary_path="$data_root/manhattan-borough.geojson"
-pbf_path="$data_root/new-york-latest.osm.pbf"
+pbf_path="$data_root/new-york-260825.osm.pbf"
 
-curl --fail --location --retry 3 "$boundary_url" --output "$boundary_path"
-curl --fail --location --retry 3 "$pbf_url" --output "$pbf_path"
-curl --fail --location --retry 3 "$md5_url" --output "$pbf_path.md5"
+if [[ ! -f "$boundary_path" ]]; then
+  curl --fail --location --retry 3 "$boundary_url" --output "$boundary_path"
+fi
+if [[ ! -f "$pbf_path" ]]; then
+  curl --fail --location --retry 3 "$pbf_url" --output "$pbf_path"
+fi
 
-expected_md5="$(awk '{print $1}' "$pbf_path.md5")"
 actual_md5="$(md5 -q "$pbf_path")"
-if [[ "$expected_md5" != "$actual_md5" ]]; then
+if [[ "$pbf_md5" != "$actual_md5" ]]; then
   print -u2 "OpenStreetMap download checksum mismatch"
+  exit 1
+fi
+actual_boundary_sha256="$(shasum -a 256 "$boundary_path" | awk '{print $1}')"
+if [[ "$boundary_sha256" != "$actual_boundary_sha256" ]]; then
+  print -u2 "Manhattan boundary checksum mismatch"
   exit 1
 fi
 
@@ -29,5 +37,7 @@ uv sync --dev
 uv run walkitall-build-city-pack \
   --input-pbf "$pbf_path" \
   --boundary "$boundary_path" \
+  --boundary-url "$boundary_url" \
   --output "$project_root/WalkItAll/Resources/OfflineMaps/manhattan-v1.sqlite" \
-  --report "$project_root/Documentation/manhattan-v1-report.json"
+  --report "$project_root/Documentation/manhattan-v1-report.json" \
+  --source-url "$pbf_url"

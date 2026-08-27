@@ -18,6 +18,8 @@ import WalkItAllCore
             ),
             phase: .complete(imported: 37, unmatched: 3),
             selectedWorkoutName: nil,
+            lastSuccessfulImport: .now,
+            hasMappedWorkouts: true,
             refresh: {},
             cancel: {},
             showDetails: {},
@@ -41,6 +43,8 @@ import WalkItAllCore
         ),
         phase: .matching(completed: 18, total: 37),
         selectedWorkoutName: nil,
+        lastSuccessfulImport: nil,
+        hasMappedWorkouts: false,
         refresh: {},
         cancel: {},
         showDetails: {},
@@ -49,4 +53,3 @@ import WalkItAllCore
     .padding()
 }
 #endif
-

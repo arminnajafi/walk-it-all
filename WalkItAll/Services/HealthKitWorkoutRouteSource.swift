@@ -35,19 +35,43 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
         try await healthStore.requestAuthorization(toShare: [], read: readTypes)
     }
 
-    func routeBatches(since checkpoint: Data?) async -> AsyncThrowingStream<WorkoutRouteBatch, Error> {
+    func routeBatches(
+        since checkpoint: Data?,
+        excluding workoutIDs: Set<UUID>
+    ) async -> AsyncThrowingStream<WorkoutRouteBatch, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            let producer = Task {
                 do {
                     let anchor = decodeAnchor(checkpoint)
                     let changes = try await queryWorkoutChanges(anchor: anchor)
                     let encodedAnchor = try encodeAnchor(changes.anchor)
-                    let workouts = changes.workouts.sorted { $0.startDate < $1.startDate }
+                    var candidates = Dictionary(
+                        uniqueKeysWithValues: changes.workouts.map { ($0.uuid, $0) }
+                    )
+
+                    // Workout-route samples can finish after the workout itself.
+                    // Rechecking a small recent window catches those updates without
+                    // re-reading a lifetime of route-less indoor walks every refresh.
+                    if checkpoint != nil {
+                        for workout in try await queryRecentWorkouts(days: 7) {
+                            candidates[workout.uuid] = workout
+                        }
+                    }
+                    let changedIDs = Set(changes.workouts.map(\.uuid))
+                    let recentCutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? .distantPast
+                    let workouts = candidates.values
+                        .filter {
+                            changedIDs.contains($0.uuid)
+                                || !workoutIDs.contains($0.uuid)
+                                || $0.endDate >= recentCutoff
+                        }
+                        .sorted { $0.startDate < $1.startDate }
 
                     if workouts.isEmpty {
                         continuation.yield(WorkoutRouteBatch(
                             routes: [],
                             deletedWorkoutIDs: changes.deletedIDs,
+                            processedWorkouts: [],
                             checkpoint: encodedAnchor,
                             completedCount: 0,
                             totalCount: 0
@@ -61,6 +85,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                         continuation.yield(WorkoutRouteBatch(
                             routes: route.map { [$0] } ?? [],
                             deletedWorkoutIDs: index == 0 ? changes.deletedIDs : [],
+                            processedWorkouts: [.init(id: workout.uuid, end: workout.endDate)],
                             checkpoint: isLast ? encodedAnchor : nil,
                             completedCount: index + 1,
                             totalCount: workouts.count
@@ -73,6 +98,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in producer.cancel() }
         }
     }
 
@@ -83,26 +109,32 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
         let hiking = HKQuery.predicateForWorkouts(with: .hiking)
         let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [walking, hiking])
 
-        return try await withCheckedThrowingContinuation { continuation in
-            let query = HKAnchoredObjectQuery(
-                type: HKObjectType.workoutType(),
-                predicate: predicate,
-                anchor: anchor,
-                limit: HKObjectQueryNoLimit
-            ) { _, samples, deleted, newAnchor, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                let workouts = (samples ?? []).compactMap { $0 as? HKWorkout }
-                continuation.resume(returning: (
-                    workouts,
-                    (deleted ?? []).map(\.uuid),
-                    newAnchor
-                ))
-            }
-            healthStore.execute(query)
-        }
+        let descriptor = HKAnchoredObjectQueryDescriptor<HKWorkout>(
+            predicates: [.workout(predicate)],
+            anchor: anchor,
+            limit: nil
+        )
+        let result = try await descriptor.result(for: healthStore)
+        return (
+            result.addedSamples,
+            result.deletedObjects.map(\.uuid),
+            result.newAnchor
+        )
+    }
+
+    private func queryRecentWorkouts(days: Int) async throws -> [HKWorkout] {
+        let walking = HKQuery.predicateForWorkouts(with: .walking)
+        let hiking = HKQuery.predicateForWorkouts(with: .hiking)
+        let activity = NSCompoundPredicate(orPredicateWithSubpredicates: [walking, hiking])
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
+        let dates = HKQuery.predicateForSamples(withStart: cutoff, end: nil)
+        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [activity, dates])
+        let descriptor = HKSampleQueryDescriptor<HKWorkout>(
+            predicates: [.workout(predicate)],
+            sortDescriptors: [SortDescriptor(\.startDate)],
+            limit: nil
+        )
+        return try await descriptor.result(for: healthStore)
     }
 
     private func loadWorkoutRoute(_ workout: HKWorkout) async throws -> WorkoutRoute? {
@@ -113,14 +145,26 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
             allLocations.append(contentsOf: try await locations(for: route))
         }
         let sorted = allLocations.sorted { $0.timestamp < $1.timestamp }
-        guard sorted.count >= 2 else { return nil }
+        var deduplicated: [CLLocation] = []
+        deduplicated.reserveCapacity(sorted.count)
+        for location in sorted {
+            if let previous = deduplicated.last,
+               previous.timestamp == location.timestamp,
+               previous.coordinate.latitude == location.coordinate.latitude,
+               previous.coordinate.longitude == location.coordinate.longitude
+            {
+                continue
+            }
+            deduplicated.append(location)
+        }
+        guard deduplicated.count >= 2 else { return nil }
 
         return WorkoutRoute(
             id: workout.uuid,
             start: workout.startDate,
             end: workout.endDate,
             sourceName: workout.sourceRevision.source.name,
-            points: sorted.map {
+            points: deduplicated.map {
                 RoutePoint(
                     coordinate: GeoCoordinate(
                         latitude: $0.coordinate.latitude,
@@ -134,42 +178,22 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
     }
 
     private func routeSamples(for workout: HKWorkout) async throws -> [HKWorkoutRoute] {
-        try await withCheckedThrowingContinuation { continuation in
-            let query = HKSampleQuery(
-                sampleType: HKSeriesType.workoutRoute(),
-                predicate: HKQuery.predicateForObjects(from: workout),
-                limit: HKObjectQueryNoLimit,
-                sortDescriptors: nil
-            ) { _, samples, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: (samples ?? []).compactMap { $0 as? HKWorkoutRoute })
-                }
-            }
-            healthStore.execute(query)
-        }
+        let descriptor = HKAnchoredObjectQueryDescriptor<HKWorkoutRoute>(
+            predicates: [.workoutRoute(HKQuery.predicateForObjects(from: workout))],
+            anchor: nil,
+            limit: nil
+        )
+        return try await descriptor.result(for: healthStore).addedSamples
     }
 
     private func locations(for route: HKWorkoutRoute) async throws -> [CLLocation] {
-        let accumulator = LocationAccumulator()
-        return try await withCheckedThrowingContinuation { continuation in
-            let query = HKWorkoutRouteQuery(route: route) { _, locations, done, error in
-                if let error {
-                    accumulator.finishOnce {
-                        continuation.resume(throwing: error)
-                    }
-                    return
-                }
-                accumulator.append(locations ?? [])
-                if done {
-                    accumulator.finishOnce {
-                        continuation.resume(returning: accumulator.values)
-                    }
-                }
-            }
-            healthStore.execute(query)
+        var locations: [CLLocation] = []
+        let descriptor = HKWorkoutRouteQueryDescriptor(route)
+        for try await location in descriptor.results(for: healthStore) {
+            try Task.checkCancellation()
+            locations.append(location)
         }
+        return locations
     }
 
     private func decodeAnchor(_ data: Data?) -> HKQueryAnchor? {
@@ -180,31 +204,5 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
     private func encodeAnchor(_ anchor: HKQueryAnchor?) throws -> Data? {
         guard let anchor else { return nil }
         return try NSKeyedArchiver.archivedData(withRootObject: anchor, requiringSecureCoding: true)
-    }
-}
-
-private final class LocationAccumulator: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: [CLLocation] = []
-    private var isFinished = false
-
-    var values: [CLLocation] {
-        lock.withLock { storage }
-    }
-
-    func append(_ locations: [CLLocation]) {
-        lock.withLock {
-            guard !isFinished else { return }
-            storage.append(contentsOf: locations)
-        }
-    }
-
-    func finishOnce(_ action: () -> Void) {
-        let shouldFinish = lock.withLock { () -> Bool in
-            guard !isFinished else { return false }
-            isFinished = true
-            return true
-        }
-        if shouldFinish { action() }
     }
 }

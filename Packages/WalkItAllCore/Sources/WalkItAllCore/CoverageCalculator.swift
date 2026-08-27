@@ -56,7 +56,15 @@ public struct CoverageCalculator: Sendable {
 
         let coveredDistance = coveredBySegment.values.reduce(0, +)
         let averageConfidence: Double
-        if contributions.isEmpty {
+        let confidenceWeights = contributions.map { contribution in
+            contribution.intervals.reduce(0) { $0 + $1.lengthMeters }
+        }
+        let confidenceWeight = confidenceWeights.reduce(0, +)
+        if confidenceWeight > 0 {
+            averageConfidence = zip(contributions, confidenceWeights).reduce(0) { partial, pair in
+                partial + pair.0.confidence * pair.1
+            } / confidenceWeight
+        } else if contributions.isEmpty {
             averageConfidence = 0
         } else {
             averageConfidence = contributions.reduce(0) { $0 + $1.confidence }

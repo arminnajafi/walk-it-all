@@ -12,10 +12,12 @@ final class RouteChunkerTests: XCTestCase {
             point(40.7601, -73.98, at: start.addingTimeInterval(410)),
         ]
 
-        let chunks = RouteChunker().chunks(from: points)
+        let result = RouteChunker().process(points)
+        let chunks = result.chunks
 
         XCTAssertEqual(chunks.count, 2)
         XCTAssertTrue(chunks.allSatisfy { $0.count == 2 })
+        XCTAssertTrue(result.unmatchedPortions.contains { $0.reason == .routeGap })
     }
 
     func testRejectsPointsLessAccurateThanFiftyMeters() {
@@ -30,7 +32,11 @@ final class RouteChunkerTests: XCTestCase {
             point(40.7502, -73.99, at: start.addingTimeInterval(20)),
         ]
 
-        XCTAssertTrue(RouteChunker().chunks(from: points).isEmpty)
+        let result = RouteChunker().process(points)
+
+        XCTAssertTrue(result.chunks.isEmpty)
+        XCTAssertEqual(result.rejectedPointCount, 3)
+        XCTAssertTrue(result.unmatchedPortions.contains { $0.reason == .inaccurateLocation })
     }
 
     private func point(_ latitude: Double, _ longitude: Double, at date: Date) -> RoutePoint {
@@ -41,4 +47,3 @@ final class RouteChunkerTests: XCTestCase {
         )
     }
 }
-

@@ -27,7 +27,6 @@ struct WorkoutHistorySheet: View {
         }
         .navigationTitle("Workout History")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { SheetCloseButton() }
     }
 }
 

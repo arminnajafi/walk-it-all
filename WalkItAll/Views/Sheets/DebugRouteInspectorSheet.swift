@@ -13,13 +13,26 @@ struct DebugRouteInspectorSheet: View {
                let pack = model.cityPack
             {
                 Map(initialPosition: .region(region(for: route))) {
-                    MapPolyline(coordinates: route.points.map {
-                        CLLocationCoordinate2D(
-                            latitude: $0.coordinate.latitude,
-                            longitude: $0.coordinate.longitude
-                        )
-                    })
-                    .stroke(.purple.opacity(0.65), lineWidth: 3)
+                    ForEach(Array(match.candidateSegmentIDs).sorted(by: {
+                        $0.rawValue < $1.rawValue
+                    }), id: \.self) { segmentID in
+                        if let segment = pack.segment(id: segmentID) {
+                            MapPolyline(coordinates: segment.coordinates.map {
+                                CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                            })
+                            .stroke(.gray.opacity(0.5), lineWidth: 2)
+                        }
+                    }
+
+                    ForEach(Array(RouteChunker().chunks(from: route.points).enumerated()), id: \.offset) { _, chunk in
+                        MapPolyline(coordinates: chunk.map {
+                            CLLocationCoordinate2D(
+                                latitude: $0.coordinate.latitude,
+                                longitude: $0.coordinate.longitude
+                            )
+                        })
+                        .stroke(.purple.opacity(0.65), lineWidth: 3)
+                    }
 
                     ForEach(Array(match.intervals.enumerated()), id: \.offset) { _, interval in
                         if let segment = pack.segment(id: interval.segmentID) {
@@ -40,6 +53,9 @@ struct DebugRouteInspectorSheet: View {
                     Label("Raw GPS", systemImage: "line.diagonal")
                         .foregroundStyle(.purple)
                     Spacer()
+                    Label("Candidates", systemImage: "line.diagonal")
+                        .foregroundStyle(.gray)
+                    Spacer()
                     Label("Accepted network", systemImage: "line.diagonal")
                         .foregroundStyle(.indigo)
                 }
@@ -53,8 +69,18 @@ struct DebugRouteInspectorSheet: View {
                         Text(match.averageConfidence, format: .percent.precision(.fractionLength(0)))
                     }
                     LabeledContent("Unmatched portions", value: match.unmatchedPortions.count.formatted())
+                    LabeledContent("Candidate segments", value: match.candidateSegmentIDs.count.formatted())
+                    ForEach(Array(match.unmatchedPortions.prefix(20).enumerated()), id: \.offset) { _, portion in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(portion.reason.rawValue.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression).capitalized)
+                                .font(.caption.weight(.semibold))
+                            Text("\(portion.start.formatted(date: .omitted, time: .standard))–\(portion.end.formatted(date: .omitted, time: .standard))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                .frame(height: 170)
+                .frame(height: 220)
             } else {
                 ContentUnavailableView(
                     "No debug route yet",
@@ -88,4 +114,3 @@ struct DebugRouteInspectorSheet: View {
     }
 }
 #endif
-

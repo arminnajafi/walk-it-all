@@ -56,11 +56,12 @@ coverage snapshot ─────────► map renderer + progress card
 
 Health anchored-query checkpoints are saved only after the corresponding batch has been processed. Deleted workout UUIDs remove their per-workout contributions before aggregate coverage is recalculated.
 
+The cache also records route-less workouts that have already been checked, so an interrupted import does not repeatedly query a lifetime of indoor walks. Incremental refreshes recheck the last seven days because Health route samples can finish after their workout. A manual full rebuild remains the recovery path for older delayed data.
+
 ## Versioning
 
-The city package records an identifier, integer version, source timestamp, and checksum. Persisted workouts also record the package identifier and version. A package change invalidates derived matching and should trigger a rebuild rather than attempting brittle geometry-ID migrations.
+The city package records an identifier, integer version, source timestamp, and checksum. Persisted workouts also record the package identifier and version. A package change atomically invalidates workout import status, checkpoints, matches, and the aggregate snapshot. The next refresh rebuilds from Health rather than attempting brittle geometry-ID migrations.
 
 ## Map rendering
 
-The main map uses Apple MapKit. An immutable custom overlay contains covered and remaining polylines. The renderer draws only geometry intersecting the current map rectangle, hides remaining paths at broad zoom, and uses solid versus dashed styling so state does not depend on color alone.
-
+The main map uses Apple MapKit. Overlay construction runs off the main actor. An immutable custom overlay spatially indexes covered and remaining polylines, and its thread-safe renderer batches only geometry intersecting the current map rectangle. Remaining paths are faint at city scale and become clearer at neighborhood scale; solid versus dashed styling means state does not depend on color alone.

@@ -20,7 +20,9 @@ jobs:
 
       - name: Verify matching core
         working-directory: Packages/WalkItAllCore
-        run: swift run WalkItAllCoreChecks
+        run: |
+          swift test
+          swift run WalkItAllCoreChecks
 
       - name: Verify offline-map builder
         working-directory: Tools/CityPackBuilder

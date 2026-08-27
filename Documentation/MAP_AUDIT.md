@@ -12,3 +12,4 @@ The initial figures are a technical baseline, not a claim that the denominator i
 
 The current street-centerline total is close to the expected scale for Manhattan, while the larger path total reflects the decision to include meaningful park and pedestrian paths. Unnamed or disconnected path clusters are the highest-priority denominator review before public distribution.
 
+The source is a dated Geofabrik extract rather than a moving “latest” URL. Both the PBF and the committed NYC boundary are checksum-verified, and their URLs and SHA-256 values are embedded in the database and report.

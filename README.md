@@ -17,14 +17,12 @@ Walk It All is a private, local-first iPhone app that turns Apple Health walking
 
 ## Open the app
 
-Full Xcode is required. This Mac currently has Apple Command Line Tools only.
+Full Xcode is required. The project is currently validated with Xcode 26.6 and the iOS 26.5 SDK while retaining an iOS 17 deployment target.
 
-1. Install the current Xcode release from the Mac App Store.
-2. Select Xcode in `xcode-select` and accept its first-launch components.
-3. Run `xcodegen generate` at the repository root.
-4. Open `WalkItAll.xcodeproj`.
-5. Choose the personal development team under Signing & Capabilities.
-6. Run on an iPhone; Health route access is not representative in Simulator.
+1. Run `xcodegen generate` at the repository root.
+2. Open `WalkItAll.xcodeproj`.
+3. Choose the personal development team under Signing & Capabilities.
+4. Run on an iPhone; Health route access is not representative in Simulator.
 
 The bundle identifier is provisionally `com.arminnajafi.walkitall`. It can be changed before the first App Store Connect/TestFlight build upload.
 
@@ -42,7 +40,7 @@ The script verifies the pure-Swift matching core, Python map builder, generated 
 ./Scripts/build-manhattan-map.sh
 ```
 
-The script downloads the official NYC borough boundary and a checksummed Geofabrik New York OpenStreetMap extract, selects Manhattan Island’s largest polygon, and generates:
+The script verifies a pinned official NYC borough boundary and the dated, checksummed August 25, 2026 Geofabrik New York OpenStreetMap extract, selects Manhattan Island’s largest polygon, and generates:
 
 - `WalkItAll/Resources/OfflineMaps/manhattan-v1.sqlite`
 - `Documentation/manhattan-v1-report.json`
@@ -64,4 +62,5 @@ Real Health routes and coordinate-bearing debug exports must never be committed.
 - [Coverage methodology](Documentation/METHODOLOGY.md)
 - [Manhattan map audit](Documentation/MAP_AUDIT.md)
 - [Privacy model](Documentation/PRIVACY.md)
+- [Product direction and release gates](Documentation/PRODUCT.md)
 - [OpenStreetMap notice](NOTICE)

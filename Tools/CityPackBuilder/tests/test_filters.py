@@ -17,6 +17,7 @@ def test_excludes_private_and_service_only_geometry() -> None:
     assert not classify_way({"highway": "path", "access": "private"}).included
     assert not classify_way({"highway": "service", "service": "parking_aisle"}).included
     assert not classify_way({"highway": "footway", "footway": "sidewalk"}).included
+    assert not classify_way({"highway": "footway", "access": "customers"}).included
 
 
 def test_keeps_crossings_only_as_graph_connectors() -> None:

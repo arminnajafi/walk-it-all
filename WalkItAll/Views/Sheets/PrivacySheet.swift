@@ -22,7 +22,5 @@ struct PrivacySheet: View {
         }
         .navigationTitle("Privacy and Data")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { SheetCloseButton() }
     }
 }
-

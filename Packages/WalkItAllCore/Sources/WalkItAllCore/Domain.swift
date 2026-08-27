@@ -153,19 +153,22 @@ public struct MatchResult: Codable, Sendable {
     public let acceptedPointCount: Int
     public let rejectedPointCount: Int
     public let averageConfidence: Double
+    public let candidateSegmentIDs: Set<SegmentID>
 
     public init(
         intervals: [SegmentInterval],
         unmatchedPortions: [UnmatchedPortion],
         acceptedPointCount: Int,
         rejectedPointCount: Int,
-        averageConfidence: Double
+        averageConfidence: Double,
+        candidateSegmentIDs: Set<SegmentID> = []
     ) {
         self.intervals = intervals
         self.unmatchedPortions = unmatchedPortions
         self.acceptedPointCount = acceptedPointCount
         self.rejectedPointCount = rejectedPointCount
         self.averageConfidence = averageConfidence
+        self.candidateSegmentIDs = candidateSegmentIDs
     }
 }
 
@@ -235,8 +238,19 @@ public struct WorkoutRoute: Codable, Sendable, Identifiable {
 }
 
 public struct WorkoutRouteBatch: Sendable {
+    public struct ProcessedWorkout: Sendable {
+        public let id: UUID
+        public let end: Date
+
+        public init(id: UUID, end: Date) {
+            self.id = id
+            self.end = end
+        }
+    }
+
     public let routes: [WorkoutRoute]
     public let deletedWorkoutIDs: [UUID]
+    public let processedWorkouts: [ProcessedWorkout]
     public let checkpoint: Data?
     public let completedCount: Int
     public let totalCount: Int
@@ -244,12 +258,14 @@ public struct WorkoutRouteBatch: Sendable {
     public init(
         routes: [WorkoutRoute],
         deletedWorkoutIDs: [UUID] = [],
+        processedWorkouts: [ProcessedWorkout] = [],
         checkpoint: Data? = nil,
         completedCount: Int = 0,
         totalCount: Int = 0
     ) {
         self.routes = routes
         self.deletedWorkoutIDs = deletedWorkoutIDs
+        self.processedWorkouts = processedWorkouts
         self.checkpoint = checkpoint
         self.completedCount = completedCount
         self.totalCount = totalCount
@@ -258,7 +274,10 @@ public struct WorkoutRouteBatch: Sendable {
 
 public protocol WorkoutRouteSource: Sendable {
     func requestReadAuthorization() async throws
-    func routeBatches(since checkpoint: Data?) async -> AsyncThrowingStream<WorkoutRouteBatch, Error>
+    func routeBatches(
+        since checkpoint: Data?,
+        excluding workoutIDs: Set<UUID>
+    ) async -> AsyncThrowingStream<WorkoutRouteBatch, Error>
 }
 
 public struct WorkoutCoverageContribution: Codable, Sendable {
@@ -278,7 +297,7 @@ public struct WorkoutCoverageRecord: Codable, Sendable, Identifiable {
     public let start: Date
     public let end: Date
     public let sourceName: String
-    public let simplifiedRoute: [GeoCoordinate]
+    public let simplifiedRouteParts: [[GeoCoordinate]]
     public let contribution: WorkoutCoverageContribution
     public let unmatchedPortions: [UnmatchedPortion]
 
@@ -287,7 +306,7 @@ public struct WorkoutCoverageRecord: Codable, Sendable, Identifiable {
         start: Date,
         end: Date,
         sourceName: String,
-        simplifiedRoute: [GeoCoordinate],
+        simplifiedRouteParts: [[GeoCoordinate]],
         contribution: WorkoutCoverageContribution,
         unmatchedPortions: [UnmatchedPortion]
     ) {
@@ -295,7 +314,7 @@ public struct WorkoutCoverageRecord: Codable, Sendable, Identifiable {
         self.start = start
         self.end = end
         self.sourceName = sourceName
-        self.simplifiedRoute = simplifiedRoute
+        self.simplifiedRouteParts = simplifiedRouteParts
         self.contribution = contribution
         self.unmatchedPortions = unmatchedPortions
     }
@@ -355,12 +374,16 @@ public struct CoverageSnapshot: Codable, Sendable {
 }
 
 public protocol CoverageRepository: Sendable {
+    func prepareForPack(identifier: String, version: Int) async throws
     func loadWorkoutRecords(packIdentifier: String, packVersion: Int) async throws -> [WorkoutCoverageRecord]
+    func loadProcessedWorkoutIDs() async throws -> Set<UUID>
+    func markWorkoutProcessed(id: UUID, end: Date) async throws
     func save(record: WorkoutCoverageRecord, packIdentifier: String, packVersion: Int) async throws
     func remove(workoutIDs: [UUID]) async throws
     func replaceSnapshot(_ snapshot: CoverageSnapshot) async throws
     func loadSnapshot() async throws -> CoverageSnapshot?
     func loadCheckpoint() async throws -> Data?
+    func loadLastSuccessfulImport() async throws -> Date?
     func saveCheckpoint(_ checkpoint: Data?) async throws
     func resetDerivedCoverage() async throws
 }

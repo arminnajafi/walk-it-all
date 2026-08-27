@@ -89,9 +89,10 @@ public final class InMemoryCityCoveragePack: CityCoveragePack, @unchecked Sendab
         }
 
         return ids.compactMap { segmentByID[$0] }.filter { segment in
+            guard segment.countsTowardCoverage else { return false }
             guard let projection = GeoMath.project(coordinate, onto: segment.coordinates) else { return false }
             return projection.distanceMeters <= radiusMeters
-        }
+        }.sorted { $0.id.rawValue < $1.id.rawValue }
     }
 
     public func shortestPath(

@@ -30,7 +30,5 @@ struct MethodologySheet: View {
         }
         .navigationTitle("How Coverage Works")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { SheetCloseButton() }
     }
 }
-

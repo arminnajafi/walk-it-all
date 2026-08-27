@@ -25,7 +25,7 @@ For each imported workout, the app retains:
 
 Full-resolution route locations are discarded after matching. The aggregate coverage snapshot is derived from per-workout intervals.
 
-The SwiftData store is created with complete file protection and excluded from device backup. Logs may include public error descriptions and counts but never coordinates, route geometry, or Health UUIDs.
+The SwiftData store is created with complete file protection and excluded from device backup. Error details are privacy-redacted in unified logging; logs never contain coordinates, route geometry, or Health UUIDs.
 
 ## Cloud recovery
 
@@ -37,6 +37,8 @@ The app does not claim that every historical route is recoverable. Walks not rec
 
 The app itself has no route-upload, analytics, advertising, account, or remote map-matching service. Apple MapKit may retrieve basemap tiles under Apple’s system behavior. The bundled OpenStreetMap-derived walking network is read offline.
 
+The privacy manifest declares the app-only preference access used to remember onboarding. No Health-derived data is placed in iCloud or CloudKit.
+
 ## Public-release checklist
 
 Before App Store submission:
@@ -46,4 +48,3 @@ Before App Store submission:
 - Verify App Store privacy answers from an actual network audit
 - Retain OSM attribution and ODbL notices
 - Review any future crash-reporting or support export before adding it
-
