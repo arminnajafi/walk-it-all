@@ -23,6 +23,7 @@ struct MapScreen: View {
                         .padding(.vertical, 11)
                         .walkItAllFloatingSurface(cornerRadius: 18)
                         .accessibilityLabel("Current completion area: Manhattan Island")
+                        .accessibilityIdentifier("current-completion-area")
                     Spacer()
                     Button {
                         model.presentedSheet = .details
@@ -67,4 +68,3 @@ struct MapScreen: View {
         }
     }
 }
-
