@@ -108,11 +108,11 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
     private func loadWorkoutRoute(_ workout: HKWorkout) async throws -> WorkoutRoute? {
         let routes = try await routeSamples(for: workout)
         guard !routes.isEmpty else { return nil }
-        var locations: [CLLocation] = []
+        var allLocations: [CLLocation] = []
         for route in routes {
-            locations.append(contentsOf: try await locations(for: route))
+            allLocations.append(contentsOf: try await locations(for: route))
         }
-        let sorted = locations.sorted { $0.timestamp < $1.timestamp }
+        let sorted = allLocations.sorted { $0.timestamp < $1.timestamp }
         guard sorted.count >= 2 else { return nil }
 
         return WorkoutRoute(
@@ -208,4 +208,3 @@ private final class LocationAccumulator: @unchecked Sendable {
         if shouldFinish { action() }
     }
 }
-

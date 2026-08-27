@@ -47,7 +47,9 @@ struct ProgressCard: View {
             ProgressView(value: coverage.completionFraction)
                 .tint(.indigo)
                 .accessibilityLabel("Manhattan walking progress")
-                .accessibilityValue(coverage.completionFraction, format: .percent.precision(.fractionLength(1)))
+                .accessibilityValue(
+                    coverage.completionFraction.formatted(.percent.precision(.fractionLength(1)))
+                )
 
             HStack {
                 Label(distance(coverage.coveredDistanceMeters), systemImage: "checkmark.circle.fill")
