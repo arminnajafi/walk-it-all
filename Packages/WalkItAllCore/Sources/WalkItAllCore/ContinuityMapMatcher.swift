@@ -197,6 +197,7 @@ public struct ContinuityMapMatcher: MapMatcher {
         pathCache: inout [NodePair: CachedPath]
     ) -> (intervals: [SegmentInterval], unmatched: [UnmatchedPortion], acceptedPoints: Int, confidences: [Double]) {
         var rows: [[State]] = [candidateSets[0].map { State(score: $0.emissionScore, previousIndex: nil) }]
+        var transitionMatrices: [[[Double]]] = []
 
         for pointIndex in 1 ..< points.count {
             let previousCandidates = candidateSets[pointIndex - 1]
@@ -207,8 +208,12 @@ public struct ContinuityMapMatcher: MapMatcher {
                 to: points[pointIndex].coordinate
             )
             var row: [State] = []
+            var transitionMatrix = Array(
+                repeating: Array(repeating: -Double.infinity, count: currentCandidates.count),
+                count: previousCandidates.count
+            )
 
-            for current in currentCandidates {
+            for (currentIndex, current) in currentCandidates.enumerated() {
                 var bestScore = -Double.infinity
                 var bestPrevious: Int?
 
@@ -231,10 +236,11 @@ public struct ContinuityMapMatcher: MapMatcher {
                         current.projection.localBearingDegrees
                     )
                     let headingScore = -pow(headingDifference / 90, 2) * 0.75
-                    let proposed = rows[pointIndex - 1][previousIndex].score
-                        + transitionScore
+                    let edgeScore = transitionScore
                         + current.emissionScore
                         + headingScore
+                    transitionMatrix[previousIndex][currentIndex] = edgeScore
+                    let proposed = rows[pointIndex - 1][previousIndex].score + edgeScore
                     if proposed > bestScore {
                         bestScore = proposed
                         bestPrevious = previousIndex
@@ -288,6 +294,7 @@ public struct ContinuityMapMatcher: MapMatcher {
                     splitConfidences
                 )
             }
+            transitionMatrices.append(transitionMatrix)
             rows.append(row)
         }
 
@@ -318,10 +325,17 @@ public struct ContinuityMapMatcher: MapMatcher {
             }
         }
 
+        let suffixScores = backwardScores(
+            candidateSets: candidateSets,
+            transitionMatrices: transitionMatrices
+        )
         let confidenceValues = rows.indices.map { rowIndex in
-            confidence(
+            let maxMarginalScores = rows[rowIndex].indices.map { candidateIndex in
+                rows[rowIndex][candidateIndex].score + suffixScores[rowIndex][candidateIndex]
+            }
+            return confidence(
                 selectedIndex: selectedIndices[rowIndex],
-                states: rows[rowIndex],
+                maxMarginalScores: maxMarginalScores,
                 candidates: candidateSets[rowIndex]
             )
         }
@@ -376,13 +390,20 @@ public struct ContinuityMapMatcher: MapMatcher {
 
     private func confidence(
         selectedIndex: Int,
-        states: [State],
+        maxMarginalScores: [Double],
         candidates: [Candidate]
     ) -> Double {
-        let selected = states[selectedIndex].score
-        let alternative = states.indices
-            .filter { $0 != selectedIndex }
-            .map { states[$0].score }
+        let selected = maxMarginalScores[selectedIndex]
+        let selectedCandidate = candidates[selectedIndex]
+        let alternative = maxMarginalScores.indices
+            .filter {
+                $0 != selectedIndex
+                    && !representsSameSourceWay(
+                        candidates[$0].segment,
+                        as: selectedCandidate.segment
+                    )
+            }
+            .map { maxMarginalScores[$0] }
             .filter(\.isFinite)
             .max()
         let marginConfidence: Double
@@ -395,8 +416,57 @@ public struct ContinuityMapMatcher: MapMatcher {
 
         // A single candidate is not automatically trustworthy: its absolute
         // distance from the GPS fix still matters.
-        let absoluteConfidence = exp(candidates[selectedIndex].emissionScore)
+        let absoluteConfidence = exp(selectedCandidate.emissionScore)
         return min(1, max(0, absoluteConfidence * (0.5 + 0.5 * marginConfidence)))
+    }
+
+    /// Returns the best possible score after each candidate. Combined with the
+    /// forward Viterbi row, this produces a max-marginal score that lets later
+    /// observations resolve earlier ambiguity instead of rejecting it forever.
+    private func backwardScores(
+        candidateSets: [[Candidate]],
+        transitionMatrices: [[[Double]]]
+    ) -> [[Double]] {
+        guard !candidateSets.isEmpty else { return [] }
+        var result = candidateSets.map {
+            Array(repeating: -Double.infinity, count: $0.count)
+        }
+        result[result.count - 1] = Array(
+            repeating: 0,
+            count: candidateSets[candidateSets.count - 1].count
+        )
+        guard candidateSets.count > 1 else { return result }
+
+        for rowIndex in stride(from: candidateSets.count - 2, through: 0, by: -1) {
+            let transitions = transitionMatrices[rowIndex]
+            for previousIndex in candidateSets[rowIndex].indices {
+                result[rowIndex][previousIndex] = candidateSets[rowIndex + 1].indices
+                    .map {
+                        transitions[previousIndex][$0] + result[rowIndex + 1][$0]
+                    }
+                    .filter(\.isFinite)
+                    .max() ?? -Double.infinity
+            }
+        }
+        return result
+    }
+
+    /// The city graph splits one OSM way at true intersections. Those adjacent
+    /// graph segments are bookkeeping pieces of the same physical path, not
+    /// competing route hypotheses. Counting them as alternatives creates an
+    /// artificial 0.5 confidence ceiling whenever a GPS fix is near the split.
+    private func representsSameSourceWay(
+        _ first: WalkableSegment,
+        as second: WalkableSegment
+    ) -> Bool {
+        guard let firstSourceWayID = first.sourceWayID,
+              let secondSourceWayID = second.sourceWayID
+        else { return false }
+        guard firstSourceWayID == secondSourceWayID else { return false }
+        return first.startNode == second.startNode
+            || first.startNode == second.endNode
+            || first.endNode == second.startNode
+            || first.endNode == second.endNode
     }
 
     private func scoreTransition(networkDistance: Double, observedDistance: Double) -> Double {

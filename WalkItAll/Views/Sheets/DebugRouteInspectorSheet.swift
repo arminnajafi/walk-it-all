@@ -387,7 +387,7 @@ struct DebugRouteInspectorSheet: View {
         pack: any CityCoveragePack
     ) {
         let fixture = PrivateRouteDiagnosticFixture(
-            schemaVersion: 1,
+            schemaVersion: 2,
             createdAt: Date(),
             packIdentifier: pack.metadata.identifier,
             packVersion: pack.metadata.version,

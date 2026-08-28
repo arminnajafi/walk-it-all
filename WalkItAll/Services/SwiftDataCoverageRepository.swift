@@ -4,7 +4,9 @@ import WalkItAllCore
 
 @ModelActor
 actor SwiftDataCoverageRepository: CoverageRepository {
-    private static let currentMatchingProjectionVersion = 1
+    // Increment whenever matcher semantics change so every Health route is
+    // deterministically projected again instead of mixing old and new results.
+    private static let currentMatchingProjectionVersion = 2
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 

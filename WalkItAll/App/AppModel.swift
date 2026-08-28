@@ -455,7 +455,7 @@ final class AppModel {
             guard let route = try await routeSource.route(for: record.id) else { return }
             let match = try await matcher.match(points: route.points, in: pack)
             let fixture = PrivateRouteDiagnosticFixture(
-                schemaVersion: 1,
+                schemaVersion: 2,
                 createdAt: Date(),
                 packIdentifier: pack.metadata.identifier,
                 packVersion: pack.metadata.version,

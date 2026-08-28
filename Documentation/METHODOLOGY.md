@@ -33,8 +33,10 @@ The filtering report is generated beside each map-package version. These rules a
 4. Search the offline spatial grid for nearby eligible ways.
 5. Score candidates by absolute coordinate distance relative to reported accuracy; a lone nearby candidate is not automatically trusted.
 6. Use heading and graph-path continuity in a Viterbi sequence.
-7. Reject transitions that imply a path far longer than observed movement.
-8. Credit only transitions whose confidence clears the conservative threshold.
+7. Calculate confidence from each candidate's best complete-route score, so later observations can resolve an earlier ambiguous GPS fix.
+8. Treat adjacent graph pieces split from the same OSM way as one physical route hypothesis while keeping disconnected or parallel geometry competing.
+9. Reject transitions that imply a path far longer than observed movement.
+10. Credit only transitions whose confidence clears the conservative threshold.
 
 Closed-loop geometry is treated as a loop: movement across the stored start/end seam uses the short wrapped interval rather than rejecting the transition or crediting the long way around.
 
@@ -62,4 +64,4 @@ Target acceptance:
 
 Precision is the priority: uncertain coverage remains unmarked.
 
-The DEBUG-only historical inspector can reload any stored workout from Health on demand. Its switchable layers show raw GPS, nearby eligible geometry, matcher candidates, exact credited intervals, and rejected trace portions with their reason. A reviewer can mark incorrect credit and clearly walked missed segments; the app calculates meter-weighted precision and recall and saves an ignored, protected local fixture containing segment IDs but no coordinates. A separate, clearly labeled private diagnostic export includes full route points only when a failed match needs local investigation.
+The DEBUG-only historical inspector can reload any stored workout from Health on demand. Its switchable layers show raw GPS, nearby eligible geometry, matcher candidates, exact credited intervals, and rejected trace portions with their reason. A reviewer can mark incorrect credit and clearly walked missed segments; the app calculates meter-weighted precision and recall and saves an ignored, protected local fixture containing segment IDs but no coordinates. A separate, clearly labeled private diagnostic export includes full route points only when a failed match needs local investigation. Private diagnostics preserve sub-second Health timestamps so an ignored local replay cannot introduce artificial zero-time gaps.

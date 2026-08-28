@@ -5,7 +5,7 @@ This file records reproducible engineering evidence without workout coordinates,
 ## Automated baseline
 
 - Complete verification run: August 28, 2026
-- `WalkItAllCore`: 20 unit tests plus the executable core checks
+- `WalkItAllCore`: 23 unit tests plus the executable core checks
 - `CityPackBuilder`: 13 tests
 - iOS app: 25 unit tests
 - iOS UI: 5 end-to-end tests, including an accessibility XXXL onboarding journey
@@ -53,4 +53,4 @@ Matching, GPS chunking, route simplification, aggregate calculation, and overlay
 
 A real iPhone completed the version-2 Health rebuild: 229 walking/hiking workouts were considered and 211 route-bearing workouts were imported and evaluated. Automatic foreground refresh, workout selection, Manhattan recentering, and the protected on-device cache were exercised with the real history.
 
-Two representative routes have completed visual review with no marked false credit or missed eligible segment. The next longer Central Park route exposed a substantial recall failure, so the ten-route gate is paused while that case is diagnosed. Personal-device signoff still requires fixing or explaining that route and completing the aggregate precision/recall gate described in `ACCURACY_REVIEW.md`; automated tests cannot substitute for those visual judgments.
+Two representative routes have completed visual review with no marked false credit or missed eligible segment. The next longer Central Park route exposed a substantial recall failure. Local diagnosis produced regression-tested fixes for same-way graph-split ambiguity and prefix-only confidence; the corrected Debug build is installed and matching-projection version 2 will rebuild every contribution. Personal-device signoff still requires re-reviewing that route and completing the aggregate precision/recall gate described in `ACCURACY_REVIEW.md`; automated tests cannot substitute for those visual judgments.

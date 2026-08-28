@@ -45,7 +45,10 @@ enum DebugRouteFixtureStore {
         try await Task.detached(priority: .utility) {
             let directory = try protectedDirectory()
             let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
+            // Health locations can contain sub-second timestamps. Milliseconds
+            // keep private diagnostics reproducible; second-only ISO-8601 can
+            // collapse distinct samples into artificial zero-time route gaps.
+            encoder.dateEncodingStrategy = .millisecondsSince1970
             let url = directory.appendingPathComponent("diagnostic-\(UUID().uuidString).json")
             try encoder.encode(fixture).write(to: url, options: [.atomic, .completeFileProtection])
             return url

@@ -19,7 +19,7 @@ The portable Swift package contains:
 - Route accuracy filtering and gap splitting
 - Immutable city graph and fixed-grid spatial lookup
 - Bounded shortest-path search
-- Continuity-aware Viterbi/HMM matching
+- Continuity-aware Viterbi/HMM matching with whole-route max-marginal confidence
 - Segment-interval union and distance-weighted progress
 
 It has no HealthKit, MapKit, SwiftData, UIKit, network, or user-interface dependency.
@@ -59,6 +59,8 @@ Health anchored-query checkpoints are saved only after the corresponding batch h
 The Health cursor is versioned inside the iOS adapter and contains independent workout and workout-route anchors plus route-sample-to-workout associations. Route additions and replacements reprocess their parent workout; route deletions remove only that route contribution unless the workout itself was also deleted. A legacy workout-only anchor is retained while a one-time full route reconciliation checks historical workouts, including records whose old route disappeared before the route anchor existed.
 
 The cache also records route-less workouts that have already been checked, so an interrupted import does not repeatedly query a lifetime of indoor walks. Incremental refreshes recheck the last seven days because Health route samples can finish after their workout. Once the user has explicitly connected Health, the app refreshes when it becomes active if the last successful refresh is more than five minutes old. Manual refresh bypasses that throttle, and a manual full rebuild remains the recovery path for older delayed data.
+
+Matcher confidence combines the best prefix and suffix score for each candidate. This lets later route continuity resolve an initially ambiguous fix without weakening the conservative distance threshold. Adjacent graph segments from one source OSM way are treated as equivalent alternatives only when they share a node; disconnected pieces remain competitors. The matching-projection version forces every local contribution to rebuild after this behavior changes.
 
 Per-workout contributions are the only durable coverage projection. Intervals are normalized before persistence, unmatched diagnostics are coalesced, and the aggregate snapshot is always recalculated off the main actor—even for an empty record set. The legacy optional snapshot field remains temporarily in the SwiftData schema only for store compatibility and is cleared during preparation.
 

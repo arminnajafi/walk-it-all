@@ -86,6 +86,122 @@ final class ContinuityMapMatcherTests: XCTestCase {
         XCTAssertGreaterThan(result.averageConfidence, 0.9)
     }
 
+    func testLaterPointsResolveAnInitiallyAmbiguousParallelStreet() async throws {
+        let west = WalkableSegment(
+            id: "resolved-west",
+            startNode: NodeID(1),
+            endNode: NodeID(2),
+            coordinates: [
+                GeoCoordinate(latitude: 40.7500, longitude: -73.9900),
+                GeoCoordinate(latitude: 40.7520, longitude: -73.9900),
+            ],
+            kind: .street
+        )
+        let east = WalkableSegment(
+            id: "resolved-east",
+            startNode: NodeID(3),
+            endNode: NodeID(4),
+            coordinates: [
+                GeoCoordinate(latitude: 40.7500, longitude: -73.9898),
+                GeoCoordinate(latitude: 40.7520, longitude: -73.9898),
+            ],
+            kind: .street
+        )
+        let pack = InMemoryCityCoveragePack(metadata: .fixture, segments: [west, east])
+        let start = Date(timeIntervalSince1970: 1_500)
+        let points = [
+            routePoint(40.7502, -73.9899, start),
+            routePoint(40.7508, -73.9900, start.addingTimeInterval(20)),
+            routePoint(40.7514, -73.9900, start.addingTimeInterval(40)),
+        ]
+
+        let result = try await ContinuityMapMatcher().match(points: points, in: pack)
+
+        XCTAssertEqual(result.acceptedPointCount, points.count)
+        XCTAssertFalse(result.intervals.isEmpty)
+        XCTAssertTrue(result.intervals.allSatisfy { $0.segmentID == west.id })
+    }
+
+    func testTreatsGraphSplitsFromOneSourceWayAsEquivalentCandidates() async throws {
+        let coordinates = [
+            GeoCoordinate(latitude: 40.75000, longitude: -73.99000),
+            GeoCoordinate(latitude: 40.75005, longitude: -73.99000),
+            GeoCoordinate(latitude: 40.75010, longitude: -73.99000),
+            GeoCoordinate(latitude: 40.75015, longitude: -73.99000),
+        ]
+        var segments: [WalkableSegment] = []
+        for index in 0 ..< 3 {
+            segments.append(WalkableSegment(
+                id: SegmentID("source-way-part-\(index)"),
+                startNode: NodeID(Int64(index + 1)),
+                endNode: NodeID(Int64(index + 2)),
+                coordinates: [coordinates[index], coordinates[index + 1]],
+                kind: .parkPath,
+                sourceWayID: 42
+            ))
+        }
+        let pack = InMemoryCityCoveragePack(metadata: .fixture, segments: segments)
+        let start = Date(timeIntervalSince1970: 2_000)
+        let points = (0 ..< coordinates.count).map { index in
+            RoutePoint(
+                coordinate: coordinates[index],
+                timestamp: start.addingTimeInterval(Double(index) * 5),
+                horizontalAccuracy: 3
+            )
+        }
+
+        let result = try await ContinuityMapMatcher().match(points: points, in: pack)
+        let contribution = WorkoutCoverageContribution(
+            workoutID: UUID(),
+            intervals: result.intervals,
+            confidence: result.averageConfidence
+        )
+
+        XCTAssertEqual(result.acceptedPointCount, points.count)
+        let creditedIDs = Set(result.intervals.map { $0.segmentID })
+        let expectedIDs = Set(segments.map { $0.id })
+        XCTAssertEqual(creditedIDs, expectedIDs)
+        XCTAssertGreaterThan(contribution.uniqueCoveredDistanceMeters, 15)
+        XCTAssertGreaterThan(result.averageConfidence, 0.7)
+    }
+
+    func testKeepsDisconnectedPartsOfOneSourceWayCompeting() async throws {
+        let west = WalkableSegment(
+            id: "loop-west",
+            startNode: NodeID(1),
+            endNode: NodeID(2),
+            coordinates: [
+                GeoCoordinate(latitude: 40.7500, longitude: -73.9901),
+                GeoCoordinate(latitude: 40.7510, longitude: -73.9901),
+            ],
+            kind: .parkPath,
+            sourceWayID: 84
+        )
+        let east = WalkableSegment(
+            id: "loop-east",
+            startNode: NodeID(3),
+            endNode: NodeID(4),
+            coordinates: [
+                GeoCoordinate(latitude: 40.7500, longitude: -73.9899),
+                GeoCoordinate(latitude: 40.7510, longitude: -73.9899),
+            ],
+            kind: .parkPath,
+            sourceWayID: 84
+        )
+        let pack = InMemoryCityCoveragePack(metadata: .fixture, segments: [west, east])
+        let start = Date(timeIntervalSince1970: 2_500)
+        let points = [
+            routePoint(40.7502, -73.9900, start),
+            routePoint(40.7508, -73.9900, start.addingTimeInterval(20)),
+        ]
+
+        let result = try await ContinuityMapMatcher().match(points: points, in: pack)
+
+        XCTAssertTrue(result.intervals.isEmpty)
+        XCTAssertEqual(result.acceptedPointCount, 0)
+        XCTAssertTrue(result.unmatchedPortions.contains { $0.reason == .lowConfidence })
+    }
+
     func testDoesNotCreateCoverageAcrossSubwaySizedGap() async throws {
         let segment = WalkableSegment(
             id: "long-street",
