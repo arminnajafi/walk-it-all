@@ -326,6 +326,39 @@ final class ContinuityMapMatcherTests: XCTestCase {
         XCTAssertTrue(result.unmatchedPortions.contains { $0.reason == .lowConfidence })
     }
 
+    func testAcceptsAnUnambiguousSidewalkScaleOffsetFromAStreetCenterline() async throws {
+        let street = WalkableSegment(
+            id: "sidewalk-street",
+            startNode: NodeID(1),
+            endNode: NodeID(2),
+            coordinates: [
+                GeoCoordinate(latitude: 40.7500, longitude: -73.9900),
+                GeoCoordinate(latitude: 40.7520, longitude: -73.9900),
+            ],
+            kind: .street
+        )
+        let pack = InMemoryCityCoveragePack(metadata: .fixture, segments: [street])
+        let start = Date(timeIntervalSince1970: 5_500)
+        let points = [
+            RoutePoint(
+                coordinate: GeoCoordinate(latitude: 40.7502, longitude: -73.98983),
+                timestamp: start,
+                horizontalAccuracy: 3
+            ),
+            RoutePoint(
+                coordinate: GeoCoordinate(latitude: 40.7505, longitude: -73.98983),
+                timestamp: start.addingTimeInterval(20),
+                horizontalAccuracy: 3
+            ),
+        ]
+
+        let result = try await ContinuityMapMatcher().match(points: points, in: pack)
+
+        XCTAssertEqual(result.acceptedPointCount, points.count)
+        XCTAssertFalse(result.intervals.isEmpty)
+        XCTAssertTrue(result.intervals.allSatisfy { $0.segmentID == street.id })
+    }
+
     func testMatchesAndNormalizesARealisticMultiThousandPointRoute() async throws {
         let street = WalkableSegment(
             id: "long-realistic-route",

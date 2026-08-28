@@ -167,9 +167,11 @@ public struct ContinuityMapMatcher: MapMatcher {
             configuration.maximumCandidateRadiusMeters,
             max(configuration.minimumCandidateRadiusMeters, point.horizontalAccuracy * 2)
         )
-        // HealthKit accuracy is an estimate, while the eligible network follows a
-        // street centerline. A modest floor avoids penalizing a good sidewalk fix.
-        let sigma = max(12, point.horizontalAccuracy)
+        // HealthKit accuracy is an estimate, while the eligible network follows
+        // mapped centerlines. Matching the default search-radius floor lets a
+        // strongly unambiguous sidewalk fix at the edge of that radius pass;
+        // competing nearby ways still reduce the confidence margin.
+        let sigma = max(15, point.horizontalAccuracy)
         return pack.segments(near: point.coordinate, radiusMeters: radius)
             .compactMap { segment -> Candidate? in
                 guard let projection = GeoMath.project(point.coordinate, onto: segment.coordinates) else { return nil }

@@ -295,7 +295,7 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertNil(checkpoint)
         XCTAssertTrue(processedWorkoutIDs.isEmpty)
         let state = try XCTUnwrap(context.fetch(FetchDescriptor<PersistedAppState>()).first)
-        XCTAssertEqual(state.matchingProjectionVersion, 2)
+        XCTAssertEqual(state.matchingProjectionVersion, 3)
     }
 
     @MainActor
@@ -316,7 +316,7 @@ final class WalkItAllTests: XCTestCase {
             lastSuccessfulImport: Date(timeIntervalSince1970: 100),
             packIdentifier: "manhattan",
             packVersion: 2,
-            matchingProjectionVersion: 2
+            matchingProjectionVersion: 3
         ))
         context.insert(PersistedWorkoutImportState(
             workoutID: workoutID,

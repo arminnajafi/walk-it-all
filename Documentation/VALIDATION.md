@@ -5,7 +5,7 @@ This file records reproducible engineering evidence without workout coordinates,
 ## Automated baseline
 
 - Complete verification run: August 28, 2026
-- `WalkItAllCore`: 23 unit tests plus the executable core checks
+- `WalkItAllCore`: 24 unit tests plus the executable core checks
 - `CityPackBuilder`: 15 tests
 - iOS app: 25 unit tests
 - iOS UI: 5 end-to-end tests, including an accessibility XXXL onboarding journey
@@ -55,4 +55,6 @@ Matching, GPS chunking, route simplification, aggregate calculation, and overlay
 
 A real iPhone completed both the matching-projection rebuild and the subsequent map-version-3 rebuild: 229 walking/hiking workouts were considered and 211 route-bearing workouts were imported and evaluated. The version-3 store retained the Health checkpoint and exact successful-refresh date, cleared the obsolete aggregate snapshot, and contained 211 per-workout contributions. Automatic foreground refresh, workout selection, Manhattan recentering, and the protected on-device cache were exercised with the real history.
 
-Two representative routes have completed visual review with no marked false credit or missed eligible segment. The next longer Central Park route exposed a substantial recall failure. Local diagnosis produced regression-tested fixes for same-way graph-split ambiguity and prefix-only confidence, then found that most residual no-nearby rejections were on OSM bridleways explicitly tagged `foot=yes`. Map version 3 adds only those explicitly walkable bridleways; an unchanged-threshold private replay increased unique credited distance from 1,104.3 to 2,113.2 meters. Personal-device signoff still requires visual re-review of that route and completion of the aggregate precision/recall gate described in `ACCURACY_REVIEW.md`; automated tests and an unreviewed replay cannot substitute for those judgments.
+Two representative routes have completed visual review with no marked false credit or missed eligible segment. The next longer Central Park route exposed a substantial recall failure. Local diagnosis produced regression-tested fixes for same-way graph-split ambiguity and prefix-only confidence, then found that most residual no-nearby rejections were on OSM bridleways explicitly tagged `foot=yes`. Map version 3 adds only those explicitly walkable bridleways. The corresponding device rebuild increased the route from 0.69 to 1.31 credited miles and visibly recovered the reservoir path without a parallel-path assignment.
+
+A follow-up rejection audit found that the 12-meter emission scale made an otherwise unambiguous candidate near the 15-meter search boundary mathematically unable to pass the 55% threshold. Matching-projection version 3 aligns those floors while retaining the confidence margin between competing ways. A private replay increased this route’s unique credited distance from 2,113.2 to 2,330.7 meters and reduced rejected observed movement from 462.0 to 267.3 meters. Personal-device signoff still requires a projection-version-3 rebuild, final visual review of that route, and completion of the aggregate precision/recall gate described in `ACCURACY_REVIEW.md`; automated tests and an unreviewed replay cannot substitute for those judgments.
