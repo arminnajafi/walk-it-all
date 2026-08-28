@@ -1,26 +1,26 @@
 {
   "connectivity": {
-    "component_count": 3230,
+    "component_count": 3222,
     "component_size_histogram": {
-      "1": 2163,
+      "1": 2158,
       "1001+": 1,
       "101-1000": 1,
-      "2-5": 792,
+      "2-5": 790,
       "21-100": 49,
-      "6-20": 224
+      "6-20": 223
     },
     "goal_miles_outside_largest_component_by_kind": {
-      "connector": 7.95102320089025,
+      "connector": 7.951023200890253,
       "greenway": 8.269186621929034,
-      "parkPath": 138.7224914119461,
+      "parkPath": 138.2688561337688,
       "pedestrian": 1.6516963428409308,
-      "steps": 6.978340499766054,
+      "steps": 6.933075049883694,
       "street": 0.16753994617456044
     },
-    "largest_component_goal_length_miles": 597.1368654354912,
-    "largest_component_goal_percent": 78.48006351207178,
-    "largest_component_goal_segment_count": 24957,
-    "largest_component_total_segment_count": 28277,
+    "largest_component_goal_length_miles": 601.8181941470812,
+    "largest_component_goal_percent": 78.66291941323135,
+    "largest_component_goal_segment_count": 25045,
+    "largest_component_total_segment_count": 28364,
     "largest_components": [
       {
         "bounding_box": {
@@ -29,20 +29,20 @@
           "min_latitude": 40.701119,
           "min_longitude": -74.0182701
         },
-        "goal_length_miles": 597.1368654354912,
-        "goal_segment_count": 24957,
+        "goal_length_miles": 601.8181941470812,
+        "goal_segment_count": 25045,
         "kinds": {
           "connector": 128,
           "greenway": 88,
-          "parkPath": 2223,
+          "parkPath": 2309,
           "pedestrian": 313,
-          "steps": 177,
+          "steps": 179,
           "street": 22028
         },
         "named_goal_segment_count": 22622,
         "rank": 1,
-        "total_segment_count": 28277,
-        "unnamed_goal_segment_count": 2335
+        "total_segment_count": 28364,
+        "unnamed_goal_segment_count": 2423
       },
       {
         "bounding_box": {
@@ -485,7 +485,7 @@
     "single_segment_component_goal_miles_by_kind": {
       "connector": 0.4611649735593247,
       "greenway": 0.16978132049063138,
-      "parkPath": 16.825236001044992,
+      "parkPath": 16.736772334688812,
       "pedestrian": 0.6298965296491883,
       "steps": 3.38110149703582,
       "street": 0.08269859015264241
@@ -503,16 +503,16 @@
     "removed_segment_count": 1
   },
   "excluded_ways_in_manhattan_boundary": {
-    "conditional_without_public_foot": 1078,
+    "conditional_without_public_foot": 1084,
     "construction": 133,
     "indoor_or_area": 1652,
-    "insignificant_path": 28797,
+    "insignificant_path": 28821,
     "missing_highway": 82206,
     "non_public_access": 1587,
     "restricted_access": 150,
     "service_only": 1220,
     "sidewalk_proxy": 15576,
-    "unsupported_highway": 1118
+    "unsupported_highway": 1091
   },
   "geometry_audit": {
     "all_segments_within_boundary": true,
@@ -527,29 +527,30 @@
     "outside_boundary_sample_ids": []
   },
   "goal_length_miles_by_kind": {
-    "connector": 19.62973974360683,
+    "connector": 19.616708183303768,
     "greenway": 11.772213133221054,
-    "parkPath": 206.17171235852967,
+    "parkPath": 210.367171902363,
     "pedestrian": 11.419064433216661,
     "steps": 8.754374941764764,
     "street": 503.1300388486999
   },
   "goal_length_miles_by_source_tag": {
     "footway": {
-      "(unset)": 206.3682985028054,
+      "(unset)": 206.29695198212343,
       "path": 2.1657402713669422,
       "traffic_island": 0.37631763115613603
     },
     "highway": {
+      "bridleway": 4.266806064515242,
       "cycleway": 19.366888260697618,
-      "footway": 208.91035640532837,
+      "footway": 208.83900988464637,
       "living_street": 1.7119709173490187,
       "path": 9.033569086421362,
       "pedestrian": 11.419064433216652,
       "primary": 89.87818302937369,
       "residential": 253.06031685603676,
       "secondary": 117.22095070650103,
-      "service": 0.20084689053350746,
+      "service": 0.1878153302304476,
       "steps": 8.754374941764754,
       "tertiary": 29.66824429179799,
       "track": 0.062004592375689234,
@@ -558,8 +559,8 @@
   },
   "goal_miles_named_and_unnamed_by_kind": {
     "connector": {
-      "named_miles": 17.05790495465016,
-      "total_miles": 19.629739743606827,
+      "named_miles": 17.0448733943471,
+      "total_miles": 19.616708183303768,
       "unnamed_miles": 2.5718347889566684
     },
     "greenway": {
@@ -569,8 +570,8 @@
     },
     "parkPath": {
       "named_miles": 20.94336874510862,
-      "total_miles": 206.17171235852965,
-      "unnamed_miles": 185.22834361342103
+      "total_miles": 210.36717190236297,
+      "unnamed_miles": 189.42380315725435
     },
     "pedestrian": {
       "named_miles": 10.58521943357868,
@@ -588,11 +589,11 @@
       "unnamed_miles": 0.4994085014108183
     }
   },
-  "graph_only_segment_count": 3561,
+  "graph_only_segment_count": 3560,
   "kinds": {
-    "connector": 3815,
+    "connector": 3814,
     "greenway": 265,
-    "parkPath": 8493,
+    "parkPath": 8564,
     "pedestrian": 379,
     "steps": 1839,
     "street": 22036
@@ -610,17 +611,17 @@
     "source_date": "2026-08-25T20:21:40Z",
     "source_sha256": "82cf8de4e5aa00e2b8c4d9fd442075a9454254112154900dea53bf741929391c",
     "source_url": "https://download.geofabrik.de/north-america/us/new-york-260825.osm.pbf",
-    "version": "2"
+    "version": "3"
   },
   "review_geojson": {
     "review_feature_count": 5000,
     "review_feature_limit": 5000,
-    "suspicious_segment_count": 10644
+    "suspicious_segment_count": 10715
   },
-  "segment_count": 36827,
+  "segment_count": 36897,
   "topology_audit": {
     "bridge_segment_count": 342,
-    "layer_tagged_segment_count": 617,
+    "layer_tagged_segment_count": 618,
     "mixed_bridge_shared_node_count": 229,
     "mixed_bridge_shared_node_samples": [
       42424240,
@@ -649,7 +650,7 @@
       373850911,
       373850912
     ],
-    "mixed_layer_shared_node_count": 390,
+    "mixed_layer_shared_node_count": 392,
     "mixed_layer_shared_node_samples": [
       42422026,
       42424240,
@@ -677,7 +678,7 @@
       248709820,
       370909370
     ],
-    "mixed_tunnel_shared_node_count": 122,
+    "mixed_tunnel_shared_node_count": 124,
     "mixed_tunnel_shared_node_samples": [
       42443194,
       246651782,
@@ -724,9 +725,9 @@
       "osm-1306411982-1209744317-1209744317-8bffe7d32985",
       "osm-1552366983-14123403309-14123403309-f1ea1956d544"
     ],
-    "shared_node_count": 24867,
-    "tunnel_segment_count": 183
+    "shared_node_count": 24920,
+    "tunnel_segment_count": 184
   },
-  "total_length_meters": 1224513.0655629435,
-  "total_length_miles": 760.8771434590388
+  "total_length_meters": 1231244.0309436698,
+  "total_length_miles": 765.059571442569
 }

@@ -27,7 +27,7 @@ ALWAYS_INCLUDED_HIGHWAYS = {
     "path",
     "steps",
 }
-CONDITIONAL_HIGHWAYS = {"cycleway", "track", "service"}
+CONDITIONAL_HIGHWAYS = {"bridleway", "cycleway", "track", "service"}
 PUBLIC_FOOT_VALUES = {"yes", "designated", "permissive", "official"}
 PROHIBITED_ACCESS = {"no", "private"}
 RESTRICTED_ACCESS = {"customers", "delivery", "destination", "permit"}
@@ -93,7 +93,7 @@ def classify_way(tags: dict[str, str]) -> Eligibility:
         kind = "steps"
     elif highway == "pedestrian":
         kind = "pedestrian"
-    elif highway in {"footway", "path"}:
+    elif highway in {"bridleway", "footway", "path"}:
         kind = "greenway" if tags.get("bicycle") in PUBLIC_FOOT_VALUES else "parkPath"
     elif highway in {"cycleway", "track", "service"}:
         kind = "connector"
@@ -846,7 +846,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--review-geojson", type=Path)
     parser.add_argument("--identifier", default="manhattan-island")
     parser.add_argument("--display-name", default="Manhattan Island")
-    parser.add_argument("--version", type=int, default=2)
+    parser.add_argument("--version", type=int, default=3)
     parser.add_argument(
         "--source-url",
         default="https://download.geofabrik.de/north-america/us/new-york-260825.osm.pbf",

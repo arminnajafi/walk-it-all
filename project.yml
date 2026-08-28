@@ -78,6 +78,7 @@ targets:
       - package: WalkItAllCore
     settings:
       base:
+        DEVELOPMENT_TEAM: 47F6V2R9AA
         PRODUCT_BUNDLE_IDENTIFIER: com.arminnajafi.walkitall.tests
         GENERATE_INFOPLIST_FILE: YES
 
@@ -90,6 +91,7 @@ targets:
       - target: WalkItAll
     settings:
       base:
+        DEVELOPMENT_TEAM: 47F6V2R9AA
         PRODUCT_BUNDLE_IDENTIFIER: com.arminnajafi.walkitall.uitests
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: WalkItAll

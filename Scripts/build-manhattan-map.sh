@@ -38,8 +38,8 @@ uv run walkitall-build-city-pack \
   --input-pbf "$pbf_path" \
   --boundary "$boundary_path" \
   --boundary-url "$boundary_url" \
-  --output "$project_root/WalkItAll/Resources/OfflineMaps/manhattan-v2.sqlite" \
-  --report "$project_root/Documentation/manhattan-v2-report.json" \
-  --review-geojson "$output_root/manhattan-v2-review.geojson" \
-  --version 2 \
+  --output "$project_root/WalkItAll/Resources/OfflineMaps/manhattan-v3.sqlite" \
+  --report "$project_root/Documentation/manhattan-v3-report.json" \
+  --review-geojson "$output_root/manhattan-v3-review.geojson" \
+  --version 3 \
   --source-url "$pbf_url"

@@ -6,7 +6,7 @@ The MVP is not accuracy-signed-off until at least ten real Health routes have be
 2. Tap **Review** at the top right, then choose a representative workout.
 3. Compare the raw Health trace, matcher candidates, credited intervals, and rejected portions with the corresponding Apple Fitness map.
 4. Mark credited segments that were not walked and candidate segments that were clearly walked but missed.
-5. Save the local review fixture only after the visual review is complete. Never add the fixture, route screenshots, coordinates, or Health IDs to Git.
+5. Tap **Mark review complete**, then save the local review fixture. The inspector intentionally withholds accuracy metrics and fixture saving until this explicit confirmation. Never add the fixture, route screenshots, coordinates, or Health IDs to Git.
 
 The nearby-network review layer intentionally searches wider than the production matcher and includes segments that never became matcher candidates. This makes true no-candidate recall failures reviewable without making production matching less conservative.
 
@@ -44,4 +44,6 @@ Aggregate the meter totals across routes before calculating the final ratios. Re
 
 Tune matcher thresholds only in response to reviewed evidence. Convert non-sensitive synthetic reproductions of fixed failures into committed regression tests; keep real route fixtures local.
 
-The current review is intentionally paused after two passing routes because the next longer Central Park route exposed a substantial recall failure. Broader private-route diagnosis found two reproducible matcher defects that can create this rejection pattern: adjacent graph pieces from one OSM way were treated as competing streets, and confidence considered only the best route prefix instead of using later observations to resolve earlier ambiguity. Both now have non-sensitive synthetic regression tests, and matching-projection version 2 forces a complete Health rebuild. Re-review the failed route on the device before attributing its complete cause, collecting more passing fixtures, or claiming an aggregate accuracy result.
+The current review is intentionally paused after two passing routes because the next longer Central Park route exposed a substantial recall failure. Broader private-route diagnosis found and regression-tested two matcher defects: adjacent graph pieces from one OSM way were treated as competing streets, and confidence considered only the best route prefix instead of using later observations to resolve earlier ambiguity. The post-rebuild device review improved accepted points from 1,178 to 1,415, but still showed extensive conservative rejection.
+
+The exact private replay then identified the main remaining cause without widening matcher tolerances: 681 of 850 points reported as having no nearby eligible way were within four meters of two OSM `highway=bridleway` ways that explicitly carry `foot=yes`. Manhattan map version 3 therefore includes only explicitly foot-accessible bridleways. On the same private route and unchanged 15-meter matcher radius, local replay increased accepted points to 2,167 and unique credited distance from 1,104.3 to 2,113.2 meters. The device has completed its version-3 Health rebuild, but this result is not yet a reviewed precision/recall fixture; the route must be visually re-reviewed before it can pass.

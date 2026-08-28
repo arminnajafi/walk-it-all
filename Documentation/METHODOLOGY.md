@@ -2,7 +2,7 @@
 
 ## Completion area
 
-Version 2 uses the largest polygon in NYC Open Data’s Manhattan borough boundary, corresponding to Manhattan Island. Roosevelt Island, Governors Island, Randall’s/Wards Island, and Marble Hill are excluded.
+Version 3 uses the largest polygon in NYC Open Data’s Manhattan borough boundary, corresponding to Manhattan Island. Roosevelt Island, Governors Island, Randall’s/Wards Island, and Marble Hill are excluded.
 
 ## Eligible ways
 
@@ -11,6 +11,7 @@ Included OpenStreetMap geometry:
 - Primary through residential streets where pedestrian access is not prohibited
 - Living streets, pedestrian streets, and linear walking ways through plazas
 - Public footways, paths, greenways, steps, and meaningful connectors
+- Bridleways only when OpenStreetMap explicitly records public pedestrian access
 - Service, cycle, and track geometry only when public foot access is explicit
 
 Excluded geometry:

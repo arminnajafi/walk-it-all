@@ -44,6 +44,13 @@ def test_conditionally_includes_public_greenways() -> None:
     assert classify_way({"highway": "cycleway", "foot": "yes"}).kind == "connector"
 
 
+def test_includes_only_explicitly_walkable_bridleways() -> None:
+    assert not classify_way({"highway": "bridleway"}).included
+    assert classify_way({"highway": "bridleway", "foot": "yes"}).kind == "parkPath"
+    assert classify_way({"highway": "bridleway", "foot": "designated"}).kind == "parkPath"
+    assert not classify_way({"highway": "bridleway", "foot": "no"}).included
+
+
 def test_stable_ids_and_length() -> None:
     coordinates = ((-73.99, 40.75), (-73.99, 40.751))
     first = stable_segment_id(10, 1, 2, coordinates)

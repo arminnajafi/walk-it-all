@@ -25,10 +25,10 @@ enum CityPackLoadError: LocalizedError {
 actor SQLiteCityPackLoader {
     func loadBundledManhattan(bundle: Bundle = .main) throws -> InMemoryCityCoveragePack {
         guard let url = bundle.url(
-            forResource: "manhattan-v2",
+            forResource: "manhattan-v3",
             withExtension: "sqlite",
             subdirectory: "OfflineMaps"
-        ) ?? bundle.url(forResource: "manhattan-v2", withExtension: "sqlite")
+        ) ?? bundle.url(forResource: "manhattan-v3", withExtension: "sqlite")
         else {
             #if DEBUG
             return PreviewCityPack.manhattanSample

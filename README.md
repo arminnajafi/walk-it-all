@@ -43,9 +43,9 @@ The script verifies the pure-Swift matching core, Python map builder, generated 
 
 The script verifies a pinned official NYC borough boundary and the dated, checksummed August 25, 2026 Geofabrik New York OpenStreetMap extract, selects Manhattan Island’s largest polygon, and generates:
 
-- `WalkItAll/Resources/OfflineMaps/manhattan-v2.sqlite`
-- `Documentation/manhattan-v2-report.json`
-- `Tools/CityPackBuilder/output/manhattan-v2-review.geojson` (ignored local review artifact)
+- `WalkItAll/Resources/OfflineMaps/manhattan-v3.sqlite`
+- `Documentation/manhattan-v3-report.json`
+- `Tools/CityPackBuilder/output/manhattan-v3-review.geojson` (ignored local review artifact)
 
 The downloaded statewide extract is intentionally ignored by Git. The generated city database contains public map geometry only—never workout data.
 

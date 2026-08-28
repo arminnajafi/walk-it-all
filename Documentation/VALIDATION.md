@@ -6,7 +6,7 @@ This file records reproducible engineering evidence without workout coordinates,
 
 - Complete verification run: August 28, 2026
 - `WalkItAllCore`: 23 unit tests plus the executable core checks
-- `CityPackBuilder`: 14 tests
+- `CityPackBuilder`: 15 tests
 - iOS app: 25 unit tests
 - iOS UI: 5 end-to-end tests, including an accessibility XXXL onboarding journey
 - Synthetic coverage: 1,500 workout contributions and a 2,500-point route
@@ -15,17 +15,18 @@ The complete suites must pass together before a personal-device build is signed 
 
 ## Offline Manhattan map
 
-Map version 2 is generated from the pinned 2026-08-25 Geofabrik New York extract and checksum-verified NYC water-excluded Manhattan boundary.
+Map version 3 is generated from the pinned 2026-08-25 Geofabrik New York extract and checksum-verified NYC water-excluded Manhattan boundary.
 
 - SQLite integrity: `ok`
-- Segments: 36,827
-- Eligible distance: 760.877143 miles
+- Segments: 36,897
+- Eligible distance: 765.059571 miles
 - Outside-boundary, invalid, duplicate-ID, and duplicate-geometry counts: zero
 - Exact equivalent geometry removed deterministically: one 13.6-meter park path
-- Graph components: 3,230
-- Eligible source geometry tagged `highway=footway`: 208.910 miles, including 206.368 miles without a more specific `footway=*` value
+- Graph components: 3,222
+- Explicitly foot-accessible `highway=bridleway` geometry: 4.267 miles
+- Eligible source geometry tagged `highway=footway`: 208.839 miles, including 206.297 miles without a more specific `footway=*` value
 
-The complete evidence and review samples are in `manhattan-v2-report.json`; the manual denominator review remains a release gate.
+The complete evidence and review samples are in `manhattan-v3-report.json`; the manual denominator review remains a release gate.
 
 ## Simulator UI and performance
 
@@ -52,6 +53,6 @@ Matching, GPS chunking, route simplification, aggregate calculation, and overlay
 
 ## Personal-device evidence and remaining human gate
 
-A real iPhone completed the version-2 Health rebuild: 229 walking/hiking workouts were considered and 211 route-bearing workouts were imported and evaluated. Automatic foreground refresh, workout selection, Manhattan recentering, and the protected on-device cache were exercised with the real history.
+A real iPhone completed both the matching-projection rebuild and the subsequent map-version-3 rebuild: 229 walking/hiking workouts were considered and 211 route-bearing workouts were imported and evaluated. The version-3 store retained the Health checkpoint and exact successful-refresh date, cleared the obsolete aggregate snapshot, and contained 211 per-workout contributions. Automatic foreground refresh, workout selection, Manhattan recentering, and the protected on-device cache were exercised with the real history.
 
-Two representative routes have completed visual review with no marked false credit or missed eligible segment. The next longer Central Park route exposed a substantial recall failure. Local diagnosis produced regression-tested fixes for same-way graph-split ambiguity and prefix-only confidence; the corrected Debug build is installed and matching-projection version 2 will rebuild every contribution. Personal-device signoff still requires re-reviewing that route and completing the aggregate precision/recall gate described in `ACCURACY_REVIEW.md`; automated tests cannot substitute for those visual judgments.
+Two representative routes have completed visual review with no marked false credit or missed eligible segment. The next longer Central Park route exposed a substantial recall failure. Local diagnosis produced regression-tested fixes for same-way graph-split ambiguity and prefix-only confidence, then found that most residual no-nearby rejections were on OSM bridleways explicitly tagged `foot=yes`. Map version 3 adds only those explicitly walkable bridleways; an unchanged-threshold private replay increased unique credited distance from 1,104.3 to 2,113.2 meters. Personal-device signoff still requires visual re-review of that route and completion of the aggregate precision/recall gate described in `ACCURACY_REVIEW.md`; automated tests and an unreviewed replay cannot substitute for those judgments.

@@ -14,6 +14,7 @@ struct DebugRouteInspectorSheet: View {
     @State private var showRejected = true
     @State private var incorrectCredited = Set<SegmentID>()
     @State private var clearlyWalkedMissed = Set<SegmentID>()
+    @State private var isReviewComplete = false
     @State private var saveStatus: String?
     @State private var diagnosticSaveStatus: String?
 
@@ -98,6 +99,7 @@ struct DebugRouteInspectorSheet: View {
         guard model.workoutRecords.indices.contains(targetIndex) else { return }
         incorrectCredited.removeAll()
         clearlyWalkedMissed.removeAll()
+        isReviewComplete = false
         saveStatus = nil
         diagnosticSaveStatus = nil
         selectedWorkoutID = model.workoutRecords[targetIndex].id
@@ -198,12 +200,15 @@ struct DebugRouteInspectorSheet: View {
                         "Credited distance",
                         value: distance(reviewContribution.uniqueCoveredDistanceMeters)
                     )
-                    if let precision = measurement.precision {
+                    if !isReviewComplete {
+                        LabeledContent("Accuracy review", value: "Not completed")
+                    }
+                    if isReviewComplete, let precision = measurement.precision {
                         LabeledContent("Reviewed precision") {
                             Text(precision, format: .percent.precision(.fractionLength(1)))
                         }
                     }
-                    if let recall = measurement.recall {
+                    if isReviewComplete, let recall = measurement.recall {
                         LabeledContent("Reviewed recall") {
                             Text(recall, format: .percent.precision(.fractionLength(1)))
                         }
@@ -249,6 +254,12 @@ struct DebugRouteInspectorSheet: View {
                 }
 
                 Section {
+                    Button("Mark review complete", systemImage: "checkmark.seal") {
+                        isReviewComplete = true
+                        saveStatus = nil
+                    }
+                    .disabled(isReviewComplete)
+
                     Button("Save local review fixture", systemImage: "square.and.arrow.down") {
                         saveReview(
                             route: route,
@@ -257,6 +268,7 @@ struct DebugRouteInspectorSheet: View {
                             pack: pack
                         )
                     }
+                    .disabled(!isReviewComplete)
                     if let saveStatus {
                         Text(saveStatus)
                             .font(.caption)
@@ -273,7 +285,7 @@ struct DebugRouteInspectorSheet: View {
                             .foregroundStyle(.secondary)
                     }
                 } footer: {
-                    Text("The review fixture has no coordinates. The private diagnostic includes the full Health route and is only for investigating a failed match. Both stay in this debug app’s protected, backup-excluded storage; never share or commit them.")
+                    Text("Complete the visual review before saving accuracy. Changing a review choice marks it incomplete again. The review fixture has no coordinates. The private diagnostic includes the full Health route and is only for investigating a failed match. Both stay in this debug app’s protected, backup-excluded storage; never share or commit them.")
                 }
             }
             .frame(minHeight: 300)
@@ -319,6 +331,8 @@ struct DebugRouteInspectorSheet: View {
         Binding(
             get: { selection.wrappedValue.contains(id) },
             set: { isSelected in
+                isReviewComplete = false
+                saveStatus = nil
                 if isSelected {
                     selection.wrappedValue.insert(id)
                 } else {
@@ -346,8 +360,9 @@ struct DebugRouteInspectorSheet: View {
         pack: any CityCoveragePack
     ) {
         let fixture = RouteReviewFixture(
-            schemaVersion: 3,
+            schemaVersion: 4,
             createdAt: Date(),
+            reviewCompleted: true,
             packIdentifier: pack.metadata.identifier,
             packVersion: pack.metadata.version,
             acceptedPointCount: match.acceptedPointCount,

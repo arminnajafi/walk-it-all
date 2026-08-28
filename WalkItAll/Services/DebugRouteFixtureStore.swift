@@ -5,6 +5,7 @@ import WalkItAllCore
 struct RouteReviewFixture: Codable, Sendable {
     let schemaVersion: Int
     let createdAt: Date
+    let reviewCompleted: Bool
     let packIdentifier: String
     let packVersion: Int
     let acceptedPointCount: Int

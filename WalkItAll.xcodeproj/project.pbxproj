@@ -13,7 +13,6 @@
 		10557EC7241C285E39ACDF5D /* MapScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C2F149DE39FE7C02CB2A374 /* MapScreen.swift */; };
 		1F975065E6666299E024AC08 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DBEAAB8EF76A38A17ED42D8 /* OnboardingView.swift */; };
 		31BA0BF758C0888773350E78 /* WalkItAllCore in Frameworks */ = {isa = PBXBuildFile; productRef = C5AB7EC69599D1233B2ACC1C /* WalkItAllCore */; };
-		3495C791E456FA3E55196FFA /* manhattan-v2.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = C6C24976C4978A93A62546D2 /* manhattan-v2.sqlite */; };
 		369C19CC441EB5043A392ED8 /* WalkItAllCore in Frameworks */ = {isa = PBXBuildFile; productRef = 743CCBC2779103FD291BCFF5 /* WalkItAllCore */; };
 		39492E0DC66EBE95B56F840D /* WorkoutHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07510A3D027DD1B78300B46C /* WorkoutHistorySheet.swift */; };
 		39D973E0EA314470390C9BE9 /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB635380CE9E629086CE486 /* AppDependencies.swift */; };
@@ -27,6 +26,7 @@
 		7C14C5EF7D724DF7663C71D8 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B499B81A9931CBF9FD2D136F /* CoreLocation.framework */; };
 		808D13FDF892A3C5FB9CBBF2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 348319A7785B2E3556FDE7FE /* Assets.xcassets */; };
 		8BE68125F8DA9A8480181B12 /* SwiftDataCoverageRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAE481DC24847009E19197AE /* SwiftDataCoverageRepository.swift */; };
+		903B26798D50A275D0BDB973 /* manhattan-v3.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = E5EE23640C7F388B3D015BE7 /* manhattan-v3.sqlite */; };
 		92F1A12E6F6E41C8B6B3FE59 /* ProgressCard+Previews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3A360D51B667F08F8726DE /* ProgressCard+Previews.swift */; };
 		9576DEA3C91B4A18EAA177CE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8FF0B7D62B0EA75177346766 /* PrivacyInfo.xcprivacy */; };
 		95FADA445111FDE0337F25D3 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A67B4C50393306F2C0EC54B2 /* libsqlite3.tbd */; };
@@ -86,13 +86,13 @@
 		B499B81A9931CBF9FD2D136F /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		B8100120032C826D8CAFA518 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		BD0562077201A0FF7534F87A /* DebugRouteFixtureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugRouteFixtureStore.swift; sourceTree = "<group>"; };
-		C6C24976C4978A93A62546D2 /* manhattan-v2.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = "manhattan-v2.sqlite"; sourceTree = "<group>"; };
 		CDCBDD4837A510C93B7C65A3 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		CE3D4EA38075A5548B87AC68 /* WalkItAllApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkItAllApp.swift; sourceTree = "<group>"; };
 		D367A9FE158602470A886865 /* PersistedModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistedModels.swift; sourceTree = "<group>"; };
 		DABD328367D5C28075FE1BF9 /* HealthKitWorkoutRouteSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitWorkoutRouteSource.swift; sourceTree = "<group>"; };
 		DAE481DC24847009E19197AE /* SwiftDataCoverageRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataCoverageRepository.swift; sourceTree = "<group>"; };
 		DFEE4016432BD4ADFD2BD156 /* HealthAccessHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthAccessHelpSheet.swift; sourceTree = "<group>"; };
+		E5EE23640C7F388B3D015BE7 /* manhattan-v3.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = "manhattan-v3.sqlite"; sourceTree = "<group>"; };
 		E859A7C657582260DBF36425 /* ProgressCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressCard.swift; sourceTree = "<group>"; };
 		E8BF0207B065346AC05141A3 /* CoverageMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageMapView.swift; sourceTree = "<group>"; };
 		ECB635380CE9E629086CE486 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
@@ -150,7 +150,7 @@
 		265548B8EBF46BA0C604D69E /* OfflineMaps */ = {
 			isa = PBXGroup;
 			children = (
-				C6C24976C4978A93A62546D2 /* manhattan-v2.sqlite */,
+				E5EE23640C7F388B3D015BE7 /* manhattan-v3.sqlite */,
 			);
 			path = OfflineMaps;
 			sourceTree = "<group>";
@@ -363,9 +363,11 @@
 						ProvisioningStyle = Automatic;
 					};
 					CD1E7C658700D7CFB9CD4918 = {
+						DevelopmentTeam = 47F6V2R9AA;
 						ProvisioningStyle = Automatic;
 					};
 					E66FC89BD9DDB797FCF82D97 = {
+						DevelopmentTeam = 47F6V2R9AA;
 						ProvisioningStyle = Automatic;
 						TestTargetID = 345A53A515D2ACC0872F6C4A;
 					};
@@ -402,7 +404,7 @@
 			files = (
 				808D13FDF892A3C5FB9CBBF2 /* Assets.xcassets in Resources */,
 				9576DEA3C91B4A18EAA177CE /* PrivacyInfo.xcprivacy in Resources */,
-				3495C791E456FA3E55196FFA /* manhattan-v2.sqlite in Resources */,
+				903B26798D50A275D0BDB973 /* manhattan-v3.sqlite in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -543,6 +545,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = 47F6V2R9AA;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -560,6 +563,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = 47F6V2R9AA;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -658,6 +662,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = 47F6V2R9AA;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -675,6 +680,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = 47F6V2R9AA;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

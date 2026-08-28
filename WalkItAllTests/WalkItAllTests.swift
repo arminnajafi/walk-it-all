@@ -155,7 +155,7 @@ final class WalkItAllTests: XCTestCase {
         let pack = try await SQLiteCityPackLoader().loadBundledManhattan()
 
         XCTAssertEqual(pack.metadata.identifier, "manhattan-island")
-        XCTAssertEqual(pack.metadata.version, 2)
+        XCTAssertEqual(pack.metadata.version, 3)
         XCTAssertEqual(
             pack.metadata.attributionURL?.absoluteString,
             "https://www.openstreetmap.org/copyright"
@@ -164,8 +164,8 @@ final class WalkItAllTests: XCTestCase {
             pack.metadata.licenseURL?.absoluteString,
             "https://opendatacommons.org/licenses/odbl/1-0/"
         )
-        XCTAssertEqual(pack.segments.count, 36_827)
-        XCTAssertEqual(pack.totalLengthMeters / 1_609.344, 760.8771434590388, accuracy: 0.000_001)
+        XCTAssertEqual(pack.segments.count, 36_897)
+        XCTAssertEqual(pack.totalLengthMeters / 1_609.344, 765.059571442569, accuracy: 0.000_001)
         XCTAssertNotNil(Bundle.main.url(
             forResource: "manhattan-v\(pack.metadata.version)",
             withExtension: "sqlite"
@@ -423,7 +423,7 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(model.lastSuccessfulImport, date)
         let prepared = await repository.preparedPack
         XCTAssertEqual(prepared?.identifier, "manhattan-island")
-        XCTAssertEqual(prepared?.version, 2)
+        XCTAssertEqual(prepared?.version, 3)
     }
 
     @MainActor
