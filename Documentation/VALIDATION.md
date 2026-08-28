@@ -47,6 +47,7 @@ Matching, GPS chunking, route simplification, aggregate calculation, and overlay
 - The signed device bundle contains HealthKit entitlement and no profiler framework
 - The bundled offline-map metadata contains direct OpenStreetMap attribution and ODbL license URLs, both exposed in the methodology screen
 - Coverage remains derived from per-workout contributions and can be rebuilt from authorized Apple Health history
+- The August 28 Debug build was installed on the connected iPhone without opening it. While the phone was locked, iOS refused both app launch and reads from the protected local-fixture directory; no route file was copied.
 
 ## Personal-device evidence and remaining human gate
 
