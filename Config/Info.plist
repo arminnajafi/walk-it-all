@@ -23,7 +23,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Walk It All reads your walking and hiking workout routes to calculate which streets and paths you have covered. Your routes stay on this device.</string>
+	<string>Walk It All reads walking and hiking workout routes to create your private lifetime map. Route processing stays on this device.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

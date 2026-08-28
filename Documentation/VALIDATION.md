@@ -1,60 +1,53 @@
-# MVP validation record
+# Validation
 
-This file records reproducible engineering evidence without workout coordinates, Health identifiers, or other personal route data.
+## Automated gates
 
-## Automated baseline
+The verification script must pass:
 
-- Complete verification run: August 28, 2026
-- `WalkItAllCore`: 24 unit tests plus the executable core checks
-- `CityPackBuilder`: 15 tests
-- iOS app: 25 unit tests
-- iOS UI: 5 end-to-end tests, including an accessibility XXXL onboarding journey
-- Synthetic coverage: 1,500 workout contributions and a 2,500-point route
+- pure-Swift route filtering, gap separation, simplification, bounds, and stress tests;
+- Health cursor migration and route-association tests;
+- repository replacement, deletion, reset, corruption recovery, cursor, ledger, and timestamp round trips;
+- synchronization addition, invalidation, deletion, cancellation, generation, and refresh-throttle tests;
+- overlay completeness, worldwide bounds, spatial clipping, repeat pass, and selection viewport tests;
+- onboarding, empty state, details, Health help, history, privacy, and Dynamic Type UI tests.
 
-The complete suites must pass together before a personal-device build is signed off.
+## Personal-device gate
 
-## Offline Manhattan map
+Before signoff:
 
-Map version 3 is generated from the pinned 2026-08-25 Geofabrik New York extract and checksum-verified NYC water-excluded Manhattan boundary.
+1. Rebuild the connected iPhone and confirm 210 drawable workout routes and the 229-workout processed ledger return. The former completion cache contained 211 workout rows, but one row's saved route geometry was an empty array; it was never a route-bearing map record.
+2. Compare at least ten representative routes with Apple Fitness. Confirm that inaccurate points, subway travel, outages, and implausible jumps are not bridged.
+3. Record a new Outdoor Walk, wait until it reaches Health, and verify foreground incremental refresh after five minutes. Verify manual Refresh bypasses the throttle.
+4. Verify a replaced or deleted Health route updates the cached map.
+5. Reinstall after Health synchronization and rebuild the same history.
 
-- SQLite integrity: `ok`
-- Segments: 36,897
-- Eligible distance: 765.059571 miles
-- Outside-boundary, invalid, duplicate-ID, and duplicate-geometry counts: zero
-- Exact equivalent geometry removed deterministically: one 13.6-meter park path
-- Graph components: 3,222
-- Explicitly foot-accessible `highway=bridleway` geometry: 4.267 miles
-- Eligible source geometry tagged `highway=footway`: 208.839 miles, including 206.297 miles without a more specific `footway=*` value
+## Performance gate
 
-The complete evidence and review samples are in `manhattan-v3-report.json`; the manual denominator review remains a release gate.
+Use a Release build and realistic synthetic history of at least 1,500 workouts with multi-thousand-point raw routes. Require:
 
-## Simulator UI and performance
+- route processing and overlay construction outside the main actor;
+- smooth map pan and zoom;
+- no interaction stall over 100 milliseconds attributable to the app;
+- no unbounded memory growth across workouts.
 
-Environment: Xcode 26.6, iOS 26.5, iPhone 17 Pro simulator.
+If the density pass misses the gate, retain the same renderer with only the baseline stroke. Do not add a raster-tile system for the MVP.
 
-A focused, symbolicated ETTrace 1.1.0 cold-launch-to-map capture ran for 13.174 seconds. The main thread was idle for 12.679 seconds and active for 0.495 seconds. Samples were dominated by SwiftUI setup/layout and Apple Maps rendering; route matching and aggregate coverage calculation did not appear on the main thread. Raw profiler output was temporary and contained no private Health route.
+## Privacy and accessibility gate
 
-Apple's `xctrace` command-line Time Profiler failed to finalize two simulator recordings after their requested time limits under Xcode 26.6. The incomplete traces were discarded. A native Instruments capture on the real phone remains part of the final personal-device pass.
+Verify light and dark appearance, high contrast, reduced transparency, reduced motion, VoiceOver, and all Dynamic Type sizes. Confirm 44-point controls and that normal-size layouts remain compact.
 
-Visual and automated checks cover normal light appearance plus dark, increased-contrast, and accessibility XXXL layouts. At accessibility sizes the progress card and onboarding become scrollable, decorative imagery yields to content, controls remain reachable, and the map controls retain VoiceOver labels. The map measures the floating card and reserves that space through `MKMapView` layout margins, keeping Apple Maps attribution visible instead of relying on a device-specific fixed inset. The current screenshot audit also covers onboarding, the empty map, coverage details, methodology and ODbL links, Health-access instructions, privacy, and workout history.
+On a real device, confirm complete file protection while locked, backup exclusion on the directory/store/sidecars, redacted logs, and no app-originated network activity beyond Apple MapKit.
 
-Matching, GPS chunking, route simplification, aggregate calculation, and overlay construction are isolated from the main actor. The August 28 Release build succeeded for a generic iPhone target with an iOS 17 deployment target; the signed app is 22 MB and links only Apple system frameworks plus SQLite.
+## Current status
 
-## Privacy and recovery
+The previous street-completion implementation is preserved on `codex/street-completion-archive`.
 
-- No app networking client, CloudKit, analytics, advertising, or location permission
-- Runtime cache directory has complete file protection and an explicit backup-exclusion resource value
-- Simulator inspection confirms the backup-exclusion marker covers the SwiftData store, WAL, and shared-memory sidecar files
-- No coordinates, routes, or Health UUIDs are logged
-- The signed device bundle contains HealthKit entitlement and no profiler framework
-- The bundled offline-map metadata contains direct OpenStreetMap attribution and ODbL license URLs, both exposed in the methodology screen
-- Coverage remains derived from per-workout contributions and can be rebuilt from authorized Apple Health history
-- The August 28 Debug build was installed on the connected iPhone without opening it. While the phone was locked, iOS refused both app launch and reads from the protected local-fixture directory; no route file was copied.
+Verified on August 28, 2026:
 
-## Personal-device evidence and remaining human gate
+- 13 core tests, 20 app/storage/map tests, and 7 rendered UI tests pass;
+- the connected iPhone Release rebuild restored 210 drawable routes plus all 229 processed workouts;
+- the active store, WAL, sidecar, and directory are excluded from backup, and the code/test invariant requests complete file protection;
+- a 15-second real-device Time Profiler recording reported no hangs or hang-risk events above its 250-millisecond threshold;
+- the signed tested build is installed over the prior app, and the legacy store files are gone.
 
-A real iPhone completed both the matching-projection rebuild and the subsequent map-version-3 rebuild: 229 walking/hiking workouts were considered and 211 route-bearing workouts were imported and evaluated. The version-3 store retained the Health checkpoint and exact successful-refresh date, cleared the obsolete aggregate snapshot, and contained 211 per-workout contributions. Automatic foreground refresh, workout selection, Manhattan recentering, and the protected on-device cache were exercised with the real history.
-
-Two representative routes have completed visual review with no marked false credit or missed eligible segment. The next longer Central Park route exposed a substantial recall failure. Local diagnosis produced regression-tested fixes for same-way graph-split ambiguity and prefix-only confidence, then found that most residual no-nearby rejections were on OSM bridleways explicitly tagged `foot=yes`. Map version 3 adds only those explicitly walkable bridleways. The corresponding device rebuild increased the route from 0.69 to 1.31 credited miles and visibly recovered the reservoir path without a parallel-path assignment.
-
-A follow-up rejection audit found that the 12-meter emission scale made an otherwise unambiguous candidate near the 15-meter search boundary mathematically unable to pass the 55% threshold. Matching-projection version 3 aligns those floors while retaining the confidence margin between competing ways. A private replay increased this route’s unique credited distance from 2,113.2 to 2,330.7 meters and reduced rejected observed movement from 462.0 to 267.3 meters. Personal-device signoff still requires a projection-version-3 rebuild, final visual review of that route, and completion of the aggregate precision/recall gate described in `ACCURACY_REVIEW.md`; automated tests and an unreviewed replay cannot substitute for those judgments.
+The remaining personal-field checks require a future Health event or visual comparison with Apple Fitness and therefore remain acceptance follow-ups rather than release-blocking code work.

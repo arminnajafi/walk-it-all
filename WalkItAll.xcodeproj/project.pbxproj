@@ -9,39 +9,33 @@
 /* Begin PBXBuildFile section */
 		03AEC17F7115392866B9154A /* PrivacySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81478E450E3A9547982D0DCA /* PrivacySheet.swift */; };
 		03E8583FAEF3E021BC27A6B0 /* WalkItAllApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3D4EA38075A5548B87AC68 /* WalkItAllApp.swift */; };
+		088EF3B75FC7D1D2D16EE736 /* LifetimeRouteOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E5E6FE2A88CB2CB95ED60A /* LifetimeRouteOverlay.swift */; };
 		0D629F6DD05C5320C8464DFC /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C32BF60E9317FB6AD472BFD /* RootView.swift */; };
 		10557EC7241C285E39ACDF5D /* MapScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C2F149DE39FE7C02CB2A374 /* MapScreen.swift */; };
 		1F975065E6666299E024AC08 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DBEAAB8EF76A38A17ED42D8 /* OnboardingView.swift */; };
+		3037AF5C16F6716FE0B9CD8D /* MapDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B046C74515C22BBC4EC5392B /* MapDetailsSheet.swift */; };
+		3051DEB5DA7A79624439F509 /* LifetimeMapCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BC03B542D988F2613CB3F8 /* LifetimeMapCard.swift */; };
 		31BA0BF758C0888773350E78 /* WalkItAllCore in Frameworks */ = {isa = PBXBuildFile; productRef = C5AB7EC69599D1233B2ACC1C /* WalkItAllCore */; };
 		369C19CC441EB5043A392ED8 /* WalkItAllCore in Frameworks */ = {isa = PBXBuildFile; productRef = 743CCBC2779103FD291BCFF5 /* WalkItAllCore */; };
 		39492E0DC66EBE95B56F840D /* WorkoutHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07510A3D027DD1B78300B46C /* WorkoutHistorySheet.swift */; };
 		39D973E0EA314470390C9BE9 /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB635380CE9E629086CE486 /* AppDependencies.swift */; };
 		3C663F3B5EA3753897FCB107 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CDCBDD4837A510C93B7C65A3 /* MapKit.framework */; };
 		3E143D15AC4609EC8283ED76 /* ProtectedModelContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 077BA6556C2F7B4B7071A680 /* ProtectedModelContainer.swift */; };
-		459DC40F36324DCCA2646629 /* CoverageMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8BF0207B065346AC05141A3 /* CoverageMapView.swift */; };
-		483F55B8C510400EE6F88D72 /* CoverageNetworkOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0680935086BEF95DCDD5497A /* CoverageNetworkOverlay.swift */; };
 		4FBA7F88E1113AA285EFAD0B /* FloatingSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19021ECDD743539F735E97EB /* FloatingSurface.swift */; };
 		64ADD8F26FA7D8D615BC9D77 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F5696D74A58FC1BE5F4B683B /* HealthKit.framework */; };
+		6A89440BF99E65FEE3049771 /* LifetimeMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC1C40A9FE2099E49F82BCD /* LifetimeMapView.swift */; };
 		6C1520F28F31E6FFDD25ACF7 /* WalkItAllTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BDAB903C28152806483F500 /* WalkItAllTests.swift */; };
 		7C14C5EF7D724DF7663C71D8 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B499B81A9931CBF9FD2D136F /* CoreLocation.framework */; };
+		7F0E2E133994B073F7D8B681 /* AboutMapSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEC91337BE114A1E5CEB53E0 /* AboutMapSheet.swift */; };
 		808D13FDF892A3C5FB9CBBF2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 348319A7785B2E3556FDE7FE /* Assets.xcassets */; };
-		8BE68125F8DA9A8480181B12 /* SwiftDataCoverageRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAE481DC24847009E19197AE /* SwiftDataCoverageRepository.swift */; };
-		903B26798D50A275D0BDB973 /* manhattan-v3.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = E5EE23640C7F388B3D015BE7 /* manhattan-v3.sqlite */; };
-		92F1A12E6F6E41C8B6B3FE59 /* ProgressCard+Previews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F3A360D51B667F08F8726DE /* ProgressCard+Previews.swift */; };
+		93565D919F418B83A9DB9603 /* SwiftDataWalkHistoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7BBD32E835A9E48F49F04B8 /* SwiftDataWalkHistoryRepository.swift */; };
 		9576DEA3C91B4A18EAA177CE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8FF0B7D62B0EA75177346766 /* PrivacyInfo.xcprivacy */; };
-		95FADA445111FDE0337F25D3 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A67B4C50393306F2C0EC54B2 /* libsqlite3.tbd */; };
 		997DDF242768B8519DDDC941 /* WalkItAllUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492C52D4F9EF866E16526CCF /* WalkItAllUITests.swift */; };
 		9F775BE05BA74554735045A0 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8100120032C826D8CAFA518 /* AppModel.swift */; };
-		ACA9D156625EC7DAF9E89C5F /* SQLiteCityPackLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F745868D274433532D71FDA4 /* SQLiteCityPackLoader.swift */; };
 		B5AC9CC528D1C64AB767B87A /* HealthAccessHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFEE4016432BD4ADFD2BD156 /* HealthAccessHelpSheet.swift */; };
 		C691B3B6540554A1EEF7A2FC /* AppSheetHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E30468590D4D9726DDFB35 /* AppSheetHost.swift */; };
-		D4CA4A9C7C1A5A6C6E9451A5 /* CoverageDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9329091AFFFFA96D1AF1B262 /* CoverageDetailsSheet.swift */; };
-		DDC1A44F88C8A4E0C7EE8ECD /* DebugRouteInspectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9C761A83C3D8700F89E5B9 /* DebugRouteInspectorSheet.swift */; };
 		E1396F76D748166FC83178F9 /* PersistedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D367A9FE158602470A886865 /* PersistedModels.swift */; };
-		E7B912EC74668C826D9E327C /* MethodologySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2179330C71F7193E3AF290 /* MethodologySheet.swift */; };
-		ECADEBD9EAB6EE31C6F2BD11 /* DebugRouteFixtureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0562077201A0FF7534F87A /* DebugRouteFixtureStore.swift */; };
 		F1F3115EE0992110C4C31275 /* HealthKitWorkoutRouteSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = DABD328367D5C28075FE1BF9 /* HealthKitWorkoutRouteSource.swift */; };
-		F2522C4FABA0C69A9C7282EE /* ProgressCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E859A7C657582260DBF36425 /* ProgressCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,15 +56,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		0680935086BEF95DCDD5497A /* CoverageNetworkOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageNetworkOverlay.swift; sourceTree = "<group>"; };
 		07510A3D027DD1B78300B46C /* WorkoutHistorySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHistorySheet.swift; sourceTree = "<group>"; };
 		077BA6556C2F7B4B7071A680 /* ProtectedModelContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedModelContainer.swift; sourceTree = "<group>"; };
 		1705B6CE9C379711F18EBD1B /* WalkItAllUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WalkItAllUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		17E30468590D4D9726DDFB35 /* AppSheetHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSheetHost.swift; sourceTree = "<group>"; };
 		19021ECDD743539F735E97EB /* FloatingSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingSurface.swift; sourceTree = "<group>"; };
 		1DBEAAB8EF76A38A17ED42D8 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
-		2F3A360D51B667F08F8726DE /* ProgressCard+Previews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgressCard+Previews.swift"; sourceTree = "<group>"; };
 		348319A7785B2E3556FDE7FE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3DC1C40A9FE2099E49F82BCD /* LifetimeMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifetimeMapView.swift; sourceTree = "<group>"; };
 		492C52D4F9EF866E16526CCF /* WalkItAllUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkItAllUITests.swift; sourceTree = "<group>"; };
 		55339BDC0BA2CC9800B82EA4 /* WalkItAllCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WalkItAllCore; path = Packages/WalkItAllCore; sourceTree = SOURCE_ROOT; };
 		6BDAB903C28152806483F500 /* WalkItAllTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkItAllTests.swift; sourceTree = "<group>"; };
@@ -78,27 +71,22 @@
 		6C32BF60E9317FB6AD472BFD /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		81478E450E3A9547982D0DCA /* PrivacySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySheet.swift; sourceTree = "<group>"; };
 		8FF0B7D62B0EA75177346766 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		9329091AFFFFA96D1AF1B262 /* CoverageDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageDetailsSheet.swift; sourceTree = "<group>"; };
-		9E2179330C71F7193E3AF290 /* MethodologySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MethodologySheet.swift; sourceTree = "<group>"; };
-		9F9C761A83C3D8700F89E5B9 /* DebugRouteInspectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugRouteInspectorSheet.swift; sourceTree = "<group>"; };
-		A67B4C50393306F2C0EC54B2 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		B046C74515C22BBC4EC5392B /* MapDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapDetailsSheet.swift; sourceTree = "<group>"; };
 		B44B76EB7EFDEBF477553C8D /* WalkItAll.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = WalkItAll.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B499B81A9931CBF9FD2D136F /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		B8100120032C826D8CAFA518 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
-		BD0562077201A0FF7534F87A /* DebugRouteFixtureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugRouteFixtureStore.swift; sourceTree = "<group>"; };
+		C9E5E6FE2A88CB2CB95ED60A /* LifetimeRouteOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifetimeRouteOverlay.swift; sourceTree = "<group>"; };
 		CDCBDD4837A510C93B7C65A3 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		CE3D4EA38075A5548B87AC68 /* WalkItAllApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkItAllApp.swift; sourceTree = "<group>"; };
 		D367A9FE158602470A886865 /* PersistedModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistedModels.swift; sourceTree = "<group>"; };
+		D4BC03B542D988F2613CB3F8 /* LifetimeMapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifetimeMapCard.swift; sourceTree = "<group>"; };
 		DABD328367D5C28075FE1BF9 /* HealthKitWorkoutRouteSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitWorkoutRouteSource.swift; sourceTree = "<group>"; };
-		DAE481DC24847009E19197AE /* SwiftDataCoverageRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataCoverageRepository.swift; sourceTree = "<group>"; };
 		DFEE4016432BD4ADFD2BD156 /* HealthAccessHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthAccessHelpSheet.swift; sourceTree = "<group>"; };
-		E5EE23640C7F388B3D015BE7 /* manhattan-v3.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = "manhattan-v3.sqlite"; sourceTree = "<group>"; };
-		E859A7C657582260DBF36425 /* ProgressCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressCard.swift; sourceTree = "<group>"; };
-		E8BF0207B065346AC05141A3 /* CoverageMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageMapView.swift; sourceTree = "<group>"; };
+		E7BBD32E835A9E48F49F04B8 /* SwiftDataWalkHistoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataWalkHistoryRepository.swift; sourceTree = "<group>"; };
 		ECB635380CE9E629086CE486 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
 		EF12E64E2A13DD96366FAD51 /* WalkItAllTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WalkItAllTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5696D74A58FC1BE5F4B683B /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
-		F745868D274433532D71FDA4 /* SQLiteCityPackLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteCityPackLoader.swift; sourceTree = "<group>"; };
+		FEC91337BE114A1E5CEB53E0 /* AboutMapSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutMapSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,7 +98,6 @@
 				64ADD8F26FA7D8D615BC9D77 /* HealthKit.framework in Frameworks */,
 				3C663F3B5EA3753897FCB107 /* MapKit.framework in Frameworks */,
 				7C14C5EF7D724DF7663C71D8 /* CoreLocation.framework in Frameworks */,
-				95FADA445111FDE0337F25D3 /* libsqlite3.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -142,17 +129,8 @@
 			children = (
 				348319A7785B2E3556FDE7FE /* Assets.xcassets */,
 				8FF0B7D62B0EA75177346766 /* PrivacyInfo.xcprivacy */,
-				265548B8EBF46BA0C604D69E /* OfflineMaps */,
 			);
 			path = Resources;
-			sourceTree = "<group>";
-		};
-		265548B8EBF46BA0C604D69E /* OfflineMaps */ = {
-			isa = PBXGroup;
-			children = (
-				E5EE23640C7F388B3D015BE7 /* manhattan-v3.sqlite */,
-			);
-			path = OfflineMaps;
 			sourceTree = "<group>";
 		};
 		26DB36C67FAC212037CF186E /* Packages */ = {
@@ -182,8 +160,8 @@
 		4AA56FD0C286D33C56F44829 /* Map */ = {
 			isa = PBXGroup;
 			children = (
-				E8BF0207B065346AC05141A3 /* CoverageMapView.swift */,
-				0680935086BEF95DCDD5497A /* CoverageNetworkOverlay.swift */,
+				3DC1C40A9FE2099E49F82BCD /* LifetimeMapView.swift */,
+				C9E5E6FE2A88CB2CB95ED60A /* LifetimeRouteOverlay.swift */,
 			);
 			path = Map;
 			sourceTree = "<group>";
@@ -192,8 +170,7 @@
 			isa = PBXGroup;
 			children = (
 				19021ECDD743539F735E97EB /* FloatingSurface.swift */,
-				E859A7C657582260DBF36425 /* ProgressCard.swift */,
-				2F3A360D51B667F08F8726DE /* ProgressCard+Previews.swift */,
+				D4BC03B542D988F2613CB3F8 /* LifetimeMapCard.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -211,11 +188,10 @@
 		9473AA8B0E1C3C14A7DEC691 /* Sheets */ = {
 			isa = PBXGroup;
 			children = (
+				FEC91337BE114A1E5CEB53E0 /* AboutMapSheet.swift */,
 				17E30468590D4D9726DDFB35 /* AppSheetHost.swift */,
-				9329091AFFFFA96D1AF1B262 /* CoverageDetailsSheet.swift */,
-				9F9C761A83C3D8700F89E5B9 /* DebugRouteInspectorSheet.swift */,
 				DFEE4016432BD4ADFD2BD156 /* HealthAccessHelpSheet.swift */,
-				9E2179330C71F7193E3AF290 /* MethodologySheet.swift */,
+				B046C74515C22BBC4EC5392B /* MapDetailsSheet.swift */,
 				81478E450E3A9547982D0DCA /* PrivacySheet.swift */,
 				07510A3D027DD1B78300B46C /* WorkoutHistorySheet.swift */,
 			);
@@ -248,11 +224,9 @@
 		D6D136B9E6898708C3BCA5B9 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				BD0562077201A0FF7534F87A /* DebugRouteFixtureStore.swift */,
 				DABD328367D5C28075FE1BF9 /* HealthKitWorkoutRouteSource.swift */,
 				077BA6556C2F7B4B7071A680 /* ProtectedModelContainer.swift */,
-				F745868D274433532D71FDA4 /* SQLiteCityPackLoader.swift */,
-				DAE481DC24847009E19197AE /* SwiftDataCoverageRepository.swift */,
+				E7BBD32E835A9E48F49F04B8 /* SwiftDataWalkHistoryRepository.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -262,7 +236,6 @@
 			children = (
 				B499B81A9931CBF9FD2D136F /* CoreLocation.framework */,
 				F5696D74A58FC1BE5F4B683B /* HealthKit.framework */,
-				A67B4C50393306F2C0EC54B2 /* libsqlite3.tbd */,
 				CDCBDD4837A510C93B7C65A3 /* MapKit.framework */,
 			);
 			name = Frameworks;
@@ -404,7 +377,6 @@
 			files = (
 				808D13FDF892A3C5FB9CBBF2 /* Assets.xcassets in Resources */,
 				9576DEA3C91B4A18EAA177CE /* PrivacyInfo.xcprivacy in Resources */,
-				903B26798D50A275D0BDB973 /* manhattan-v3.sqlite in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -423,28 +395,24 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7F0E2E133994B073F7D8B681 /* AboutMapSheet.swift in Sources */,
 				39D973E0EA314470390C9BE9 /* AppDependencies.swift in Sources */,
 				9F775BE05BA74554735045A0 /* AppModel.swift in Sources */,
 				C691B3B6540554A1EEF7A2FC /* AppSheetHost.swift in Sources */,
-				D4CA4A9C7C1A5A6C6E9451A5 /* CoverageDetailsSheet.swift in Sources */,
-				459DC40F36324DCCA2646629 /* CoverageMapView.swift in Sources */,
-				483F55B8C510400EE6F88D72 /* CoverageNetworkOverlay.swift in Sources */,
-				ECADEBD9EAB6EE31C6F2BD11 /* DebugRouteFixtureStore.swift in Sources */,
-				DDC1A44F88C8A4E0C7EE8ECD /* DebugRouteInspectorSheet.swift in Sources */,
 				4FBA7F88E1113AA285EFAD0B /* FloatingSurface.swift in Sources */,
 				B5AC9CC528D1C64AB767B87A /* HealthAccessHelpSheet.swift in Sources */,
 				F1F3115EE0992110C4C31275 /* HealthKitWorkoutRouteSource.swift in Sources */,
+				3051DEB5DA7A79624439F509 /* LifetimeMapCard.swift in Sources */,
+				6A89440BF99E65FEE3049771 /* LifetimeMapView.swift in Sources */,
+				088EF3B75FC7D1D2D16EE736 /* LifetimeRouteOverlay.swift in Sources */,
+				3037AF5C16F6716FE0B9CD8D /* MapDetailsSheet.swift in Sources */,
 				10557EC7241C285E39ACDF5D /* MapScreen.swift in Sources */,
-				E7B912EC74668C826D9E327C /* MethodologySheet.swift in Sources */,
 				1F975065E6666299E024AC08 /* OnboardingView.swift in Sources */,
 				E1396F76D748166FC83178F9 /* PersistedModels.swift in Sources */,
 				03AEC17F7115392866B9154A /* PrivacySheet.swift in Sources */,
-				92F1A12E6F6E41C8B6B3FE59 /* ProgressCard+Previews.swift in Sources */,
-				F2522C4FABA0C69A9C7282EE /* ProgressCard.swift in Sources */,
 				3E143D15AC4609EC8283ED76 /* ProtectedModelContainer.swift in Sources */,
 				0D629F6DD05C5320C8464DFC /* RootView.swift in Sources */,
-				ACA9D156625EC7DAF9E89C5F /* SQLiteCityPackLoader.swift in Sources */,
-				8BE68125F8DA9A8480181B12 /* SwiftDataCoverageRepository.swift in Sources */,
+				93565D919F418B83A9DB9603 /* SwiftDataWalkHistoryRepository.swift in Sources */,
 				03E8583FAEF3E021BC27A6B0 /* WalkItAllApp.swift in Sources */,
 				39492E0DC66EBE95B56F840D /* WorkoutHistorySheet.swift in Sources */,
 			);

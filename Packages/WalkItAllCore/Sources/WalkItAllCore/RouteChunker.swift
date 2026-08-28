@@ -2,20 +2,16 @@ import Foundation
 
 public struct RouteChunkingResult: Sendable {
     public let chunks: [[RoutePoint]]
-    public let unmatchedPortions: [UnmatchedPortion]
-    public let rejectedPointCount: Int
+    public let discardedPointCount: Int
 
-    public init(
-        chunks: [[RoutePoint]],
-        unmatchedPortions: [UnmatchedPortion],
-        rejectedPointCount: Int
-    ) {
+    public init(chunks: [[RoutePoint]], discardedPointCount: Int) {
         self.chunks = chunks
-        self.unmatchedPortions = unmatchedPortions
-        self.rejectedPointCount = rejectedPointCount
+        self.discardedPointCount = discardedPointCount
     }
 }
 
+/// Filters unreliable samples and separates continuous walking portions. A
+/// break always ends the current part; the processor never draws across it.
 public struct RouteChunker: Sendable {
     public let maximumHorizontalAccuracyMeters: Double
     public let maximumTimeGap: TimeInterval
@@ -39,86 +35,58 @@ public struct RouteChunker: Sendable {
     }
 
     public func process(_ points: [RoutePoint]) -> RouteChunkingResult {
-        let ordered = points.sorted { $0.timestamp < $1.timestamp }
-        var result: [[RoutePoint]] = []
+        let ordered = points.enumerated().sorted {
+            if $0.element.timestamp == $1.element.timestamp { return $0.offset < $1.offset }
+            return $0.element.timestamp < $1.element.timestamp
+        }.map(\.element)
+
+        var chunks: [[RoutePoint]] = []
         var current: [RoutePoint] = []
-        var unmatched: [UnmatchedPortion] = []
-        var rejectedPointCount = 0
+        var discardedPointCount = 0
+
+        func finishCurrent() {
+            if current.count >= 2 {
+                chunks.append(current)
+            } else {
+                discardedPointCount += current.count
+            }
+            current.removeAll(keepingCapacity: true)
+        }
 
         for point in ordered {
             guard point.coordinate.isValid,
+                  point.horizontalAccuracy.isFinite,
                   point.horizontalAccuracy >= 0,
                   point.horizontalAccuracy <= maximumHorizontalAccuracyMeters
             else {
-                finish(
-                    &current,
-                    into: &result,
-                    unmatched: &unmatched,
-                    rejectedPointCount: &rejectedPointCount
-                )
-                unmatched.append(UnmatchedPortion(
-                    start: point.timestamp,
-                    end: point.timestamp,
-                    reason: .inaccurateLocation
-                ))
-                rejectedPointCount += 1
+                finishCurrent()
+                discardedPointCount += 1
                 continue
             }
 
             if let previous = current.last {
+                if previous.timestamp == point.timestamp,
+                   previous.coordinate == point.coordinate
+                {
+                    discardedPointCount += 1
+                    continue
+                }
+
                 let elapsed = point.timestamp.timeIntervalSince(previous.timestamp)
                 let distance = GeoMath.distance(previous.coordinate, point.coordinate)
-                let impliedSpeed = elapsed > 0 ? distance / elapsed : .greatestFiniteMagnitude
+                let speed = elapsed > 0 ? distance / elapsed : .greatestFiniteMagnitude
                 if elapsed <= 0
                     || elapsed > maximumTimeGap
                     || distance > maximumDistanceGapMeters
-                    || impliedSpeed > maximumImpliedSpeedMetersPerSecond
+                    || speed > maximumImpliedSpeedMetersPerSecond
                 {
-                    unmatched.append(UnmatchedPortion(
-                        start: previous.timestamp,
-                        end: point.timestamp,
-                        reason: .routeGap
-                    ))
-                    finish(
-                        &current,
-                        into: &result,
-                        unmatched: &unmatched,
-                        rejectedPointCount: &rejectedPointCount
-                    )
+                    finishCurrent()
                 }
             }
             current.append(point)
         }
 
-        finish(
-            &current,
-            into: &result,
-            unmatched: &unmatched,
-            rejectedPointCount: &rejectedPointCount
-        )
-        return RouteChunkingResult(
-            chunks: result,
-            unmatchedPortions: unmatched,
-            rejectedPointCount: rejectedPointCount
-        )
-    }
-
-    private func finish(
-        _ current: inout [RoutePoint],
-        into result: inout [[RoutePoint]],
-        unmatched: inout [UnmatchedPortion],
-        rejectedPointCount: inout Int
-    ) {
-        if current.count >= 2 {
-            result.append(current)
-        } else if let point = current.first {
-            unmatched.append(UnmatchedPortion(
-                start: point.timestamp,
-                end: point.timestamp,
-                reason: .lowConfidence
-            ))
-            rejectedPointCount += 1
-        }
-        current.removeAll(keepingCapacity: true)
+        finishCurrent()
+        return RouteChunkingResult(chunks: chunks, discardedPointCount: discardedPointCount)
     }
 }

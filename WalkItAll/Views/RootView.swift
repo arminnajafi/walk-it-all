@@ -64,7 +64,7 @@ private struct LaunchPlaceholder: View {
                 Image(systemName: "map.fill")
                     .font(.system(size: 42))
                     .foregroundStyle(.indigo)
-                ProgressView("Opening Manhattan…")
+                ProgressView("Opening your map…")
             }
         }
     }

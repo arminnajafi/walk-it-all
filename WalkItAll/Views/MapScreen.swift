@@ -1,39 +1,31 @@
 import SwiftUI
-import WalkItAllCore
 
 struct MapScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let model: AppModel
     @State private var showHealthWaitHelp = false
-    @State private var bottomOverlayHeight: CGFloat = 300
+    @State private var bottomOverlayHeight: CGFloat = 220
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                if let pack = model.cityPack {
-                    CoverageMapView(
-                        pack: pack,
-                        coverage: model.coverage,
-                        selectedWorkout: model.selectedWorkout,
-                        coverageRevision: model.coverageRenderRevision,
-                        viewportCommand: model.mapViewportCommand,
-                        mapOrnamentBottomInset: bottomOverlayHeight
-                            + geometry.safeAreaInsets.bottom
-                            + 8
-                    )
-                    .ignoresSafeArea()
-                }
+                LifetimeMapView(
+                    records: model.routeRecords,
+                    selectedWorkout: model.selectedWorkout,
+                    routeRevision: model.routeRenderRevision,
+                    viewportCommand: model.mapViewportCommand,
+                    mapOrnamentBottomInset: bottomOverlayHeight
+                        + geometry.safeAreaInsets.bottom
+                        + 8
+                )
+                .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     topControls
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
-
                     Spacer()
-
-                    if let coverage = model.coverage {
-                        progressCard(coverage, availableHeight: geometry.size.height)
-                    }
+                    bottomCard(availableHeight: geometry.size.height)
                 }
                 .onPreferenceChange(BottomOverlayHeightPreferenceKey.self) { height in
                     guard height > 0 else { return }
@@ -51,11 +43,7 @@ struct MapScreen: View {
         }
         .task(id: model.importPhase) {
             guard model.importPhase == .requestingHealthAccess else { return }
-            do {
-                try await Task.sleep(for: .seconds(10))
-            } catch {
-                return
-            }
+            do { try await Task.sleep(for: .seconds(10)) } catch { return }
             guard model.importPhase == .requestingHealthAccess else { return }
             showHealthWaitHelp = true
         }
@@ -66,7 +54,7 @@ struct MapScreen: View {
             }
             Button("Keep Waiting", role: .cancel) {}
         } message: {
-            Text("If the Apple Health permission sheet is not visible, review the access steps or try the request again.")
+            Text("If Apple’s permission sheet is not visible, review the access steps or try again.")
         }
     }
 
@@ -75,70 +63,58 @@ struct MapScreen: View {
         if #available(iOS 26.0, *) {
             GlassEffectContainer(spacing: 12) {
                 HStack {
-                    areaButton
-                        .buttonStyle(.glass)
+                    manhattanButton.buttonStyle(.glass)
                     Spacer()
-                    Button {
-                        model.presentedSheet = .details
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .font(.title3.weight(.semibold))
-                            .frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.glass)
-                    .accessibilityLabel("About Walk It All")
+                    infoButton.buttonStyle(.glass)
                 }
             }
         } else {
             HStack {
-                areaButton
+                manhattanButton
                     .buttonStyle(.plain)
                     .walkItAllControlSurface()
                 Spacer()
-                Button {
-                    model.presentedSheet = .details
-                } label: {
-                    Image(systemName: "info.circle")
-                        .font(.title3.weight(.semibold))
-                        .frame(width: 44, height: 44)
-                        .walkItAllControlSurface()
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("About Walk It All")
+                infoButton
+                    .buttonStyle(.plain)
+                    .walkItAllControlSurface()
             }
         }
     }
 
-    private var areaButton: some View {
+    private var manhattanButton: some View {
         Button(action: model.showAllManhattan) {
-            Group {
-                if dynamicTypeSize >= .accessibility4 {
-                    Image(systemName: "map.fill")
-                        .frame(width: 44, height: 44)
-                } else {
-                    Label("Manhattan", systemImage: "map.fill")
-                        .padding(.horizontal, 15)
-                        .padding(.vertical, 11)
-                }
-            }
-            .font(.subheadline.weight(.semibold))
+            Label("Manhattan", systemImage: "map.fill")
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 14)
+                .frame(minHeight: 44)
         }
-        .accessibilityLabel("Show all Manhattan")
-        .accessibilityHint("Recenters the map on the full completion area")
-        .accessibilityIdentifier("current-completion-area")
+        .accessibilityLabel("Show Manhattan")
+        .accessibilityHint("Recenters the map on Manhattan")
+        .accessibilityIdentifier("manhattan-recenter")
+    }
+
+    private var infoButton: some View {
+        Button {
+            model.presentedSheet = .details
+        } label: {
+            Image(systemName: "info.circle")
+                .font(.title3.weight(.semibold))
+                .frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("About Walk It All")
     }
 
     @ViewBuilder
-    private func progressCard(_ coverage: CoverageSnapshot, availableHeight: CGFloat) -> some View {
+    private func bottomCard(availableHeight: CGFloat) -> some View {
         let card = Group {
             if let workout = model.selectedWorkout {
                 SelectedWorkoutCard(workout: workout, clear: model.clearSelectedWorkout)
             } else {
-                ProgressCard(
-                    coverage: coverage,
+                LifetimeMapCard(
+                    mappedWorkoutCount: model.mappedWorkoutCount,
                     phase: model.importPhase,
                     lastSuccessfulImport: model.lastSuccessfulImport,
-                    hasMappedWorkouts: model.hasMappedWorkouts,
+                    hasConnectedHealth: model.hasConnectedHealth,
                     refresh: model.refresh,
                     cancel: model.cancelImport,
                     showDetails: { model.presentedSheet = .details }
@@ -149,10 +125,9 @@ struct MapScreen: View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 ScrollView {
-                    card
-                        .padding(.vertical, 12)
+                    card.padding(.vertical, 10)
                 }
-                .frame(maxHeight: availableHeight * 0.78)
+                .frame(maxHeight: availableHeight * 0.62)
                 .padding(.horizontal, 16)
             } else {
                 card
@@ -169,12 +144,10 @@ struct MapScreen: View {
             }
         }
     }
-
 }
 
 private struct BottomOverlayHeightPreferenceKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
-
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
     }

@@ -155,11 +155,6 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
         try await healthStore.requestAuthorization(toShare: [], read: readTypes)
     }
 
-    func route(for workoutID: UUID) async throws -> WorkoutRoute? {
-        guard let workout = try await workout(id: workoutID) else { return nil }
-        return try await loadWorkoutRoute(workout).route
-    }
-
     func routeBatches(
         since checkpoint: Data?,
         excluding workoutIDs: Set<UUID>
@@ -183,7 +178,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                         try Task.checkCancellation()
                         guard let parent = try await parentWorkout(for: routeSample) else {
                             // Routes for activities other than walking and hiking are
-                            // intentionally outside this app's completion history.
+                            // intentionally outside this app's walking history.
                             continue
                         }
                         addedAssociations[routeSample.uuid] = parent.uuid

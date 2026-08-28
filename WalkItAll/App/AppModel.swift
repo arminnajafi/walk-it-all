@@ -36,14 +36,14 @@ enum ImportPhase: Equatable {
     case requestingHealthAccess
     case findingWorkouts
     case readingRoutes(completed: Int, total: Int)
-    case matching(completed: Int, total: Int)
-    case calculating
-    case complete(imported: Int, unmatched: Int)
+    case processingRoutes(completed: Int, total: Int)
+    case preparingMap
+    case complete(imported: Int)
     case failed(String)
 
     var isWorking: Bool {
         switch self {
-        case .requestingHealthAccess, .findingWorkouts, .readingRoutes, .matching, .calculating:
+        case .requestingHealthAccess, .findingWorkouts, .readingRoutes, .processingRoutes, .preparingMap:
             true
         default:
             false
@@ -56,78 +56,52 @@ enum ImportPhase: Equatable {
         case .requestingHealthAccess: "Connecting to Apple Health…"
         case .findingWorkouts: "Finding workouts…"
         case let .readingRoutes(completed, total): "Reading routes \(completed) of \(total)…"
-        case let .matching(completed, total): "Matching walks \(completed) of \(total)…"
-        case .calculating: "Calculating coverage…"
-        case let .complete(imported, _): "Updated \(imported) workout\(imported == 1 ? "" : "s")"
-        case .failed: "Import needs attention"
+        case let .processingRoutes(completed, total): "Preparing walks \(completed) of \(total)…"
+        case .preparingMap: "Updating your map…"
+        case let .complete(imported): "Updated \(imported) walk\(imported == 1 ? "" : "s")"
+        case .failed: "Refresh needs attention"
         }
     }
 }
-
-private struct ProcessedWorkoutRoute: Sendable {
-    let record: WorkoutCoverageRecord
-    let unmatchedPortionCount: Int
-}
-
-#if DEBUG
-enum DebugInspectionState {
-    case idle
-    case loading
-    case loaded(route: WorkoutRoute, match: MatchResult, nearbySegmentIDs: Set<SegmentID>)
-    case failed(String)
-}
-#endif
 
 @MainActor
 @Observable
 final class AppModel {
     private static let onboardingKey = "didCompleteOnboarding"
     private static let connectedHealthKey = "didConnectAppleHealth"
+    private static let migrationStartedKey = "didBeginLifetimeMapMigration"
     private static let automaticRefreshInterval: TimeInterval = 5 * 60
     private let logger = Logger(subsystem: "com.arminnajafi.walkitall", category: "AppModel")
 
     var launchState: AppLaunchState = .loading
     var importPhase: ImportPhase = .idle
-    var coverage: CoverageSnapshot?
-    var workoutRecords: [WorkoutCoverageRecord] = []
+    var routeRecords: [WorkoutRouteRecord] = []
     var selectedWorkoutID: UUID?
     var presentedSheet: AppSheet?
     var lastSuccessfulImport: Date?
-    var coverageRenderRevision = 0
+    var routeRenderRevision = 0
     var mapViewportCommand = MapViewportCommand(revision: 0, target: .manhattan)
-    #if DEBUG
-    var debugInspectionState: DebugInspectionState = .idle
-    #endif
     var hasCompletedOnboarding: Bool {
         didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: Self.onboardingKey) }
     }
 
     @ObservationIgnored private let routeSource: any WorkoutRouteSource
-    @ObservationIgnored private let repository: any CoverageRepository
-    @ObservationIgnored private let cityPackLoader: SQLiteCityPackLoader
-    @ObservationIgnored private let matcher: any MapMatcher
-    @ObservationIgnored private let coverageCalculator: CoverageCalculator
-    @ObservationIgnored private let routeSimplifier: RouteSimplifier
-    @ObservationIgnored private let routeChunker: RouteChunker
+    @ObservationIgnored private let repository: any WalkHistoryRepository
+    @ObservationIgnored private let routeProcessor: RouteProcessor
+    @ObservationIgnored private let legacyStore: LegacyCoverageStore
+    @ObservationIgnored private let protectStorage: @Sendable () throws -> Void
     @ObservationIgnored private var importTask: Task<Void, Never>?
     @ObservationIgnored private var importGeneration = 0
     @ObservationIgnored private var shouldImportAfterOnboardingDismisses = false
     @ObservationIgnored private var lastAutomaticRefreshAttempt: Date?
-    #if DEBUG
-    @ObservationIgnored private var hasExportedRequestedDiagnostic = false
-    @ObservationIgnored private var debugInspectionGeneration = 0
-    #endif
-
-    private(set) var cityPack: (any CityCoveragePack)?
 
     init(dependencies: AppDependencies) {
         routeSource = dependencies.routeSource
         repository = dependencies.repository
-        cityPackLoader = dependencies.cityPackLoader
-        matcher = dependencies.matcher
-        coverageCalculator = dependencies.coverageCalculator
-        routeSimplifier = dependencies.routeSimplifier
-        routeChunker = dependencies.routeChunker
+        routeProcessor = dependencies.routeProcessor
+        legacyStore = dependencies.legacyStore
+        protectStorage = dependencies.protectStorage
+
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("-resetOnboarding") {
             UserDefaults.standard.removeObject(forKey: Self.onboardingKey)
@@ -137,50 +111,44 @@ final class AppModel {
             || arguments.contains("-skipOnboarding")
     }
 
-    var selectedWorkout: WorkoutCoverageRecord? {
-        workoutRecords.first { $0.id == selectedWorkoutID }
+    var selectedWorkout: WorkoutRouteRecord? {
+        routeRecords.first { $0.id == selectedWorkoutID }
     }
 
-    var workoutsWithCoverageCount: Int {
-        workoutRecords.lazy.filter {
-            $0.contribution.uniqueCoveredDistanceMeters > 0
-        }.count
-    }
-
-    var hasMappedWorkouts: Bool {
-        workoutsWithCoverageCount > 0
-    }
+    var mappedWorkoutCount: Int { routeRecords.count }
+    var hasMappedWorkouts: Bool { !routeRecords.isEmpty }
 
     var hasConnectedHealth: Bool {
-        UserDefaults.standard.bool(forKey: Self.connectedHealthKey)
+        UserDefaults.standard.bool(forKey: Self.connectedHealthKey) || !routeRecords.isEmpty
     }
 
     func bootstrap() async {
         guard launchState == .loading || isFailure(launchState) else { return }
         launchState = .loading
         do {
-            let pack = try await cityPackLoader.loadBundledManhattan()
-            cityPack = pack
-            try await repository.prepareForPack(
-                identifier: pack.metadata.identifier,
-                version: pack.metadata.version
-            )
-
-            workoutRecords = try await repository.loadWorkoutRecords(
-                packIdentifier: pack.metadata.identifier,
-                packVersion: pack.metadata.version
-            )
-            coverage = await Self.calculateCoverage(
-                calculator: coverageCalculator,
-                pack: pack,
-                contributions: workoutRecords.map(\.contribution)
-            )
-            lastSuccessfulImport = try await repository.loadLastSuccessfulImport()
-            coverageRenderRevision &+= 1
-            launchState = .ready
+            routeRecords = try await repository.loadRecords()
             #if DEBUG
-            await exportRequestedDiagnosticIfNeeded()
+            if routeRecords.isEmpty,
+               ProcessInfo.processInfo.arguments.contains("-uiTestPopulated")
+            {
+                routeRecords = Self.uiTestRecords
+            }
             #endif
+            lastSuccessfulImport = try await repository.loadLastSuccessfulImport()
+            try protectStorage()
+            routeRenderRevision &+= 1
+            launchState = .ready
+
+            // A completed new-store import can outlive a failed legacy-file
+            // cleanup. Retry the exact cleanup on a later unlocked launch.
+            if legacyStore.exists,
+               lastSuccessfulImport != nil,
+               !routeRecords.isEmpty
+            {
+                try? finishLegacyMigration()
+            } else if !legacyStore.exists {
+                UserDefaults.standard.removeObject(forKey: Self.migrationStartedKey)
+            }
         } catch {
             logger.error("Bootstrap failed: \(error.localizedDescription, privacy: .private)")
             launchState = .failed(error.localizedDescription)
@@ -200,7 +168,7 @@ final class AppModel {
 
     func refresh() {
         guard !importPhase.isWorking else { return }
-        beginAuthorizedImport(resetFirst: false, isAutomatic: false)
+        beginAuthorizedImport(resetFirst: shouldStartLegacyRebuild, isAutomatic: false)
     }
 
     func rebuildFromHealth() {
@@ -209,6 +177,11 @@ final class AppModel {
     }
 
     func refreshIfNeeded(now: Date = Date()) {
+        #if DEBUG
+        // Synthetic records exercise populated UI without opening a real
+        // Health authorization sheet in UI tests.
+        guard !ProcessInfo.processInfo.arguments.contains("-uiTestPopulated") else { return }
+        #endif
         guard launchState == .ready,
               hasConnectedHealth,
               !importPhase.isWorking,
@@ -217,41 +190,7 @@ final class AppModel {
         else { return }
 
         lastAutomaticRefreshAttempt = now
-        beginAuthorizedImport(resetFirst: false, isAutomatic: true)
-    }
-
-    private func beginAuthorizedImport(resetFirst: Bool, isAutomatic: Bool) {
-        importGeneration &+= 1
-        let generation = importGeneration
-        importTask?.cancel()
-        importTask = Task { [weak self] in
-            guard let self else { return }
-            importPhase = .requestingHealthAccess
-            do {
-                try await routeSource.requestReadAuthorization()
-                try Task.checkCancellation()
-                guard generation == importGeneration else { return }
-                UserDefaults.standard.set(true, forKey: Self.connectedHealthKey)
-                if resetFirst {
-                    try await repository.resetDerivedCoverage()
-                    workoutRecords = []
-                    selectedWorkoutID = nil
-                    showAllManhattan()
-                    lastSuccessfulImport = nil
-                    if let cityPack { coverage = .empty(pack: cityPack) }
-                    coverageRenderRevision &+= 1
-                }
-                await performImport(generation: generation)
-            } catch is CancellationError {
-                guard generation == importGeneration else { return }
-                importPhase = .idle
-            } catch {
-                guard generation == importGeneration else { return }
-                logger.error("Health import setup failed: \(error.localizedDescription, privacy: .private)")
-                importPhase = .failed(error.localizedDescription)
-                if isAutomatic { lastAutomaticRefreshAttempt = Date() }
-            }
-        }
+        beginAuthorizedImport(resetFirst: shouldStartLegacyRebuild, isAutomatic: true)
     }
 
     func cancelImport() {
@@ -259,6 +198,7 @@ final class AppModel {
         importTask?.cancel()
         importTask = nil
         importPhase = .idle
+        publishStoredHistory()
     }
 
     func selectWorkout(_ id: UUID) {
@@ -282,8 +222,47 @@ final class AppModel {
         )
     }
 
+    private var shouldStartLegacyRebuild: Bool {
+        legacyStore.exists
+            && !UserDefaults.standard.bool(forKey: Self.migrationStartedKey)
+    }
+
+    private func beginAuthorizedImport(resetFirst: Bool, isAutomatic: Bool) {
+        importGeneration &+= 1
+        let generation = importGeneration
+        importTask?.cancel()
+        importTask = Task { [weak self] in
+            guard let self else { return }
+            importPhase = .requestingHealthAccess
+            do {
+                try await routeSource.requestReadAuthorization()
+                try Task.checkCancellation()
+                guard generation == importGeneration else { return }
+                UserDefaults.standard.set(true, forKey: Self.connectedHealthKey)
+                if resetFirst {
+                    try await repository.reset()
+                    if legacyStore.exists {
+                        UserDefaults.standard.set(true, forKey: Self.migrationStartedKey)
+                    }
+                    routeRecords = []
+                    lastSuccessfulImport = nil
+                    clearSelectedWorkout()
+                    routeRenderRevision &+= 1
+                }
+                await performImport(generation: generation)
+            } catch is CancellationError {
+                guard generation == importGeneration else { return }
+                importPhase = .idle
+            } catch {
+                guard generation == importGeneration else { return }
+                logger.error("Health import setup failed: \(error.localizedDescription, privacy: .private)")
+                importPhase = .failed(error.localizedDescription)
+                if isAutomatic { lastAutomaticRefreshAttempt = Date() }
+            }
+        }
+    }
+
     private func performImport(generation: Int) async {
-        guard let pack = cityPack else { return }
         guard generation == importGeneration else { return }
         importPhase = .findingWorkouts
         do {
@@ -294,49 +273,34 @@ final class AppModel {
                 excluding: processedWorkoutIDs
             )
             var imported = 0
-            var unmatched = 0
 
             for try await batch in batches {
                 try Task.checkCancellation()
                 if !batch.deletedWorkoutIDs.isEmpty {
-                    try await repository.remove(workoutIDs: batch.deletedWorkoutIDs)
-                    let deleted = Set(batch.deletedWorkoutIDs)
-                    workoutRecords.removeAll { deleted.contains($0.id) }
-                    if let selectedWorkoutID, deleted.contains(selectedWorkoutID) {
-                        clearSelectedWorkout()
-                    }
+                    try await repository.removeWorkouts(workoutIDs: batch.deletedWorkoutIDs)
                 }
                 if !batch.routeInvalidatedWorkoutIDs.isEmpty {
-                    try await repository.removeCoverage(workoutIDs: batch.routeInvalidatedWorkoutIDs)
-                    let invalidated = Set(batch.routeInvalidatedWorkoutIDs)
-                    workoutRecords.removeAll { invalidated.contains($0.id) }
-                    if let selectedWorkoutID, invalidated.contains(selectedWorkoutID) {
-                        clearSelectedWorkout()
-                    }
+                    try await repository.removeRouteRecords(
+                        workoutIDs: batch.routeInvalidatedWorkoutIDs
+                    )
                 }
 
-                importPhase = .readingRoutes(completed: batch.completedCount, total: batch.totalCount)
+                importPhase = .readingRoutes(
+                    completed: batch.completedCount,
+                    total: batch.totalCount
+                )
                 for route in batch.routes {
                     try Task.checkCancellation()
-                    importPhase = .matching(completed: batch.completedCount, total: batch.totalCount)
-                    let processed = try await Self.process(
-                        route: route,
-                        matcher: matcher,
-                        pack: pack,
-                        routeChunker: routeChunker,
-                        routeSimplifier: routeSimplifier
+                    importPhase = .processingRoutes(
+                        completed: batch.completedCount,
+                        total: batch.totalCount
                     )
-                    let record = processed.record
-                    try await repository.save(
-                        record: record,
-                        packIdentifier: pack.metadata.identifier,
-                        packVersion: pack.metadata.version
-                    )
-                    workoutRecords.removeAll { $0.id == record.id }
-                    workoutRecords.append(record)
-                    workoutRecords.sort { $0.start > $1.start }
-                    imported += 1
-                    unmatched += processed.unmatchedPortionCount
+                    if let record = await Self.process(route, with: routeProcessor) {
+                        try await repository.save(record: record)
+                        imported += 1
+                    } else {
+                        try await repository.removeRouteRecords(workoutIDs: [route.id])
+                    }
                 }
                 for processed in batch.processedWorkouts {
                     try await repository.markWorkoutProcessed(id: processed.id, end: processed.end)
@@ -346,43 +310,66 @@ final class AppModel {
                 }
             }
 
-            importPhase = .calculating
-            let calculatedCoverage = await Self.calculateCoverage(
-                calculator: coverageCalculator,
-                pack: pack,
-                contributions: workoutRecords.map(\.contribution)
-            )
+            importPhase = .preparingMap
+            let records = try await repository.loadRecords()
             try Task.checkCancellation()
             guard generation == importGeneration else { return }
-            coverage = calculatedCoverage
             let successfulRefreshDate = Date()
             try await repository.saveLastSuccessfulImport(successfulRefreshDate)
+            try protectStorage()
+            routeRecords = records
             lastSuccessfulImport = successfulRefreshDate
-            coverageRenderRevision &+= 1
-            importPhase = .complete(imported: imported, unmatched: unmatched)
-            #if DEBUG
-            await exportRequestedDiagnosticIfNeeded()
-            #endif
+            clearSelectionIfMissing()
+            routeRenderRevision &+= 1
+            importPhase = .complete(imported: imported)
+
+            if legacyStore.exists, !records.isEmpty {
+                do {
+                    try finishLegacyMigration()
+                } catch {
+                    logger.error("Legacy cache cleanup deferred: \(error.localizedDescription, privacy: .private)")
+                }
+            }
         } catch is CancellationError {
             guard generation == importGeneration else { return }
-            coverage = await Self.calculateCoverage(
-                calculator: coverageCalculator,
-                pack: pack,
-                contributions: workoutRecords.map(\.contribution)
-            )
-            coverageRenderRevision &+= 1
+            await publishStoredHistory()
             importPhase = .idle
         } catch {
             guard generation == importGeneration else { return }
-            coverage = await Self.calculateCoverage(
-                calculator: coverageCalculator,
-                pack: pack,
-                contributions: workoutRecords.map(\.contribution)
-            )
-            coverageRenderRevision &+= 1
-            logger.error("Import failed: \(error.localizedDescription, privacy: .private)")
+            await publishStoredHistory()
+            logger.error("Health import failed: \(error.localizedDescription, privacy: .private)")
             importPhase = .failed(error.localizedDescription)
         }
+    }
+
+    private func publishStoredHistory() {
+        Task { [weak self] in
+            guard let self else { return }
+            await publishStoredHistory()
+        }
+    }
+
+    private func publishStoredHistory() async {
+        do {
+            routeRecords = try await repository.loadRecords()
+            clearSelectionIfMissing()
+            routeRenderRevision &+= 1
+            try protectStorage()
+        } catch {
+            logger.error("Could not publish stored history: \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
+    private func clearSelectionIfMissing() {
+        guard let selectedWorkoutID,
+              !routeRecords.contains(where: { $0.id == selectedWorkoutID })
+        else { return }
+        clearSelectedWorkout()
+    }
+
+    private func finishLegacyMigration() throws {
+        try legacyStore.removeAfterSuccessfulRebuild()
+        UserDefaults.standard.removeObject(forKey: Self.migrationStartedKey)
     }
 
     private func isFailure(_ state: AppLaunchState) -> Bool {
@@ -390,128 +377,43 @@ final class AppModel {
         return false
     }
 
-    #if DEBUG
-    func loadDebugInspection(workoutID: UUID) async {
-        debugInspectionGeneration &+= 1
-        let generation = debugInspectionGeneration
-        debugInspectionState = .loading
-        do {
-            guard let pack = cityPack else {
-                debugInspectionState = .failed("The offline Manhattan map is not loaded.")
-                return
-            }
-            guard let route = try await routeSource.route(for: workoutID) else {
-                guard generation == debugInspectionGeneration else { return }
-                debugInspectionState = .failed(
-                    "Apple Health no longer has a readable route for this workout."
-                )
-                return
-            }
-            try Task.checkCancellation()
-            guard generation == debugInspectionGeneration else { return }
-            let match = try await matcher.match(points: route.points, in: pack)
-            let nearbySegmentIDs = await Task.detached(priority: .userInitiated) {
-                let strideLength = max(1, route.points.count / 500)
-                var ids = Set<SegmentID>()
-                for index in stride(from: 0, to: route.points.count, by: strideLength) {
-                    ids.formUnion(
-                        pack.segments(near: route.points[index].coordinate, radiusMeters: 75).map(\.id)
-                    )
-                }
-                return ids
-            }.value
-            try Task.checkCancellation()
-            guard generation == debugInspectionGeneration else { return }
-            debugInspectionState = .loaded(
-                route: route,
-                match: match,
-                nearbySegmentIDs: nearbySegmentIDs
-            )
-        } catch is CancellationError {
-            guard generation == debugInspectionGeneration else { return }
-            debugInspectionState = .idle
-        } catch {
-            guard generation == debugInspectionGeneration else { return }
-            logger.error("Debug route inspection failed: \(error.localizedDescription, privacy: .private)")
-            debugInspectionState = .failed(error.localizedDescription)
-        }
-    }
-
-    func clearDebugInspection() {
-        debugInspectionGeneration &+= 1
-        debugInspectionState = .idle
-    }
-
-    private func exportRequestedDiagnosticIfNeeded() async {
-        guard !hasExportedRequestedDiagnostic,
-              let rawIndex = ProcessInfo.processInfo.environment["WALK_IT_ALL_DIAGNOSTIC_WORKOUT_INDEX"],
-              let index = Int(rawIndex),
-              workoutRecords.indices.contains(index),
-              let pack = cityPack
-        else { return }
-
-        do {
-            let record = workoutRecords[index]
-            guard let route = try await routeSource.route(for: record.id) else { return }
-            let match = try await matcher.match(points: route.points, in: pack)
-            let fixture = PrivateRouteDiagnosticFixture(
-                schemaVersion: 2,
-                createdAt: Date(),
-                packIdentifier: pack.metadata.identifier,
-                packVersion: pack.metadata.version,
-                route: route,
-                match: match
-            )
-            _ = try await DebugRouteFixtureStore.saveDiagnostic(fixture)
-            hasExportedRequestedDiagnostic = true
-        } catch {
-            logger.error("Private debug diagnostic export failed: \(error.localizedDescription, privacy: .private)")
-        }
-    }
-    #endif
-
-    private nonisolated static func calculateCoverage(
-        calculator: CoverageCalculator,
-        pack: any CityCoveragePack,
-        contributions: [WorkoutCoverageContribution]
-    ) async -> CoverageSnapshot {
+    /// Full-resolution Health locations are processed away from the main actor
+    /// and never retained by the app model or repository.
+    private nonisolated static func process(
+        _ route: WorkoutRoute,
+        with processor: RouteProcessor
+    ) async -> WorkoutRouteRecord? {
         await Task.detached(priority: .userInitiated) {
-            calculator.snapshot(pack: pack, contributions: contributions)
+            processor.process(route)
         }.value
     }
 
-    /// Matching, chunking, and route simplification must all stay off the main
-    /// actor. A long Health route can contain thousands of locations even when
-    /// its final stored representation is small.
-    private nonisolated static func process(
-        route: WorkoutRoute,
-        matcher: any MapMatcher,
-        pack: any CityCoveragePack,
-        routeChunker: RouteChunker,
-        routeSimplifier: RouteSimplifier
-    ) async throws -> ProcessedWorkoutRoute {
-        let result = try await matcher.match(points: route.points, in: pack)
-        try Task.checkCancellation()
-        let contribution = WorkoutCoverageContribution(
-            workoutID: route.id,
-            intervals: result.intervals,
-            confidence: result.averageConfidence
-        )
-        let routeParts = routeChunker.chunks(from: route.points).map {
-            routeSimplifier.simplify($0.map(\.coordinate))
-        }
-        try Task.checkCancellation()
-        return ProcessedWorkoutRoute(
-            record: WorkoutCoverageRecord(
-                id: route.id,
-                start: route.start,
-                end: route.end,
-                sourceName: route.sourceName,
-                simplifiedRouteParts: routeParts,
-                contribution: contribution,
-                unmatchedPortions: result.unmatchedPortions
+    #if DEBUG
+    private static let uiTestRecords: [WorkoutRouteRecord] = {
+        let start = Date(timeIntervalSince1970: 1_782_640_800)
+        return [
+            WorkoutRouteRecord(
+                id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+                start: start,
+                end: start.addingTimeInterval(2_700),
+                sourceName: "Apple Watch",
+                routeParts: [[
+                    GeoCoordinate(latitude: 40.7680, longitude: -73.9819),
+                    GeoCoordinate(latitude: 40.7725, longitude: -73.9760),
+                    GeoCoordinate(latitude: 40.7780, longitude: -73.9740),
+                ]]
             ),
-            unmatchedPortionCount: result.unmatchedPortions.count
-        )
-    }
+            WorkoutRouteRecord(
+                id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+                start: start.addingTimeInterval(-86_400),
+                end: start.addingTimeInterval(-84_600),
+                sourceName: "iPhone",
+                routeParts: [[
+                    GeoCoordinate(latitude: 40.7420, longitude: -74.0060),
+                    GeoCoordinate(latitude: 40.7480, longitude: -74.0030),
+                ]]
+            ),
+        ]
+    }()
+    #endif
 }

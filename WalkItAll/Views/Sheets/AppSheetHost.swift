@@ -8,7 +8,7 @@ struct AppSheetHost: View {
         NavigationStack {
             switch destination {
             case .details:
-                CoverageDetailsSheet(model: model)
+                MapDetailsSheet(model: model)
             case .healthAccess:
                 HealthAccessHelpSheet(model: model)
             }

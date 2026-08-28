@@ -2,68 +2,42 @@
 
 **See what you’ve covered. Walk it all.**
 
-Walk It All is a private, local-first iPhone app that turns Apple Health walking and hiking workout routes into a lifetime coverage map. The first offline map covers Manhattan Island.
+Walk It All is a private iPhone app that turns outdoor walking and hiking routes from Apple Health into one lifetime map. It opens on Manhattan and can display recorded routes anywhere in the world.
 
-## Current implementation
+## Product scope
 
 - Native SwiftUI app for iOS 17 and later
-- Read-only Apple Health workout and route import
-- Continuity-aware local map matching with GPS accuracy, heading, and graph transitions
-- Exact distance-weighted coverage with a 70% secondary completed-segment diagnostic
-- Apple Maps presentation with an OpenStreetMap-derived offline walking network
-- Protected, backup-excluded SwiftData cache that can be rebuilt from Apple Health
-- No account, backend, analytics, advertising, background location, or route upload
-- Debug-only route inspector and deterministic SwiftUI previews
-- Automatic foreground refresh after an explicit Health connection, with a five-minute throttle
+- Read-only walking and hiking workout-route import from Apple Health
+- Conservative filtering of inaccurate locations, GPS gaps, large jumps, and implausible speeds
+- Smooth Apple Maps rendering with subtle deepening where routes repeat
+- Incremental foreground refresh, including Health route replacements and deletions
+- Protected, backup-excluded SwiftData cache rebuilt from Apple Health
+- No account, backend, analytics, advertising, background location, CloudKit, or route upload
 
-## Open the app
+The app visualizes recorded GPS workouts. It does not claim verified street or sidewalk completion, and ordinary steps or indoor workouts do not appear.
 
-Full Xcode is required. The project is currently validated with Xcode 26.6 and the iOS 26.5 SDK while retaining an iOS 17 deployment target.
+## Open and verify
 
-1. Run `xcodegen generate` at the repository root.
-2. Open `WalkItAll.xcodeproj`.
-3. Choose the personal development team under Signing & Capabilities.
-4. Run on an iPhone; Health route access is not representative in Simulator.
-
-The bundle identifier is provisionally `com.arminnajafi.walkitall`. It can be changed before the first App Store Connect/TestFlight build upload.
-
-## Verify the platform-independent code
+The repository uses XcodeGen. Run:
 
 ```sh
 ./Scripts/verify.sh
 ```
 
-The script verifies the pure-Swift matching core, Python map builder, generated SQLite package, and Xcode project. It also runs iOS tests when full Xcode is available.
+Then open `WalkItAll.xcodeproj`, select the personal development team, and run on an iPhone. Health route access is not representative in Simulator.
 
-## Rebuild the Manhattan offline map
-
-```sh
-./Scripts/build-manhattan-map.sh
-```
-
-The script verifies a pinned official NYC borough boundary and the dated, checksummed August 25, 2026 Geofabrik New York OpenStreetMap extract, selects Manhattan Island’s largest polygon, and generates:
-
-- `WalkItAll/Resources/OfflineMaps/manhattan-v3.sqlite`
-- `Documentation/manhattan-v3-report.json`
-- `Tools/CityPackBuilder/output/manhattan-v3-review.geojson` (ignored local review artifact)
-
-The downloaded statewide extract is intentionally ignored by Git. The generated city database contains public map geometry only—never workout data.
+The bundle identifier is provisionally `com.arminnajafi.walkitall` and the deployment target is iOS 17.
 
 ## Repository guide
 
-- `WalkItAll/`: iOS application, HealthKit adapter, persistence, maps, and views
-- `Packages/WalkItAllCore/`: portable geometry, graph, matcher, and coverage logic
-- `Tools/CityPackBuilder/`: reproducible OSM-to-SQLite pipeline
-- `Documentation/`: architecture, matching methodology, privacy, and map report
-
-Real Health routes and coordinate-bearing debug exports must never be committed. Local fixtures belong under the ignored `LocalRouteFixtures/` directory.
+- `WalkItAll/`: iOS app, HealthKit adapter, protected persistence, map renderer, and SwiftUI views
+- `Packages/WalkItAllCore/`: portable route filtering and simplification
+- `Documentation/`: product, architecture, privacy, and validation decisions
+- `LocalRouteFixtures/`: ignored private device evidence; never commit its contents
 
 ## Documentation
 
+- [Product direction](Documentation/PRODUCT.md)
 - [Architecture](Documentation/ARCHITECTURE.md)
-- [Coverage methodology](Documentation/METHODOLOGY.md)
-- [Personal accuracy review](Documentation/ACCURACY_REVIEW.md)
-- [Manhattan map audit](Documentation/MAP_AUDIT.md)
-- [Privacy model](Documentation/PRIVACY.md)
-- [Product direction and release gates](Documentation/PRODUCT.md)
-- [OpenStreetMap notice](NOTICE)
+- [Privacy and recovery](Documentation/PRIVACY.md)
+- [Validation and release gates](Documentation/VALIDATION.md)

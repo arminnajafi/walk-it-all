@@ -1,54 +1,28 @@
-# Privacy model
+# Privacy and Recovery
 
-Walk It All is intentionally local-first.
+## Data use
 
-## Permissions
+Walk It All requests read-only access to walking and hiking workouts and workout routes. It never writes to Apple Health and never requests live or background location.
 
-The app requests read-only access to:
+The app has no account, server, analytics, advertising, or CloudKit container. Health-derived routes are not transmitted by Walk It All. Apple Maps may use Apple’s normal MapKit network services to display its basemap.
 
-- Walking and hiking workouts
-- Workout route series associated with those workouts
+## Local minimization
 
-It does not request Health write access, foreground location, background location, motion tracking, contacts, advertising identifiers, or an account.
+Full-resolution Health locations exist only while one workout is being processed. The durable cache contains:
 
-Apple intentionally does not disclose whether Health read access was denied. The interface therefore never diagnoses denial; it explains that an empty result can mean no outdoor route, limited access, or incomplete Health synchronization.
+- workout UUID, dates, and source name;
+- simplified route parts;
+- Health import cursor and processed-workout ledger; and
+- the exact last successful refresh date.
 
-## Local data
+Coordinates and Health identifiers must never appear in logs. Private device evidence belongs only under the ignored `LocalRouteFixtures/` directory.
 
-For each imported workout, the app retains:
+## Protection
 
-- Health workout UUID and dates
-- Source application/device name
-- Simplified route geometry
-- Normalized matched network intervals and compact confidence diagnostics
-- Coalesced unmatched time portions
+The history directory, store, and existing WAL/SHM sidecars receive complete file protection and explicit backup exclusion. The app reapplies these attributes after writes. The cache is rebuildable and intentionally does not use device backup or iCloud storage.
 
-Full-resolution route locations are discarded after matching. The aggregate coverage snapshot is derived from per-workout intervals.
+## Recovery
 
-In DEBUG builds only, opening the historical route inspector reloads full-resolution points from Health into memory for that inspector session. Loading is cancelled when the workout changes or the inspector closes. A saved local review fixture contains only aggregate measurements and public-map segment IDs—no coordinates or Health UUID. It is protected, excluded from backup, and belongs only in the Git-ignored `LocalRouteFixtures` workflow.
+Apple Health is the recoverable history. After reinstalling or changing phones, the user authorizes access and Walk It All reconstructs its local route map from whatever Health history has synchronized to that device.
 
-The inspector also offers a deliberately separate **private diagnostic route** export for investigating a confirmed matching failure. It contains the full Health route, remains protected and backup-excluded, and must never be shared or committed. It is not created by normal imports, Release builds, or ordinary review-fixture saves.
-
-The SwiftData store is created with complete file protection and excluded from device backup. Error details are privacy-redacted in unified logging; logs never contain coordinates, route geometry, or Health UUIDs.
-
-## Cloud recovery
-
-There is no Walk It All cloud database. Apple Health remains the cloud-synchronized history. On a new device or after reinstalling, the app rebuilds from whatever Health data has synchronized and the user authorizes.
-
-The app does not claim that every historical route is recoverable. Walks not recorded as route-bearing workouts, deleted from Health, or excluded by limited authorization cannot be reconstructed.
-
-## Network behavior
-
-The app itself has no route-upload, analytics, advertising, account, or remote map-matching service. Apple MapKit may retrieve basemap tiles under Apple’s system behavior. The bundled OpenStreetMap-derived walking network is read offline.
-
-The privacy manifest declares the app-only preference access used to remember onboarding. No Health-derived data is placed in iCloud or CloudKit.
-
-## Public-release checklist
-
-Before App Store submission:
-
-- Publish a privacy-policy URL matching the implementation
-- Re-audit the privacy manifest and required-reason APIs against the release SDK
-- Verify App Store privacy answers from an actual network audit
-- Retain OSM attribution and ODbL notices
-- Review any future crash-reporting or support export before adding it
+HealthKit intentionally does not disclose whether read access was denied. Empty-state copy therefore lists possible causes rather than asserting a permission decision.

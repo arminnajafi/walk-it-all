@@ -5,16 +5,9 @@ project_root="${0:A:h:h}"
 
 cd "$project_root/Packages/WalkItAllCore"
 swift test
-swift run WalkItAllCoreChecks
-
-cd "$project_root/Tools/CityPackBuilder"
-uv sync --dev
-uv run pytest -q
 
 cd "$project_root"
 xcodegen generate
-sqlite3 WalkItAll/Resources/OfflineMaps/manhattan-v3.sqlite \
-  "PRAGMA integrity_check; SELECT count(*) FROM segments;"
 
 if [[ -d /Applications/Xcode.app ]]; then
   simulator_id="$(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \

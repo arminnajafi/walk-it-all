@@ -16,23 +16,11 @@ jobs:
           swift --version
 
       - name: Install build tools
-        run: brew install xcodegen uv
+        run: brew install xcodegen
 
-      - name: Verify matching core
+      - name: Verify route-processing core
         working-directory: Packages/WalkItAllCore
-        run: |
-          swift test
-          swift run WalkItAllCoreChecks
-
-      - name: Verify offline-map builder
-        working-directory: Tools/CityPackBuilder
-        run: |
-          uv sync --dev
-          uv run pytest -q
-
-      - name: Verify bundled Manhattan database
-        run: |
-          sqlite3 WalkItAll/Resources/OfflineMaps/manhattan-v2.sqlite 'PRAGMA integrity_check; SELECT count(*) FROM segments;'
+        run: swift test
 
       - name: Generate Xcode project
         run: xcodegen generate

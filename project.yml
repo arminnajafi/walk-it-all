@@ -26,8 +26,6 @@ targets:
     platform: iOS
     sources:
       - path: WalkItAll
-        excludes:
-          - Resources/OfflineMaps/README.md
     resources:
       - path: WalkItAll/Resources
     dependencies:
@@ -35,7 +33,6 @@ targets:
       - sdk: HealthKit.framework
       - sdk: MapKit.framework
       - sdk: CoreLocation.framework
-      - sdk: libsqlite3.tbd
     entitlements:
       path: Config/WalkItAll.entitlements
       properties:
@@ -49,7 +46,7 @@ targets:
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
-        NSHealthShareUsageDescription: Walk It All reads your walking and hiking workout routes to calculate which streets and paths you have covered. Your routes stay on this device.
+        NSHealthShareUsageDescription: Walk It All reads walking and hiking workout routes to create your private lifetime map. Route processing stays on this device.
         UIRequiredDeviceCapabilities:
           - healthkit
         ITSAppUsesNonExemptEncryption: false

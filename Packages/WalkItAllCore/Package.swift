@@ -10,18 +10,12 @@ let package = Package(
     ],
     products: [
         .library(name: "WalkItAllCore", targets: ["WalkItAllCore"]),
-        .executable(name: "WalkItAllCoreChecks", targets: ["WalkItAllCoreChecks"]),
     ],
     targets: [
         .target(name: "WalkItAllCore"),
-        .executableTarget(
-            name: "WalkItAllCoreChecks",
-            dependencies: ["WalkItAllCore"]
-        ),
         .testTarget(
             name: "WalkItAllCoreTests",
             dependencies: ["WalkItAllCore"]
         ),
     ]
 )
-

@@ -9,7 +9,7 @@ struct HealthAccessHelpSheet: View {
                 ContentUnavailableView {
                     Label("Apple Health Access", systemImage: "heart.text.square.fill")
                 } description: {
-                    Text("Walk It All needs read-only access to Workouts and Workout Routes. Your Health data stays on this iPhone.")
+                    Text("Walk It All needs read-only access to Workouts and Workout Routes. Route processing stays on this iPhone.")
                 }
             }
 
