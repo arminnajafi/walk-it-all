@@ -1,4 +1,7 @@
 import SwiftUI
+#if DEBUG
+import UIKit
+#endif
 
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -25,7 +28,15 @@ struct RootView: View {
             }
         }
         .task { await model.bootstrap() }
+        #if DEBUG
+        .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = scenePhase == .active
+        }
+        #endif
         .onChange(of: scenePhase) { _, newPhase in
+            #if DEBUG
+            UIApplication.shared.isIdleTimerDisabled = newPhase == .active
+            #endif
             guard newPhase == .active else { return }
             model.refreshIfNeeded()
         }
