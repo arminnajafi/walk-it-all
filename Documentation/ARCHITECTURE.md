@@ -56,15 +56,17 @@ coverage snapshot ─────────► map renderer + progress card
 
 Health anchored-query checkpoints are saved only after the corresponding batch has been processed. Deleted workout UUIDs remove their per-workout contributions before aggregate coverage is recalculated.
 
-The Health cursor is versioned inside the iOS adapter and contains independent workout and workout-route anchors plus route-sample-to-workout associations. Route additions and replacements reprocess their parent workout; route deletions remove only that route contribution unless the workout itself was also deleted. A legacy workout-only anchor is retained while a fresh route reconciliation is performed.
+The Health cursor is versioned inside the iOS adapter and contains independent workout and workout-route anchors plus route-sample-to-workout associations. Route additions and replacements reprocess their parent workout; route deletions remove only that route contribution unless the workout itself was also deleted. A legacy workout-only anchor is retained while a one-time full route reconciliation checks historical workouts, including records whose old route disappeared before the route anchor existed.
 
 The cache also records route-less workouts that have already been checked, so an interrupted import does not repeatedly query a lifetime of indoor walks. Incremental refreshes recheck the last seven days because Health route samples can finish after their workout. Once the user has explicitly connected Health, the app refreshes when it becomes active if the last successful refresh is more than five minutes old. Manual refresh bypasses that throttle, and a manual full rebuild remains the recovery path for older delayed data.
 
 Per-workout contributions are the only durable coverage projection. Intervals are normalized before persistence, unmatched diagnostics are coalesced, and the aggregate snapshot is always recalculated off the main actor—even for an empty record set. The legacy optional snapshot field remains temporarily in the SwiftData schema only for store compatibility and is cleared during preparation.
 
+If any persisted workout projection cannot be decoded, the complete rebuildable cache, import ledger, and Health cursor are cleared together. Retaining a partial cache could let an old processed-workout entry or advanced anchor prevent the damaged workout from being reconstructed.
+
 ## Versioning
 
-The city package records an identifier, integer version, source timestamp, and checksum. Persisted workouts also record the package identifier and version. A package change atomically invalidates workout import status, checkpoints, and matches. The next refresh rebuilds from Health rather than attempting brittle geometry-ID migrations.
+The city package records an identifier, integer version, source timestamp, and checksum. Persisted workouts also record the package identifier and version. The cache separately records a matching-projection version so matcher fixes cannot silently leave stale contributions behind. A city-package or matching-projection change atomically invalidates workout import status, checkpoints, and matches. The next refresh rebuilds from Health rather than attempting brittle geometry-ID migrations.
 
 ## Map rendering
 

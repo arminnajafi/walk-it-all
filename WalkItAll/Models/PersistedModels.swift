@@ -44,6 +44,7 @@ final class PersistedAppState {
     var lastSuccessfulImport: Date?
     var packIdentifier: String?
     var packVersion: Int?
+    var matchingProjectionVersion: Int?
 
     init(
         key: String = "primary",
@@ -51,7 +52,8 @@ final class PersistedAppState {
         snapshotData: Data? = nil,
         lastSuccessfulImport: Date? = nil,
         packIdentifier: String? = nil,
-        packVersion: Int? = nil
+        packVersion: Int? = nil,
+        matchingProjectionVersion: Int? = nil
     ) {
         self.key = key
         self.checkpoint = checkpoint
@@ -59,6 +61,7 @@ final class PersistedAppState {
         self.lastSuccessfulImport = lastSuccessfulImport
         self.packIdentifier = packIdentifier
         self.packVersion = packVersion
+        self.matchingProjectionVersion = matchingProjectionVersion
     }
 }
 

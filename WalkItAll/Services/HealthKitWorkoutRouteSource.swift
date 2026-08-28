@@ -74,15 +74,39 @@ enum HealthRouteAssociationReconciler {
 }
 
 enum HealthImportCursorCodec {
+    struct DecodingResult: Sendable {
+        let cursor: HealthImportCursor
+        let requiresFullRouteReconciliation: Bool
+    }
+
     static func decode(_ data: Data?) -> HealthImportCursor {
-        guard let data else { return HealthImportCursor() }
+        decodeForImport(data).cursor
+    }
+
+    static func decodeForImport(_ data: Data?) -> DecodingResult {
+        guard let data else {
+            return DecodingResult(
+                cursor: HealthImportCursor(),
+                requiresFullRouteReconciliation: false
+            )
+        }
         if let cursor = try? JSONDecoder().decode(HealthImportCursor.self, from: data) {
-            return cursor
+            return DecodingResult(
+                cursor: cursor,
+                requiresFullRouteReconciliation: cursor.version < HealthImportCursor.currentVersion
+                    || cursor.routeAnchorData == nil
+            )
         }
         if (try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: data)) != nil {
-            return HealthImportCursor(workoutAnchorData: data)
+            return DecodingResult(
+                cursor: HealthImportCursor(workoutAnchorData: data),
+                requiresFullRouteReconciliation: true
+            )
         }
-        return HealthImportCursor()
+        return DecodingResult(
+            cursor: HealthImportCursor(),
+            requiresFullRouteReconciliation: true
+        )
     }
 
     static func encode(_ cursor: HealthImportCursor) throws -> Data {
@@ -143,7 +167,9 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
         AsyncThrowingStream { continuation in
             let producer = Task {
                 do {
-                    var cursor = HealthImportCursorCodec.decode(checkpoint)
+                    let decoding = HealthImportCursorCodec.decodeForImport(checkpoint)
+                    var cursor = decoding.cursor
+                    let requiresFullRouteReconciliation = decoding.requiresFullRouteReconciliation
                     let workoutChanges = try await queryWorkoutChanges(
                         anchor: decodeAnchor(cursor.workoutAnchorData)
                     )
@@ -174,7 +200,11 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                     var candidates = Dictionary(
                         uniqueKeysWithValues: workoutChanges.workouts.map { ($0.uuid, $0) }
                     )
-                    if checkpoint != nil {
+                    if requiresFullRouteReconciliation {
+                        for historical in try await queryAllWorkouts() {
+                            candidates[historical.uuid] = historical
+                        }
+                    } else if checkpoint != nil {
                         for recent in try await queryRecentWorkouts(days: recentReconciliationDays) {
                             candidates[recent.uuid] = recent
                         }
@@ -197,7 +227,8 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                                 && (changedWorkoutIDs.contains($0.uuid)
                                     || routeAffectedWorkoutIDs.contains($0.uuid)
                                     || !workoutIDs.contains($0.uuid)
-                                    || $0.endDate >= recentCutoff)
+                                    || $0.endDate >= recentCutoff
+                                    || requiresFullRouteReconciliation)
                         }
                         .sorted { $0.startDate < $1.startDate }
 
@@ -230,8 +261,9 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                             cursor.routeToWorkout[sampleID] = workout.uuid
                         }
 
-                        let routeWasInvalidated = routeAffectedWorkoutIDs.contains(workout.uuid)
-                            && loaded.route == nil
+                        let routeWasInvalidated = loaded.route == nil
+                            && (routeAffectedWorkoutIDs.contains(workout.uuid)
+                                || requiresFullRouteReconciliation)
                         let isLast = index == workouts.count - 1
                         continuation.yield(WorkoutRouteBatch(
                             routes: loaded.route.map { [$0] } ?? [],
@@ -287,6 +319,13 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
         let dates = HKQuery.predicateForSamples(withStart: cutoff, end: nil)
         return try await queryWorkouts(
             predicate: NSCompoundPredicate(andPredicateWithSubpredicates: [walkingOrHikingPredicate(), dates]),
+            sortDescriptors: [SortDescriptor(\.startDate)]
+        )
+    }
+
+    private func queryAllWorkouts() async throws -> [HKWorkout] {
+        try await queryWorkouts(
+            predicate: walkingOrHikingPredicate(),
             sortDescriptors: [SortDescriptor(\.startDate)]
         )
     }

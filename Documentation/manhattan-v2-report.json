@@ -9,6 +9,14 @@
       "21-100": 49,
       "6-20": 224
     },
+    "goal_miles_outside_largest_component_by_kind": {
+      "connector": 7.95102320089025,
+      "greenway": 8.269186621929034,
+      "parkPath": 138.7224914119461,
+      "pedestrian": 1.6516963428409308,
+      "steps": 6.978340499766054,
+      "street": 0.16753994617456044
+    },
     "largest_component_goal_length_miles": 597.1368654354912,
     "largest_component_goal_percent": 78.48006351207178,
     "largest_component_goal_segment_count": 24957,
@@ -473,7 +481,15 @@
         "total_segment_count": 30,
         "unnamed_goal_segment_count": 30
       }
-    ]
+    ],
+    "single_segment_component_goal_miles_by_kind": {
+      "connector": 0.4611649735593247,
+      "greenway": 0.16978132049063138,
+      "parkPath": 16.825236001044992,
+      "pedestrian": 0.6298965296491883,
+      "steps": 3.38110149703582,
+      "street": 0.08269859015264241
+    }
   },
   "deduplication": {
     "removed_geometry_groups": [

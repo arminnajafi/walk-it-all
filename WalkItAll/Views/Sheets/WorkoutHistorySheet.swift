@@ -4,68 +4,124 @@ import WalkItAllCore
 struct WorkoutHistorySheet: View {
     @Environment(\.dismiss) private var dismiss
     let model: AppModel
+    #if DEBUG
+    @State private var inspectorWorkoutID: UUID?
+    @State private var isReviewingMatching = false
+    #endif
 
     var body: some View {
         Group {
             if model.workoutRecords.isEmpty {
                 ContentUnavailableView(
-                    "No mapped workouts",
+                    "No workout routes",
                     systemImage: "figure.walk",
                     description: Text("Outdoor walking and hiking routes imported from Apple Health will appear here.")
                 )
             } else {
                 List(model.workoutRecords) { record in
-                    HStack(spacing: 8) {
-                        Button {
-                            model.selectWorkout(record.id)
-                            dismiss()
-                        } label: {
-                            WorkoutRow(record: record, isSelected: model.selectedWorkoutID == record.id)
-                        }
-                        .buttonStyle(.plain)
-
-                        #if DEBUG
-                        NavigationLink {
-                            DebugRouteInspectorSheet(model: model, workoutID: record.id)
-                        } label: {
-                            Image(systemName: "ladybug")
-                                .frame(width: 44, height: 44)
-                        }
-                        .accessibilityLabel("Inspect route matching")
-                        #endif
+                    Button {
+                        open(record)
+                    } label: {
+                        WorkoutRow(
+                            record: record,
+                            isSelected: model.selectedWorkoutID == record.id,
+                            isReviewingMatching: reviewModeIsActive
+                        )
                     }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
         .navigationTitle("Workout History")
         .navigationBarTitleDisplayMode(.inline)
+        #if DEBUG
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(
+                    isReviewingMatching ? "Done" : "Review",
+                    systemImage: "ladybug"
+                ) {
+                    isReviewingMatching.toggle()
+                }
+                .accessibilityHint("Changes workout taps between map selection and route matching review")
+            }
+        }
+        #endif
+        #if DEBUG
+        .navigationDestination(
+            isPresented: Binding(
+                get: { inspectorWorkoutID != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        inspectorWorkoutID = nil
+                    }
+                }
+            )
+        ) {
+            if let inspectorWorkoutID {
+                DebugRouteInspectorSheet(model: model, workoutID: inspectorWorkoutID)
+            }
+        }
+        #endif
+    }
+
+    private var reviewModeIsActive: Bool {
+        #if DEBUG
+        isReviewingMatching
+        #else
+        false
+        #endif
+    }
+
+    private func open(_ record: WorkoutCoverageRecord) {
+        #if DEBUG
+        if isReviewingMatching {
+            inspectorWorkoutID = record.id
+            return
+        }
+        #endif
+        model.selectWorkout(record.id)
+        dismiss()
     }
 }
 
 private struct WorkoutRow: View {
     let record: WorkoutCoverageRecord
     let isSelected: Bool
+    let isReviewingMatching: Bool
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "figure.walk.circle")
+            Image(systemName: iconName)
                 .font(.title2)
-                .foregroundStyle(isSelected ? .indigo : .secondary)
+                .foregroundStyle(isSelected || isReviewingMatching ? .indigo : .secondary)
             VStack(alignment: .leading, spacing: 4) {
                 Text(record.start.formatted(date: .abbreviated, time: .shortened))
                     .font(.body.weight(.semibold))
+                    .lineLimit(1)
                 Text("\(record.sourceName) · \(duration(record.duration))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             Spacer()
             Text(distance(record.contribution.uniqueCoveredDistanceMeters))
                 .font(.caption.weight(.semibold).monospacedDigit())
                 .foregroundStyle(.indigo)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .accessibilityLabel("Uniquely credited distance")
         }
         .contentShape(Rectangle())
         .padding(.vertical, 3)
+    }
+
+    private var iconName: String {
+        if isReviewingMatching {
+            return "ladybug"
+        }
+        return isSelected ? "checkmark.circle.fill" : "figure.walk.circle"
     }
 
     private func distance(_ meters: Double) -> String {

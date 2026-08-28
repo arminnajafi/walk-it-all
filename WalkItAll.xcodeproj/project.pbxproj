@@ -39,6 +39,7 @@
 		DDC1A44F88C8A4E0C7EE8ECD /* DebugRouteInspectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9C761A83C3D8700F89E5B9 /* DebugRouteInspectorSheet.swift */; };
 		E1396F76D748166FC83178F9 /* PersistedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D367A9FE158602470A886865 /* PersistedModels.swift */; };
 		E7B912EC74668C826D9E327C /* MethodologySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2179330C71F7193E3AF290 /* MethodologySheet.swift */; };
+		ECADEBD9EAB6EE31C6F2BD11 /* DebugRouteFixtureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0562077201A0FF7534F87A /* DebugRouteFixtureStore.swift */; };
 		F1F3115EE0992110C4C31275 /* HealthKitWorkoutRouteSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = DABD328367D5C28075FE1BF9 /* HealthKitWorkoutRouteSource.swift */; };
 		F2522C4FABA0C69A9C7282EE /* ProgressCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E859A7C657582260DBF36425 /* ProgressCard.swift */; };
 /* End PBXBuildFile section */
@@ -84,6 +85,7 @@
 		B44B76EB7EFDEBF477553C8D /* WalkItAll.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = WalkItAll.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B499B81A9931CBF9FD2D136F /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		B8100120032C826D8CAFA518 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		BD0562077201A0FF7534F87A /* DebugRouteFixtureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugRouteFixtureStore.swift; sourceTree = "<group>"; };
 		C6C24976C4978A93A62546D2 /* manhattan-v2.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = "manhattan-v2.sqlite"; sourceTree = "<group>"; };
 		CDCBDD4837A510C93B7C65A3 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		CE3D4EA38075A5548B87AC68 /* WalkItAllApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkItAllApp.swift; sourceTree = "<group>"; };
@@ -246,6 +248,7 @@
 		D6D136B9E6898708C3BCA5B9 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				BD0562077201A0FF7534F87A /* DebugRouteFixtureStore.swift */,
 				DABD328367D5C28075FE1BF9 /* HealthKitWorkoutRouteSource.swift */,
 				077BA6556C2F7B4B7071A680 /* ProtectedModelContainer.swift */,
 				F745868D274433532D71FDA4 /* SQLiteCityPackLoader.swift */,
@@ -424,6 +427,7 @@
 				D4CA4A9C7C1A5A6C6E9451A5 /* CoverageDetailsSheet.swift in Sources */,
 				459DC40F36324DCCA2646629 /* CoverageMapView.swift in Sources */,
 				483F55B8C510400EE6F88D72 /* CoverageNetworkOverlay.swift in Sources */,
+				ECADEBD9EAB6EE31C6F2BD11 /* DebugRouteFixtureStore.swift in Sources */,
 				DDC1A44F88C8A4E0C7EE8ECD /* DebugRouteInspectorSheet.swift in Sources */,
 				4FBA7F88E1113AA285EFAD0B /* FloatingSurface.swift in Sources */,
 				B5AC9CC528D1C64AB767B87A /* HealthAccessHelpSheet.swift in Sources */,

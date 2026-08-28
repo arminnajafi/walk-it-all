@@ -415,12 +415,37 @@ public struct ContinuityMapMatcher: MapMatcher {
         pathCache: inout [NodePair: CachedPath]
     ) -> Travel? {
         if start.segment.id == end.segment.id {
+            let lowerOffset = min(start.projection.offsetMeters, end.projection.offsetMeters)
+            let upperOffset = max(start.projection.offsetMeters, end.projection.offsetMeters)
+            let directDistance = upperOffset - lowerOffset
+            if start.segment.startNode == start.segment.endNode {
+                let wrappedDistance = max(0, start.segment.lengthMeters - directDistance)
+                if wrappedDistance < directDistance {
+                    return Travel(
+                        distanceMeters: wrappedDistance,
+                        intervals: [
+                            SegmentInterval(
+                                segmentID: start.segment.id,
+                                lowerBoundMeters: 0,
+                                upperBoundMeters: lowerOffset,
+                                confidence: 1
+                            ),
+                            SegmentInterval(
+                                segmentID: start.segment.id,
+                                lowerBoundMeters: upperOffset,
+                                upperBoundMeters: start.segment.lengthMeters,
+                                confidence: 1
+                            ),
+                        ]
+                    )
+                }
+            }
             return Travel(
-                distanceMeters: abs(end.projection.offsetMeters - start.projection.offsetMeters),
+                distanceMeters: directDistance,
                 intervals: [SegmentInterval(
                     segmentID: start.segment.id,
-                    lowerBoundMeters: start.projection.offsetMeters,
-                    upperBoundMeters: end.projection.offsetMeters,
+                    lowerBoundMeters: lowerOffset,
+                    upperBoundMeters: upperOffset,
                     confidence: 1
                 )]
             )

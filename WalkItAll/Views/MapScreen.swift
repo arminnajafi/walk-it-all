@@ -5,6 +5,7 @@ struct MapScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let model: AppModel
     @State private var showHealthWaitHelp = false
+    @State private var bottomOverlayHeight: CGFloat = 300
 
     var body: some View {
         GeometryReader { geometry in
@@ -16,7 +17,9 @@ struct MapScreen: View {
                         selectedWorkout: model.selectedWorkout,
                         coverageRevision: model.coverageRenderRevision,
                         viewportCommand: model.mapViewportCommand,
-                        bottomMapInset: bottomMapInset
+                        mapOrnamentBottomInset: bottomOverlayHeight
+                            + geometry.safeAreaInsets.bottom
+                            + 8
                     )
                     .ignoresSafeArea()
                 }
@@ -31,6 +34,10 @@ struct MapScreen: View {
                     if let coverage = model.coverage {
                         progressCard(coverage, availableHeight: geometry.size.height)
                     }
+                }
+                .onPreferenceChange(BottomOverlayHeightPreferenceKey.self) { height in
+                    guard height > 0 else { return }
+                    bottomOverlayHeight = height
                 }
             }
         }
@@ -131,7 +138,7 @@ struct MapScreen: View {
                     coverage: coverage,
                     phase: model.importPhase,
                     lastSuccessfulImport: model.lastSuccessfulImport,
-                    hasMappedWorkouts: !model.workoutRecords.isEmpty,
+                    hasMappedWorkouts: model.hasMappedWorkouts,
                     refresh: model.refresh,
                     cancel: model.cancelImport,
                     showDetails: { model.presentedSheet = .details }
@@ -139,24 +146,36 @@ struct MapScreen: View {
             }
         }
 
-        if dynamicTypeSize.isAccessibilitySize {
-            ScrollView {
-                card
-                    .padding(.vertical, 12)
-            }
-            .frame(maxHeight: availableHeight * 0.78)
-            .padding(.horizontal, 16)
-        } else {
-            card
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                ScrollView {
+                    card
+                        .padding(.vertical, 12)
+                }
+                .frame(maxHeight: availableHeight * 0.78)
                 .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+            } else {
+                card
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
+        }
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: BottomOverlayHeightPreferenceKey.self,
+                    value: proxy.size.height
+                )
+            }
         }
     }
 
-    private var bottomMapInset: CGFloat {
-        if model.selectedWorkout != nil {
-            return dynamicTypeSize.isAccessibilitySize ? 360 : 210
-        }
-        return dynamicTypeSize.isAccessibilitySize ? 520 : 300
+}
+
+private struct BottomOverlayHeightPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

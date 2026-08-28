@@ -108,6 +108,10 @@ final class AppModel {
     @ObservationIgnored private var importGeneration = 0
     @ObservationIgnored private var shouldImportAfterOnboardingDismisses = false
     @ObservationIgnored private var lastAutomaticRefreshAttempt: Date?
+    #if DEBUG
+    @ObservationIgnored private var hasExportedRequestedDiagnostic = false
+    @ObservationIgnored private var debugInspectionGeneration = 0
+    #endif
 
     private(set) var cityPack: (any CityCoveragePack)?
 
@@ -130,6 +134,16 @@ final class AppModel {
 
     var selectedWorkout: WorkoutCoverageRecord? {
         workoutRecords.first { $0.id == selectedWorkoutID }
+    }
+
+    var workoutsWithCoverageCount: Int {
+        workoutRecords.lazy.filter {
+            $0.contribution.uniqueCoveredDistanceMeters > 0
+        }.count
+    }
+
+    var hasMappedWorkouts: Bool {
+        workoutsWithCoverageCount > 0
     }
 
     var hasConnectedHealth: Bool {
@@ -159,6 +173,9 @@ final class AppModel {
             lastSuccessfulImport = try await repository.loadLastSuccessfulImport()
             coverageRenderRevision &+= 1
             launchState = .ready
+            #if DEBUG
+            await exportRequestedDiagnosticIfNeeded()
+            #endif
         } catch {
             logger.error("Bootstrap failed: \(error.localizedDescription, privacy: .private)")
             launchState = .failed(error.localizedDescription)
@@ -347,6 +364,9 @@ final class AppModel {
             lastSuccessfulImport = successfulRefreshDate
             coverageRenderRevision &+= 1
             importPhase = .complete(imported: imported, unmatched: unmatched)
+            #if DEBUG
+            await exportRequestedDiagnosticIfNeeded()
+            #endif
         } catch is CancellationError {
             guard generation == importGeneration else { return }
             coverage = await Self.calculateCoverage(
@@ -376,6 +396,8 @@ final class AppModel {
 
     #if DEBUG
     func loadDebugInspection(workoutID: UUID) async {
+        debugInspectionGeneration &+= 1
+        let generation = debugInspectionGeneration
         debugInspectionState = .loading
         do {
             guard let pack = cityPack else {
@@ -383,11 +405,14 @@ final class AppModel {
                 return
             }
             guard let route = try await routeSource.route(for: workoutID) else {
+                guard generation == debugInspectionGeneration else { return }
                 debugInspectionState = .failed(
                     "Apple Health no longer has a readable route for this workout."
                 )
                 return
             }
+            try Task.checkCancellation()
+            guard generation == debugInspectionGeneration else { return }
             let match = try await matcher.match(points: route.points, in: pack)
             let nearbySegmentIDs = await Task.detached(priority: .userInitiated) {
                 let strideLength = max(1, route.points.count / 500)
@@ -400,21 +425,52 @@ final class AppModel {
                 return ids
             }.value
             try Task.checkCancellation()
+            guard generation == debugInspectionGeneration else { return }
             debugInspectionState = .loaded(
                 route: route,
                 match: match,
                 nearbySegmentIDs: nearbySegmentIDs
             )
         } catch is CancellationError {
+            guard generation == debugInspectionGeneration else { return }
             debugInspectionState = .idle
         } catch {
+            guard generation == debugInspectionGeneration else { return }
             logger.error("Debug route inspection failed: \(error.localizedDescription, privacy: .private)")
             debugInspectionState = .failed(error.localizedDescription)
         }
     }
 
     func clearDebugInspection() {
+        debugInspectionGeneration &+= 1
         debugInspectionState = .idle
+    }
+
+    private func exportRequestedDiagnosticIfNeeded() async {
+        guard !hasExportedRequestedDiagnostic,
+              let rawIndex = ProcessInfo.processInfo.environment["WALK_IT_ALL_DIAGNOSTIC_WORKOUT_INDEX"],
+              let index = Int(rawIndex),
+              workoutRecords.indices.contains(index),
+              let pack = cityPack
+        else { return }
+
+        do {
+            let record = workoutRecords[index]
+            guard let route = try await routeSource.route(for: record.id) else { return }
+            let match = try await matcher.match(points: route.points, in: pack)
+            let fixture = PrivateRouteDiagnosticFixture(
+                schemaVersion: 1,
+                createdAt: Date(),
+                packIdentifier: pack.metadata.identifier,
+                packVersion: pack.metadata.version,
+                route: route,
+                match: match
+            )
+            _ = try await DebugRouteFixtureStore.saveDiagnostic(fixture)
+            hasExportedRequestedDiagnostic = true
+        } catch {
+            logger.error("Private debug diagnostic export failed: \(error.localizedDescription, privacy: .private)")
+        }
     }
     #endif
 

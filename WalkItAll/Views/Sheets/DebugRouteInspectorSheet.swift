@@ -5,7 +5,7 @@ import WalkItAllCore
 
 struct DebugRouteInspectorSheet: View {
     let model: AppModel
-    let workoutID: UUID
+    @State private var selectedWorkoutID: UUID
 
     @State private var showRawTrace = true
     @State private var showNearbyNetwork = false
@@ -15,6 +15,12 @@ struct DebugRouteInspectorSheet: View {
     @State private var incorrectCredited = Set<SegmentID>()
     @State private var clearlyWalkedMissed = Set<SegmentID>()
     @State private var saveStatus: String?
+    @State private var diagnosticSaveStatus: String?
+
+    init(model: AppModel, workoutID: UUID) {
+        self.model = model
+        _selectedWorkoutID = State(initialValue: workoutID)
+    }
 
     var body: some View {
         Group {
@@ -51,11 +57,50 @@ struct DebugRouteInspectorSheet: View {
                     Toggle("Rejected trace", isOn: $showRejected)
                 }
             }
+            ToolbarItemGroup(placement: .bottomBar) {
+                Button("Newer", systemImage: "chevron.up") {
+                    moveWorkout(by: -1)
+                }
+                .disabled(workoutIndex == nil || workoutIndex == 0)
+
+                Spacer()
+
+                if let workoutIndex {
+                    Text("\((workoutIndex + 1).formatted()) of \(model.workoutRecords.count.formatted())")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button("Older", systemImage: "chevron.down") {
+                    moveWorkout(by: 1)
+                }
+                .disabled(
+                    workoutIndex == nil ||
+                        workoutIndex == model.workoutRecords.index(before: model.workoutRecords.endIndex)
+                )
+            }
         }
-        .task(id: workoutID) {
-            await model.loadDebugInspection(workoutID: workoutID)
+        .task(id: selectedWorkoutID) {
+            await model.loadDebugInspection(workoutID: selectedWorkoutID)
         }
         .onDisappear(perform: model.clearDebugInspection)
+    }
+
+    private var workoutIndex: Int? {
+        model.workoutRecords.firstIndex { $0.id == selectedWorkoutID }
+    }
+
+    private func moveWorkout(by offset: Int) {
+        guard let workoutIndex else { return }
+        let targetIndex = workoutIndex + offset
+        guard model.workoutRecords.indices.contains(targetIndex) else { return }
+        incorrectCredited.removeAll()
+        clearlyWalkedMissed.removeAll()
+        saveStatus = nil
+        diagnosticSaveStatus = nil
+        selectedWorkoutID = model.workoutRecords[targetIndex].id
     }
 
     private func inspector(
@@ -66,16 +111,15 @@ struct DebugRouteInspectorSheet: View {
     ) -> some View {
         let creditedIDs = Set(match.intervals.map(\.segmentID))
         let missedCandidates = match.candidateSegmentIDs.subtracting(creditedIDs)
-        let clearlyWalkedIDs = creditedIDs
-            .subtracting(incorrectCredited)
-            .union(clearlyWalkedMissed)
+        let displayRejections = UnmatchedPortion.coalesced(match.unmatchedPortions)
         let measurement = MatchAccuracyEvaluator().evaluate(
             contribution: WorkoutCoverageContribution(
                 workoutID: route.id,
                 intervals: match.intervals,
                 confidence: match.averageConfidence
             ),
-            clearlyWalkedSegmentIDs: clearlyWalkedIDs,
+            incorrectCreditedSegmentIDs: incorrectCredited,
+            clearlyWalkedMissedSegmentIDs: clearlyWalkedMissed,
             in: pack
         )
 
@@ -120,7 +164,7 @@ struct DebugRouteInspectorSheet: View {
                 }
 
                 if showRejected {
-                    ForEach(Array(match.unmatchedPortions.enumerated()), id: \.offset) { _, portion in
+                    ForEach(Array(displayRejections.enumerated()), id: \.offset) { _, portion in
                         let rejected = route.points.filter {
                             $0.timestamp >= portion.start && $0.timestamp <= portion.end
                         }
@@ -186,15 +230,15 @@ struct DebugRouteInspectorSheet: View {
                 }
 
                 Section("Rejected portions") {
-                    if match.unmatchedPortions.isEmpty {
+                    if displayRejections.isEmpty {
                         Text("None")
                             .foregroundStyle(.secondary)
                     }
-                    ForEach(Array(match.unmatchedPortions.enumerated()), id: \.offset) { _, portion in
+                    ForEach(rejectionGroups(displayRejections)) { group in
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(reason(portion.reason))
+                            Text(reason(group.reason))
                                 .font(.subheadline.weight(.semibold))
-                            Text("\(portion.start.formatted(date: .omitted, time: .standard))–\(portion.end.formatted(date: .omitted, time: .standard))")
+                            Text(rejectionSummary(group))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -203,15 +247,30 @@ struct DebugRouteInspectorSheet: View {
 
                 Section {
                     Button("Save local review fixture", systemImage: "square.and.arrow.down") {
-                        saveReview(route: route, match: match, pack: pack)
+                        saveReview(
+                            route: route,
+                            match: match,
+                            measurement: measurement,
+                            pack: pack
+                        )
                     }
                     if let saveStatus {
                         Text(saveStatus)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+
+                    Button("Save private diagnostic route", systemImage: "lock.doc") {
+                        saveDiagnostic(route: route, match: match, pack: pack)
+                    }
+                    .foregroundStyle(.orange)
+                    if let diagnosticSaveStatus {
+                        Text(diagnosticSaveStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 } footer: {
-                    Text("The fixture stays in this debug app’s protected, backup-excluded storage. It contains segment IDs and the Health workout ID, but no coordinates.")
+                    Text("The review fixture has no coordinates. The private diagnostic includes the full Health route and is only for investigating a failed match. Both stay in this debug app’s protected, backup-excluded storage; never share or commit them.")
                 }
             }
             .frame(minHeight: 300)
@@ -280,14 +339,26 @@ struct DebugRouteInspectorSheet: View {
     private func saveReview(
         route: WorkoutRoute,
         match: MatchResult,
+        measurement: MatchAccuracyMeasurement,
         pack: any CityCoveragePack
     ) {
-        let fixture = ReviewFixture(
-            schemaVersion: 1,
+        let fixture = RouteReviewFixture(
+            schemaVersion: 3,
             createdAt: Date(),
-            workoutID: route.id,
             packIdentifier: pack.metadata.identifier,
             packVersion: pack.metadata.version,
+            acceptedPointCount: match.acceptedPointCount,
+            rejectedPointCount: match.rejectedPointCount,
+            correctlyCreditedMeters: measurement.correctlyCreditedMeters,
+            creditedMeters: measurement.creditedMeters,
+            clearlyWalkedMeters: measurement.clearlyWalkedMeters,
+            rejectionReasonCounts: Dictionary(
+                uniqueKeysWithValues: rejectionGroups(
+                    UnmatchedPortion.coalesced(match.unmatchedPortions)
+                ).map {
+                    ($0.reason.rawValue, $0.portions.count)
+                }
+            ),
             creditedSegmentIDs: sorted(Set(match.intervals.map(\.segmentID))).map(\.rawValue),
             clearlyWalkedSegmentIDs: sorted(
                 Set(match.intervals.map(\.segmentID))
@@ -299,10 +370,33 @@ struct DebugRouteInspectorSheet: View {
         )
         Task {
             do {
-                let url = try await ReviewFixtureStore.save(fixture)
+                let url = try await DebugRouteFixtureStore.saveReview(fixture)
                 saveStatus = "Saved \(url.lastPathComponent) locally."
             } catch {
                 saveStatus = "Couldn’t save the review: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func saveDiagnostic(
+        route: WorkoutRoute,
+        match: MatchResult,
+        pack: any CityCoveragePack
+    ) {
+        let fixture = PrivateRouteDiagnosticFixture(
+            schemaVersion: 1,
+            createdAt: Date(),
+            packIdentifier: pack.metadata.identifier,
+            packVersion: pack.metadata.version,
+            route: route,
+            match: match
+        )
+        Task {
+            do {
+                let url = try await DebugRouteFixtureStore.saveDiagnostic(fixture)
+                diagnosticSaveStatus = "Saved \(url.lastPathComponent) privately."
+            } catch {
+                diagnosticSaveStatus = "Couldn’t save the diagnostic: \(error.localizedDescription)"
             }
         }
     }
@@ -319,6 +413,20 @@ struct DebugRouteInspectorSheet: View {
                 options: .regularExpression
             )
             .capitalized
+    }
+
+    private func rejectionGroups(_ portions: [UnmatchedPortion]) -> [RejectionGroup] {
+        Dictionary(grouping: portions, by: \.reason)
+            .map { RejectionGroup(reason: $0.key, portions: $0.value) }
+            .sorted { $0.reason.rawValue < $1.reason.rawValue }
+    }
+
+    private func rejectionSummary(_ group: RejectionGroup) -> String {
+        let totalSeconds = group.portions.reduce(0) {
+            $0 + max(0, $1.end.timeIntervalSince($1.start))
+        }
+        let portionLabel = group.portions.count == 1 ? "portion" : "portions"
+        return "\(group.portions.count.formatted()) \(portionLabel) · \(Duration.seconds(totalSeconds).formatted(.units(allowed: [.minutes, .seconds], width: .abbreviated, maximumUnitCount: 2))) total"
     }
 
     private func distance(_ meters: Double) -> String {
@@ -354,48 +462,11 @@ struct DebugRouteInspectorSheet: View {
     }
 }
 
-private struct ReviewFixture: Codable, Sendable {
-    let schemaVersion: Int
-    let createdAt: Date
-    let workoutID: UUID
-    let packIdentifier: String
-    let packVersion: Int
-    let creditedSegmentIDs: [String]
-    let clearlyWalkedSegmentIDs: [String]
-    let incorrectCreditedSegmentIDs: [String]
-    let clearlyWalkedMissedSegmentIDs: [String]
+private struct RejectionGroup: Identifiable {
+    let reason: UnmatchedPortion.Reason
+    let portions: [UnmatchedPortion]
+
+    var id: UnmatchedPortion.Reason { reason }
 }
 
-private enum ReviewFixtureStore {
-    static func save(_ fixture: ReviewFixture) async throws -> URL {
-        try await Task.detached(priority: .utility) {
-            let fileManager = FileManager.default
-            let applicationSupport = try fileManager.url(
-                for: .applicationSupportDirectory,
-                in: .userDomainMask,
-                appropriateFor: nil,
-                create: true
-            )
-            let directory = applicationSupport
-                .appendingPathComponent("WalkItAll", isDirectory: true)
-                .appendingPathComponent("LocalRouteFixtures", isDirectory: true)
-            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-            try fileManager.setAttributes(
-                [.protectionKey: FileProtectionType.complete],
-                ofItemAtPath: directory.path
-            )
-            var values = URLResourceValues()
-            values.isExcludedFromBackup = true
-            var protectedDirectory = directory
-            try protectedDirectory.setResourceValues(values)
-
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let url = directory.appendingPathComponent("review-\(UUID().uuidString).json")
-            try encoder.encode(fixture).write(to: url, options: [.atomic, .completeFileProtection])
-            return url
-        }.value
-    }
-}
 #endif

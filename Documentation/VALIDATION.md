@@ -4,9 +4,9 @@ This file records reproducible engineering evidence without workout coordinates,
 
 ## Automated baseline
 
-- `WalkItAllCore`: 18 unit tests plus the executable core checks
-- `CityPackBuilder`: 12 tests
-- iOS app: 20 unit tests
+- `WalkItAllCore`: 20 unit tests plus the executable core checks
+- `CityPackBuilder`: 13 tests
+- iOS app: 25 unit tests
 - iOS UI: 5 end-to-end tests, including an accessibility XXXL onboarding journey
 - Synthetic coverage: 1,500 workout contributions and a 2,500-point route
 
@@ -33,7 +33,7 @@ A focused, symbolicated ETTrace 1.1.0 cold-launch-to-map capture ran for 13.174 
 
 Apple's `xctrace` command-line Time Profiler failed to finalize two simulator recordings after their requested time limits under Xcode 26.6. The incomplete traces were discarded. A native Instruments capture on the real phone remains part of the final personal-device pass.
 
-Visual and automated checks cover normal light appearance plus dark, increased-contrast, and accessibility XXXL layouts. At accessibility sizes the progress card and onboarding become scrollable, decorative imagery yields to content, controls remain reachable, and the map controls retain VoiceOver labels.
+Visual and automated checks cover normal light appearance plus dark, increased-contrast, and accessibility XXXL layouts. At accessibility sizes the progress card and onboarding become scrollable, decorative imagery yields to content, controls remain reachable, and the map controls retain VoiceOver labels. The map measures the floating card and reserves that space through `MKMapView` layout margins, keeping Apple Maps attribution visible instead of relying on a device-specific fixed inset.
 
 ## Privacy and recovery
 
@@ -44,6 +44,8 @@ Visual and automated checks cover normal light appearance plus dark, increased-c
 - The signed device bundle contains HealthKit entitlement and no profiler framework
 - Coverage remains derived from per-workout contributions and can be rebuilt from authorized Apple Health history
 
-## Human gates
+## Personal-device evidence and remaining human gate
 
-Personal-device signoff still requires a successful version-2 Health rebuild and the ten-route reviewed precision/recall gate described in `ACCURACY_REVIEW.md`. These checks require the user's actual Apple Health history and visual judgments; automated tests cannot substitute for them.
+A real iPhone completed the version-2 Health rebuild: 229 walking/hiking workouts were considered and 211 route-bearing workouts were imported and evaluated. Automatic foreground refresh, workout selection, Manhattan recentering, and the protected on-device cache were exercised with the real history.
+
+Two representative routes have completed visual review with no marked false credit or missed eligible segment. The next longer Central Park route exposed a substantial recall failure, so the ten-route gate is paused while that case is diagnosed. Personal-device signoff still requires fixing or explaining that route and completing the aggregate precision/recall gate described in `ACCURACY_REVIEW.md`; automated tests cannot substitute for those visual judgments.

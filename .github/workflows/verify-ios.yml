@@ -32,7 +32,7 @@ jobs:
 
       - name: Verify bundled Manhattan database
         run: |
-          sqlite3 WalkItAll/Resources/OfflineMaps/manhattan-v1.sqlite 'PRAGMA integrity_check; SELECT count(*) FROM segments;'
+          sqlite3 WalkItAll/Resources/OfflineMaps/manhattan-v2.sqlite 'PRAGMA integrity_check; SELECT count(*) FROM segments;'
 
       - name: Generate Xcode project
         run: xcodegen generate

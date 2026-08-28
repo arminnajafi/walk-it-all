@@ -69,6 +69,20 @@ def test_connectivity_uses_graph_only_connectors_without_counting_their_length()
     assert stats["largest_component_goal_length_miles"] == 200 / 1_609.344
 
 
+def test_geometric_crossing_without_a_shared_osm_node_stays_disconnected() -> None:
+    segments = [
+        Segment("ground", 1, 2, "street", 100, 1, "Ground", ((0, 1), (2, 1)), True),
+        Segment(
+            "bridge", 3, 4, "street", 100, 2, "Bridge", ((1, 0), (1, 2)), True,
+            layer=1, bridge=True,
+        ),
+    ]
+
+    stats = connectivity_stats(segments)
+
+    assert stats["component_count"] == 2
+
+
 def test_boundary_prefilter_scopes_way_counts_to_manhattan_geometry() -> None:
     boundary = Polygon(((0, 0), (2, 0), (2, 2), (0, 2)))
     assert way_intersects_boundary(((-1, 1), (1, 1)), boundary)
@@ -156,6 +170,13 @@ def test_component_histogram_details_and_suspicious_geojson(tmp_path) -> None:
     assert stats["component_count"] == 2
     assert stats["component_size_histogram"] == {"1": 1, "2-5": 1}
     assert stats["largest_components"][1]["bounding_box"]["min_latitude"] == 1
+    assert stats["goal_miles_outside_largest_component_by_kind"] == {
+        "parkPath": 50 / 1_609.344,
+        "street": 0,
+    }
+    assert stats["single_segment_component_goal_miles_by_kind"] == {
+        "parkPath": 50 / 1_609.344,
+    }
     assert review["suspicious_segment_count"] == 1
     assert document["features"][0]["properties"]["reasons"] == [
         "unnamed",

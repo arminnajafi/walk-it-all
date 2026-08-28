@@ -32,19 +32,36 @@ final class WalkItAllTests: XCTestCase {
         )
 
         let decoded = HealthImportCursorCodec.decode(legacy)
+        let migration = HealthImportCursorCodec.decodeForImport(legacy)
 
         XCTAssertEqual(decoded.version, HealthImportCursor.currentVersion)
         XCTAssertEqual(decoded.workoutAnchorData, legacy)
         XCTAssertNil(decoded.routeAnchorData)
         XCTAssertTrue(decoded.routeToWorkout.isEmpty)
+        XCTAssertTrue(migration.requiresFullRouteReconciliation)
     }
 
     func testCorruptHealthCursorFallsBackToRebuildableEmptyState() {
         let decoded = HealthImportCursorCodec.decode(Data("not a cursor".utf8))
+        let migration = HealthImportCursorCodec.decodeForImport(Data("not a cursor".utf8))
 
         XCTAssertNil(decoded.workoutAnchorData)
         XCTAssertNil(decoded.routeAnchorData)
         XCTAssertTrue(decoded.routeToWorkout.isEmpty)
+        XCTAssertTrue(migration.requiresFullRouteReconciliation)
+    }
+
+    func testCurrentHealthCursorDoesNotRepeatFullRouteReconciliation() throws {
+        let cursor = HealthImportCursor(
+            workoutAnchorData: Data([1]),
+            routeAnchorData: Data([2])
+        )
+
+        let decoding = HealthImportCursorCodec.decodeForImport(
+            try HealthImportCursorCodec.encode(cursor)
+        )
+
+        XCTAssertFalse(decoding.requiresFullRouteReconciliation)
     }
 
     func testRouteAssociationReplacementAndDeletionAffectTheParentWorkout() {
@@ -238,6 +255,95 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
+    func testRepositoryInvalidatesAnOlderMatchingProjection() async throws {
+        let schema = Schema([
+            PersistedWorkoutCoverage.self,
+            PersistedAppState.self,
+            PersistedWorkoutImportState.self,
+        ])
+        let container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+        )
+        let context = ModelContext(container)
+        let workoutID = UUID()
+        context.insert(PersistedAppState(
+            checkpoint: Data([1]),
+            packIdentifier: "manhattan",
+            packVersion: 2,
+            matchingProjectionVersion: 0
+        ))
+        context.insert(PersistedWorkoutImportState(
+            workoutID: workoutID,
+            end: Date(timeIntervalSince1970: 100)
+        ))
+        try context.save()
+        let repository = SwiftDataCoverageRepository(modelContainer: container)
+
+        try await repository.prepareForPack(identifier: "manhattan", version: 2)
+
+        let checkpoint = try await repository.loadCheckpoint()
+        let processedWorkoutIDs = try await repository.loadProcessedWorkoutIDs()
+        XCTAssertNil(checkpoint)
+        XCTAssertTrue(processedWorkoutIDs.isEmpty)
+        let state = try XCTUnwrap(context.fetch(FetchDescriptor<PersistedAppState>()).first)
+        XCTAssertEqual(state.matchingProjectionVersion, 1)
+    }
+
+    @MainActor
+    func testRepositoryClearsAllDerivedStateWhenAWorkoutProjectionIsCorrupt() async throws {
+        let schema = Schema([
+            PersistedWorkoutCoverage.self,
+            PersistedAppState.self,
+            PersistedWorkoutImportState.self,
+        ])
+        let container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+        )
+        let context = ModelContext(container)
+        let workoutID = UUID()
+        context.insert(PersistedAppState(
+            checkpoint: Data([9]),
+            lastSuccessfulImport: Date(timeIntervalSince1970: 100),
+            packIdentifier: "manhattan",
+            packVersion: 2,
+            matchingProjectionVersion: 1
+        ))
+        context.insert(PersistedWorkoutImportState(
+            workoutID: workoutID,
+            end: Date(timeIntervalSince1970: 100)
+        ))
+        context.insert(PersistedWorkoutCoverage(
+            workoutID: workoutID,
+            start: Date(timeIntervalSince1970: 50),
+            end: Date(timeIntervalSince1970: 100),
+            sourceName: "Test",
+            packIdentifier: "manhattan",
+            packVersion: 2,
+            routeData: Data("invalid".utf8),
+            contributionData: Data("invalid".utf8),
+            unmatchedData: Data("invalid".utf8)
+        ))
+        try context.save()
+        let repository = SwiftDataCoverageRepository(modelContainer: container)
+
+        let records = try await repository.loadWorkoutRecords(
+            packIdentifier: "manhattan",
+            packVersion: 2
+        )
+        let processedWorkoutIDs = try await repository.loadProcessedWorkoutIDs()
+        let checkpoint = try await repository.loadCheckpoint()
+        let lastSuccessfulImport = try await repository.loadLastSuccessfulImport()
+
+        XCTAssertTrue(records.isEmpty)
+        XCTAssertTrue(processedWorkoutIDs.isEmpty)
+        XCTAssertNil(checkpoint)
+        XCTAssertNil(lastSuccessfulImport)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<PersistedWorkoutCoverage>()).isEmpty)
+    }
+
+    @MainActor
     func testRefreshAlwaysRequestsHealthAuthorization() async throws {
         let source = TestRouteSource(batches: [WorkoutRouteBatch(
             routes: [],
@@ -310,6 +416,60 @@ final class WalkItAllTests: XCTestCase {
         let prepared = await repository.preparedPack
         XCTAssertEqual(prepared?.identifier, "manhattan-island")
         XCTAssertEqual(prepared?.version, 2)
+    }
+
+    @MainActor
+    func testMappedWorkoutStateRequiresCreditedManhattanDistance() async throws {
+        let pack = try await SQLiteCityPackLoader().loadBundledManhattan()
+        let segment = try XCTUnwrap(pack.segments.first(where: \.countsTowardCoverage))
+        let uncreditedID = UUID()
+        let creditedID = UUID()
+        let records = [
+            WorkoutCoverageRecord(
+                id: uncreditedID,
+                start: .distantPast,
+                end: .distantPast,
+                sourceName: "Outside Manhattan",
+                simplifiedRouteParts: [],
+                contribution: WorkoutCoverageContribution(
+                    workoutID: uncreditedID,
+                    intervals: [],
+                    confidence: 0
+                ),
+                unmatchedPortions: []
+            ),
+            WorkoutCoverageRecord(
+                id: creditedID,
+                start: .distantPast,
+                end: .distantPast,
+                sourceName: "Manhattan",
+                simplifiedRouteParts: [],
+                contribution: WorkoutCoverageContribution(
+                    workoutID: creditedID,
+                    intervals: [SegmentInterval(
+                        segmentID: segment.id,
+                        lowerBoundMeters: 0,
+                        upperBoundMeters: min(10, segment.lengthMeters),
+                        confidence: 1
+                    )],
+                    confidence: 1
+                ),
+                unmatchedPortions: []
+            ),
+        ]
+        let repository = TestCoverageRepository(records: [records[0]])
+        let model = makeModel(source: TestRouteSource(batches: []), repository: repository)
+
+        await model.bootstrap()
+
+        XCTAssertEqual(model.workoutRecords.count, 1)
+        XCTAssertEqual(model.workoutsWithCoverageCount, 0)
+        XCTAssertFalse(model.hasMappedWorkouts)
+
+        model.workoutRecords = records
+
+        XCTAssertEqual(model.workoutsWithCoverageCount, 1)
+        XCTAssertTrue(model.hasMappedWorkouts)
     }
 
     @MainActor
@@ -485,9 +645,40 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertGreaterThan(model.mapViewportCommand.revision, selectedRevision)
     }
 
+    #if DEBUG
+    @MainActor
+    func testOlderInspectorLoadCannotReplaceNewerSelection() async throws {
+        let olderID = UUID()
+        let newerID = UUID()
+        let source = OutOfOrderRouteSource(
+            suspendedWorkoutID: olderID,
+            immediateRoute: WorkoutRoute(
+                id: newerID,
+                start: Date(timeIntervalSince1970: 200),
+                end: Date(timeIntervalSince1970: 210),
+                sourceName: "Test",
+                points: []
+            )
+        )
+        let model = makeModel(source: source, repository: TestCoverageRepository())
+        await model.bootstrap()
+
+        let olderLoad = Task { await model.loadDebugInspection(workoutID: olderID) }
+        try await waitForSuspendedRoute(source)
+        await model.loadDebugInspection(workoutID: newerID)
+        await source.finishSuspendedRoute()
+        await olderLoad.value
+
+        guard case let .loaded(route, _, _) = model.debugInspectionState else {
+            return XCTFail("Expected the newer inspector route to remain loaded")
+        }
+        XCTAssertEqual(route.id, newerID)
+    }
+    #endif
+
     @MainActor
     private func makeModel(
-        source: TestRouteSource,
+        source: any WorkoutRouteSource,
         repository: TestCoverageRepository,
         matcher: any MapMatcher = EmptyMatcher()
     ) -> AppModel {
@@ -537,6 +728,17 @@ final class WalkItAllTests: XCTestCase {
         }
         XCTFail("Matcher did not start")
     }
+
+    #if DEBUG
+    @MainActor
+    private func waitForSuspendedRoute(_ source: OutOfOrderRouteSource) async throws {
+        for _ in 0 ..< 200 {
+            if await source.hasSuspendedRouteRequest() { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Inspector route request did not suspend")
+    }
+    #endif
 }
 
 private struct EmptyMatcher: MapMatcher {
@@ -621,6 +823,52 @@ private actor TestRouteSource: WorkoutRouteSource {
         }
     }
 }
+
+#if DEBUG
+private actor OutOfOrderRouteSource: WorkoutRouteSource {
+    private let suspendedWorkoutID: UUID
+    private let immediateRoute: WorkoutRoute
+    private var suspendedRouteRequest = false
+    private var suspendedContinuation: CheckedContinuation<WorkoutRoute?, Never>?
+
+    init(suspendedWorkoutID: UUID, immediateRoute: WorkoutRoute) {
+        self.suspendedWorkoutID = suspendedWorkoutID
+        self.immediateRoute = immediateRoute
+    }
+
+    func requestReadAuthorization() async throws {}
+
+    func route(for workoutID: UUID) async throws -> WorkoutRoute? {
+        if workoutID == suspendedWorkoutID {
+            suspendedRouteRequest = true
+            return await withCheckedContinuation { continuation in
+                suspendedContinuation = continuation
+            }
+        }
+        return workoutID == immediateRoute.id ? immediateRoute : nil
+    }
+
+    func routeBatches(
+        since checkpoint: Data?,
+        excluding workoutIDs: Set<UUID>
+    ) async -> AsyncThrowingStream<WorkoutRouteBatch, Error> {
+        AsyncThrowingStream { $0.finish() }
+    }
+
+    func hasSuspendedRouteRequest() -> Bool { suspendedRouteRequest }
+
+    func finishSuspendedRoute() {
+        suspendedContinuation?.resume(returning: WorkoutRoute(
+            id: suspendedWorkoutID,
+            start: Date(timeIntervalSince1970: 100),
+            end: Date(timeIntervalSince1970: 110),
+            sourceName: "Test",
+            points: []
+        ))
+        suspendedContinuation = nil
+    }
+}
+#endif
 
 private actor TestCoverageRepository: CoverageRepository {
     var records: [WorkoutCoverageRecord]

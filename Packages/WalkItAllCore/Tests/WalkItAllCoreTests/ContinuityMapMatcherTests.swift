@@ -3,6 +3,48 @@ import XCTest
 @testable import WalkItAllCore
 
 final class ContinuityMapMatcherTests: XCTestCase {
+    func testClosedLoopUsesShortPathAcrossGeometrySeam() async throws {
+        let start = GeoCoordinate(latitude: 40.75, longitude: -73.99)
+        let loop = WalkableSegment(
+            id: "closed-loop",
+            startNode: NodeID(1),
+            endNode: NodeID(1),
+            coordinates: [
+                start,
+                GeoCoordinate(latitude: 40.75, longitude: -73.989),
+                GeoCoordinate(latitude: 40.751, longitude: -73.989),
+                GeoCoordinate(latitude: 40.751, longitude: -73.99),
+                start,
+            ],
+            kind: .parkPath
+        )
+        let pack = InMemoryCityCoveragePack(metadata: .fixture, segments: [loop])
+        let points = [
+            RoutePoint(
+                coordinate: GeoCoordinate(latitude: 40.7501, longitude: -73.99),
+                timestamp: Date(timeIntervalSince1970: 100),
+                horizontalAccuracy: 3
+            ),
+            RoutePoint(
+                coordinate: GeoCoordinate(latitude: 40.75, longitude: -73.9899),
+                timestamp: Date(timeIntervalSince1970: 105),
+                horizontalAccuracy: 3
+            ),
+        ]
+
+        let result = try await ContinuityMapMatcher().match(points: points, in: pack)
+        let contribution = WorkoutCoverageContribution(
+            workoutID: UUID(),
+            intervals: result.intervals,
+            confidence: result.averageConfidence
+        )
+
+        XCTAssertEqual(result.acceptedPointCount, 2)
+        XCTAssertEqual(contribution.intervals.count, 2)
+        XCTAssertGreaterThan(contribution.uniqueCoveredDistanceMeters, 5)
+        XCTAssertLessThan(contribution.uniqueCoveredDistanceMeters, 40)
+    }
+
     func testKeepsRouteOnCorrectParallelStreet() async throws {
         let west = WalkableSegment(
             id: "west-street",

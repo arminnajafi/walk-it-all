@@ -39,28 +39,30 @@ public struct MatchAccuracyEvaluator: Sendable {
 
     public func evaluate(
         contribution: WorkoutCoverageContribution,
-        clearlyWalkedSegmentIDs: Set<SegmentID>,
+        incorrectCreditedSegmentIDs: Set<SegmentID>,
+        clearlyWalkedMissedSegmentIDs: Set<SegmentID>,
         ambiguousSegmentIDs: Set<SegmentID> = [],
         in pack: any CityCoveragePack
     ) -> MatchAccuracyMeasurement {
-        let eligibleExpectedIDs = clearlyWalkedSegmentIDs.subtracting(ambiguousSegmentIDs)
         let eligibleIntervals = contribution.intervals.filter {
             !ambiguousSegmentIDs.contains($0.segmentID)
         }
         let creditedMeters = eligibleIntervals.reduce(0) { $0 + $1.lengthMeters }
         let correctlyCreditedMeters = eligibleIntervals.reduce(0) { partial, interval in
-            partial + (eligibleExpectedIDs.contains(interval.segmentID) ? interval.lengthMeters : 0)
+            partial + (incorrectCreditedSegmentIDs.contains(interval.segmentID) ? 0 : interval.lengthMeters)
         }
-        let clearlyWalkedMeters = eligibleExpectedIDs.reduce(0) { partial, segmentID in
-            guard let segment = pack.segment(id: segmentID), segment.countsTowardCoverage else {
-                return partial
+        let missedMeters = clearlyWalkedMissedSegmentIDs
+            .subtracting(ambiguousSegmentIDs)
+            .reduce(0) { partial, segmentID in
+                guard let segment = pack.segment(id: segmentID), segment.countsTowardCoverage else {
+                    return partial
+                }
+                return partial + segment.lengthMeters
             }
-            return partial + segment.lengthMeters
-        }
         return MatchAccuracyMeasurement(
             correctlyCreditedMeters: correctlyCreditedMeters,
             creditedMeters: creditedMeters,
-            clearlyWalkedMeters: clearlyWalkedMeters
+            clearlyWalkedMeters: correctlyCreditedMeters + missedMeters
         )
     }
 }

@@ -25,7 +25,9 @@ For each imported workout, the app retains:
 
 Full-resolution route locations are discarded after matching. The aggregate coverage snapshot is derived from per-workout intervals.
 
-In DEBUG builds only, opening the historical route inspector reloads full-resolution points from Health into memory for that inspector session. Loading is cancelled when the workout changes or the inspector closes. A saved local review fixture contains segment IDs and a Health workout UUID but no coordinates; it is protected, excluded from backup, and belongs only in the Git-ignored `LocalRouteFixtures` workflow.
+In DEBUG builds only, opening the historical route inspector reloads full-resolution points from Health into memory for that inspector session. Loading is cancelled when the workout changes or the inspector closes. A saved local review fixture contains only aggregate measurements and public-map segment IDs—no coordinates or Health UUID. It is protected, excluded from backup, and belongs only in the Git-ignored `LocalRouteFixtures` workflow.
+
+The inspector also offers a deliberately separate **private diagnostic route** export for investigating a confirmed matching failure. It contains the full Health route, remains protected and backup-excluded, and must never be shared or committed. It is not created by normal imports, Release builds, or ordinary review-fixture saves.
 
 The SwiftData store is created with complete file protection and excluded from device backup. Error details are privacy-redacted in unified logging; logs never contain coordinates, route geometry, or Health UUIDs.
 

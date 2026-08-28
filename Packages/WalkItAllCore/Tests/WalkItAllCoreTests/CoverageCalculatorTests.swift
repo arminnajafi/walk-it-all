@@ -82,7 +82,8 @@ final class CoverageCalculatorTests: XCTestCase {
 
         let measurement = MatchAccuracyEvaluator().evaluate(
             contribution: contribution,
-            clearlyWalkedSegmentIDs: [first.id],
+            incorrectCreditedSegmentIDs: [second.id],
+            clearlyWalkedMissedSegmentIDs: [],
             in: pack
         )
         let combined = MatchAccuracyMeasurement.combined([measurement, measurement])
@@ -91,6 +92,60 @@ final class CoverageCalculatorTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(measurement.recall), 1, accuracy: 0.001)
         XCTAssertEqual(combined.precision, measurement.precision)
         XCTAssertEqual(combined.recall, measurement.recall)
+    }
+
+    func testAccuracyEvaluationCountsOnlyReviewedMissedMetersAgainstRecall() throws {
+        let credited = WalkableSegment(
+            id: "credited",
+            startNode: NodeID(1),
+            endNode: NodeID(2),
+            coordinates: [
+                GeoCoordinate(latitude: 40.75, longitude: -73.99),
+                GeoCoordinate(latitude: 40.751, longitude: -73.99),
+            ],
+            lengthMeters: 100,
+            kind: .street
+        )
+        let missed = WalkableSegment(
+            id: "missed",
+            startNode: NodeID(2),
+            endNode: NodeID(3),
+            coordinates: [
+                GeoCoordinate(latitude: 40.751, longitude: -73.99),
+                GeoCoordinate(latitude: 40.752, longitude: -73.99),
+            ],
+            lengthMeters: 50,
+            kind: .street
+        )
+        let pack = InMemoryCityCoveragePack(metadata: .fixture, segments: [credited, missed])
+        let contribution = WorkoutCoverageContribution(
+            workoutID: UUID(),
+            intervals: [
+                SegmentInterval(
+                    segmentID: credited.id,
+                    lowerBoundMeters: 20,
+                    upperBoundMeters: 80,
+                    confidence: 1
+                ),
+            ],
+            confidence: 1
+        )
+
+        let withoutMiss = MatchAccuracyEvaluator().evaluate(
+            contribution: contribution,
+            incorrectCreditedSegmentIDs: [],
+            clearlyWalkedMissedSegmentIDs: [],
+            in: pack
+        )
+        let withMiss = MatchAccuracyEvaluator().evaluate(
+            contribution: contribution,
+            incorrectCreditedSegmentIDs: [],
+            clearlyWalkedMissedSegmentIDs: [missed.id],
+            in: pack
+        )
+
+        XCTAssertEqual(try XCTUnwrap(withoutMiss.recall), 1, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(withMiss.recall), 60.0 / 110.0, accuracy: 0.001)
     }
 
     func testUnionsRepeatedIntervalsInsteadOfDoubleCountingDistance() {

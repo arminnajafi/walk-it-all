@@ -492,6 +492,8 @@ def connectivity_stats(segments: list[Segment]) -> dict[str, Any]:
             "largest_component_goal_percent": 0,
             "largest_component_goal_segment_count": 0,
             "largest_component_total_segment_count": 0,
+            "goal_miles_outside_largest_component_by_kind": {},
+            "single_segment_component_goal_miles_by_kind": {},
         }
 
     total_goal_length = sum(
@@ -500,6 +502,17 @@ def connectivity_stats(segments: list[Segment]) -> dict[str, Any]:
     largest = components[0]
     largest_goal = [segment for segment in largest if segment.counts_toward_coverage]
     largest_length = sum(segment.length_meters for segment in largest_goal)
+    all_goal_by_kind: Counter[str] = Counter()
+    largest_goal_by_kind: Counter[str] = Counter()
+    single_segment_goal_by_kind: Counter[str] = Counter()
+    for component in components:
+        for segment in component:
+            if segment.counts_toward_coverage:
+                all_goal_by_kind[segment.kind] += segment.length_meters
+                if component is largest:
+                    largest_goal_by_kind[segment.kind] += segment.length_meters
+                if len(component) == 1:
+                    single_segment_goal_by_kind[segment.kind] += segment.length_meters
     histogram = Counter(component_size_bucket(len(component)) for component in components)
     component_details = []
     for rank, component in enumerate(components[:25], start=1):
@@ -530,6 +543,14 @@ def connectivity_stats(segments: list[Segment]) -> dict[str, Any]:
         ),
         "largest_component_goal_segment_count": len(largest_goal),
         "largest_component_total_segment_count": len(largest),
+        "goal_miles_outside_largest_component_by_kind": {
+            kind: (meters - largest_goal_by_kind[kind]) / 1_609.344
+            for kind, meters in sorted(all_goal_by_kind.items())
+        },
+        "single_segment_component_goal_miles_by_kind": {
+            kind: meters / 1_609.344
+            for kind, meters in sorted(single_segment_goal_by_kind.items())
+        },
     }
 
 

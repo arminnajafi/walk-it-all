@@ -4,6 +4,7 @@ import WalkItAllCore
 
 @ModelActor
 actor SwiftDataCoverageRepository: CoverageRepository {
+    private static let currentMatchingProjectionVersion = 1
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -17,21 +18,26 @@ actor SwiftDataCoverageRepository: CoverageRepository {
         )).isEmpty
         let hasDerivedState = state.checkpoint != nil
             || state.snapshotData != nil
+            || state.lastSuccessfulImport != nil
             || hasCoverageRecords
             || hasImportRecords
-        let isCompatible = state.packIdentifier == identifier && state.packVersion == version
+        let isCompatible = state.packIdentifier == identifier
+            && state.packVersion == version
+            && state.matchingProjectionVersion == Self.currentMatchingProjectionVersion
 
         guard !hasDerivedState || isCompatible else {
             try await resetDerivedCoverage()
             let resetState = try primaryState()
             resetState.packIdentifier = identifier
             resetState.packVersion = version
+            resetState.matchingProjectionVersion = Self.currentMatchingProjectionVersion
             try modelContext.save()
             return
         }
 
         state.packIdentifier = identifier
         state.packVersion = version
+        state.matchingProjectionVersion = Self.currentMatchingProjectionVersion
         // Kept in the schema only so existing personal stores migrate cleanly.
         // Aggregate coverage is always derived from per-workout contributions.
         state.snapshotData = nil
@@ -48,8 +54,17 @@ actor SwiftDataCoverageRepository: CoverageRepository {
             },
             sortBy: [SortDescriptor(\.start, order: .reverse)]
         )
-        return try modelContext.fetch(descriptor)
-            .compactMap(decode)
+        let persistedRecords = try modelContext.fetch(descriptor)
+        let records = persistedRecords.compactMap(decode)
+        guard records.count == persistedRecords.count else {
+            // A partial cache cannot be trusted: its processed-workout ledger
+            // and Health anchors may otherwise prevent an older workout from
+            // being reconstructed. Clear the rebuildable projection so the
+            // next foreground refresh performs a complete Health import.
+            try await resetDerivedCoverage()
+            return []
+        }
+        return records
     }
 
     func loadProcessedWorkoutIDs() async throws -> Set<UUID> {
@@ -162,6 +177,7 @@ actor SwiftDataCoverageRepository: CoverageRepository {
         state.lastSuccessfulImport = nil
         state.packIdentifier = nil
         state.packVersion = nil
+        state.matchingProjectionVersion = nil
         try modelContext.save()
     }
 

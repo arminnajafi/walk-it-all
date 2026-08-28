@@ -19,7 +19,8 @@ struct CoverageDetailsSheet: View {
 
             Section("Apple Health") {
                 LabeledContent("Status", value: model.importPhase.title)
-                LabeledContent("Mapped workouts", value: model.workoutRecords.count.formatted())
+                LabeledContent("Imported route workouts", value: model.workoutRecords.count.formatted())
+                LabeledContent("With Manhattan coverage", value: model.workoutsWithCoverageCount.formatted())
                 if let date = model.lastSuccessfulImport {
                     LabeledContent("Last refreshed", value: date.formatted(date: .abbreviated, time: .shortened))
                 }
@@ -38,7 +39,7 @@ struct CoverageDetailsSheet: View {
                 }
             }
 
-            if model.workoutRecords.isEmpty {
+            if !model.hasMappedWorkouts {
                 Section {
                     ContentUnavailableView(
                         "No mappable routes found",

@@ -110,7 +110,7 @@ final class WalkItAllUITests: XCTestCase {
         let history = app.buttons["Workout history"]
         XCTAssertTrue(history.waitForExistence(timeout: 5))
         history.tap()
-        XCTAssertTrue(app.staticTexts["No mapped workouts"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No workout routes"].waitForExistence(timeout: 5))
     }
 
     @MainActor

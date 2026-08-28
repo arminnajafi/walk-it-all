@@ -36,6 +36,8 @@ The filtering report is generated beside each map-package version. These rules a
 7. Reject transitions that imply a path far longer than observed movement.
 8. Credit only transitions whose confidence clears the conservative threshold.
 
+Closed-loop geometry is treated as a loop: movement across the stored start/end seam uses the short wrapped interval rather than rejecting the transition or crediting the long way around.
+
 Shortest-path searches use a transition-sized distance budget and are cached within each workout match. Graph-only crossings can connect eligible ways but cannot themselves become GPS candidates or earn coverage. No route or coordinate is sent to a server.
 
 ## Progress
@@ -60,4 +62,4 @@ Target acceptance:
 
 Precision is the priority: uncertain coverage remains unmarked.
 
-The DEBUG-only historical inspector can reload any stored workout from Health on demand. Its switchable layers show raw GPS, nearby eligible geometry, matcher candidates, exact credited intervals, and rejected trace portions with their reason. A reviewer can mark incorrect credit and clearly walked missed segments; the app calculates meter-weighted precision and recall and saves an ignored, protected local fixture containing segment IDs but no coordinates.
+The DEBUG-only historical inspector can reload any stored workout from Health on demand. Its switchable layers show raw GPS, nearby eligible geometry, matcher candidates, exact credited intervals, and rejected trace portions with their reason. A reviewer can mark incorrect credit and clearly walked missed segments; the app calculates meter-weighted precision and recall and saves an ignored, protected local fixture containing segment IDs but no coordinates. A separate, clearly labeled private diagnostic export includes full route points only when a failed match needs local investigation.

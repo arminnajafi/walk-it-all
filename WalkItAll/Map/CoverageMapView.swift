@@ -8,7 +8,7 @@ struct CoverageMapView: UIViewRepresentable {
     let selectedWorkout: WorkoutCoverageRecord?
     let coverageRevision: Int
     let viewportCommand: MapViewportCommand
-    let bottomMapInset: CGFloat
+    let mapOrnamentBottomInset: CGFloat
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -34,7 +34,7 @@ struct CoverageMapView: UIViewRepresentable {
             selectedWorkout: selectedWorkout,
             coverageRevision: coverageRevision,
             viewportCommand: viewportCommand,
-            bottomMapInset: bottomMapInset,
+            mapOrnamentBottomInset: mapOrnamentBottomInset,
             shouldSetInitialRegion: true
         )
         return mapView
@@ -48,7 +48,7 @@ struct CoverageMapView: UIViewRepresentable {
             selectedWorkout: selectedWorkout,
             coverageRevision: coverageRevision,
             viewportCommand: viewportCommand,
-            bottomMapInset: bottomMapInset,
+            mapOrnamentBottomInset: mapOrnamentBottomInset,
             shouldSetInitialRegion: false
         )
     }
@@ -60,7 +60,8 @@ struct CoverageMapView: UIViewRepresentable {
         private var networkBounds = MKMapRect.null
         private var pendingViewportCommand = MapViewportCommand(revision: 0, target: .manhattan)
         private var pendingSelectedWorkout: WorkoutCoverageRecord?
-        private var pendingBottomMapInset: CGFloat = 300
+        private var pendingMapOrnamentBottomInset: CGFloat = 300
+        private var appliedMapOrnamentBottomInset: CGFloat?
         private var overlayTask: Task<Void, Never>?
         private var viewportTask: Task<Void, Never>?
 
@@ -76,12 +77,18 @@ struct CoverageMapView: UIViewRepresentable {
             selectedWorkout: WorkoutCoverageRecord?,
             coverageRevision: Int,
             viewportCommand: MapViewportCommand,
-            bottomMapInset: CGFloat,
+            mapOrnamentBottomInset: CGFloat,
             shouldSetInitialRegion: Bool
         ) {
+            mapView.layoutMargins = UIEdgeInsets(
+                top: 92,
+                left: 16,
+                bottom: max(16, mapOrnamentBottomInset),
+                right: 16
+            )
             pendingViewportCommand = viewportCommand
             pendingSelectedWorkout = selectedWorkout
-            pendingBottomMapInset = bottomMapInset
+            pendingMapOrnamentBottomInset = mapOrnamentBottomInset
             if let bounds = pack.geographicBounds {
                 networkBounds = Self.mapRect(for: bounds)
             }
@@ -90,7 +97,11 @@ struct CoverageMapView: UIViewRepresentable {
                 coverageRevision: coverageRevision,
                 workoutID: selectedWorkout?.id
             )
-            if viewportRevision != viewportCommand.revision {
+            if viewportRevision != viewportCommand.revision
+                || appliedMapOrnamentBottomInset.map({
+                    abs($0 - mapOrnamentBottomInset) > 1
+                }) ?? true
+            {
                 schedulePendingViewport(
                     on: mapView,
                     animated: !shouldSetInitialRegion
@@ -146,7 +157,11 @@ struct CoverageMapView: UIViewRepresentable {
         }
 
         func mapViewDidLayout(_ mapView: MKMapView) {
-            guard viewportRevision != pendingViewportCommand.revision else { return }
+            guard viewportRevision != pendingViewportCommand.revision
+                    || appliedMapOrnamentBottomInset.map({
+                        abs($0 - pendingMapOrnamentBottomInset) > 1
+                    }) ?? true
+            else { return }
             schedulePendingViewport(on: mapView, animated: false)
         }
 
@@ -168,10 +183,10 @@ struct CoverageMapView: UIViewRepresentable {
                 pendingViewportCommand,
                 to: mapView,
                 selectedWorkout: pendingSelectedWorkout,
-                bottomMapInset: pendingBottomMapInset,
                 animated: animated
             ) {
                 viewportRevision = pendingViewportCommand.revision
+                appliedMapOrnamentBottomInset = pendingMapOrnamentBottomInset
             }
         }
 
@@ -203,7 +218,6 @@ struct CoverageMapView: UIViewRepresentable {
             _ command: MapViewportCommand,
             to mapView: MKMapView,
             selectedWorkout: WorkoutCoverageRecord?,
-            bottomMapInset: CGFloat,
             animated: Bool
         ) -> Bool {
             // MapKit can accept a region while the representable has a non-zero
@@ -233,10 +247,10 @@ struct CoverageMapView: UIViewRepresentable {
             mapView.setVisibleMapRect(
                 mapRect,
                 edgePadding: UIEdgeInsets(
-                    top: 92,
-                    left: 36,
-                    bottom: bottomMapInset,
-                    right: 36
+                    top: 12,
+                    left: 20,
+                    bottom: 12,
+                    right: 20
                 ),
                 animated: animated
             )
