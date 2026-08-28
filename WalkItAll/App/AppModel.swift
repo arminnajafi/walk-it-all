@@ -6,11 +6,13 @@ import WalkItAllCore
 enum AppSheet: Identifiable, Hashable {
     case details
     case healthAccess
+    case liveTrailIntro
 
     var id: String {
         switch self {
         case .details: "details"
         case .healthAccess: "health-access"
+        case .liveTrailIntro: "live-trail-intro"
         }
     }
 }
@@ -24,6 +26,7 @@ enum AppLaunchState: Equatable {
 enum MapViewportTarget: Equatable, Sendable {
     case manhattan
     case workout(UUID)
+    case userLocation
 }
 
 struct MapViewportCommand: Equatable, Sendable {
@@ -70,6 +73,7 @@ final class AppModel {
     private static let onboardingKey = "didCompleteOnboarding"
     private static let connectedHealthKey = "didConnectAppleHealth"
     private static let migrationStartedKey = "didBeginLifetimeMapMigration"
+    private static let liveTrailExplainedKey = "didExplainLiveTrail"
     private static let automaticRefreshInterval: TimeInterval = 5 * 60
     private let logger = Logger(subsystem: "com.arminnajafi.walkitall", category: "AppModel")
 
@@ -81,6 +85,7 @@ final class AppModel {
     var lastSuccessfulImport: Date?
     var routeRenderRevision = 0
     var mapViewportCommand = MapViewportCommand(revision: 0, target: .manhattan)
+    @ObservationIgnored let liveTrail: LiveTrailController
     var hasCompletedOnboarding: Bool {
         didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: Self.onboardingKey) }
     }
@@ -93,12 +98,18 @@ final class AppModel {
     @ObservationIgnored private var importTask: Task<Void, Never>?
     @ObservationIgnored private var importGeneration = 0
     @ObservationIgnored private var shouldImportAfterOnboardingDismisses = false
+    @ObservationIgnored private var shouldStartLiveTrailAfterSheetDismisses = false
     @ObservationIgnored private var lastAutomaticRefreshAttempt: Date?
+    @ObservationIgnored private var bootstrapInProgress = false
 
     init(dependencies: AppDependencies) {
         routeSource = dependencies.routeSource
         repository = dependencies.repository
         routeProcessor = dependencies.routeProcessor
+        liveTrail = LiveTrailController(
+            repository: dependencies.liveTrailRepository,
+            processor: dependencies.liveTrailProcessor
+        )
         legacyStore = dependencies.legacyStore
         protectStorage = dependencies.protectStorage
 
@@ -106,9 +117,17 @@ final class AppModel {
         if arguments.contains("-resetOnboarding") {
             UserDefaults.standard.removeObject(forKey: Self.onboardingKey)
             UserDefaults.standard.removeObject(forKey: Self.connectedHealthKey)
+            UserDefaults.standard.removeObject(forKey: Self.liveTrailExplainedKey)
         }
         hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Self.onboardingKey)
             || arguments.contains("-skipOnboarding")
+        liveTrail.onDidFinish = { [weak self] in
+            guard let self,
+                  self.launchState == .ready,
+                  self.hasConnectedHealth
+            else { return }
+            self.refresh()
+        }
     }
 
     var selectedWorkout: WorkoutRouteRecord? {
@@ -123,7 +142,11 @@ final class AppModel {
     }
 
     func bootstrap() async {
-        guard launchState == .loading || isFailure(launchState) else { return }
+        guard !bootstrapInProgress,
+              launchState == .loading || isFailure(launchState)
+        else { return }
+        bootstrapInProgress = true
+        defer { bootstrapInProgress = false }
         launchState = .loading
         do {
             routeRecords = try await repository.loadRecords()
@@ -135,6 +158,8 @@ final class AppModel {
             }
             #endif
             lastSuccessfulImport = try await repository.loadLastSuccessfulImport()
+            await liveTrail.bootstrap()
+            await liveTrail.reconcile(with: routeRecords)
             try protectStorage()
             routeRenderRevision &+= 1
             launchState = .ready
@@ -172,11 +197,12 @@ final class AppModel {
     }
 
     func rebuildFromHealth() {
-        guard !importPhase.isWorking else { return }
+        guard !importPhase.isWorking, !liveTrail.isActive else { return }
         beginAuthorizedImport(resetFirst: true, isAutomatic: false)
     }
 
     func refreshIfNeeded(now: Date = Date()) {
+        liveTrail.resumeIfNeeded()
         #if DEBUG
         // Synthetic records exercise populated UI without opening a real
         // Health authorization sheet in UI tests.
@@ -202,6 +228,7 @@ final class AppModel {
     }
 
     func selectWorkout(_ id: UUID) {
+        guard liveTrail.session == nil else { return }
         selectedWorkoutID = id
         mapViewportCommand = MapViewportCommand(
             revision: mapViewportCommand.revision &+ 1,
@@ -219,6 +246,49 @@ final class AppModel {
         mapViewportCommand = MapViewportCommand(
             revision: mapViewportCommand.revision &+ 1,
             target: .manhattan
+        )
+    }
+
+    func showUserLocation() {
+        liveTrail.requestCurrentLocation()
+        mapViewportCommand = MapViewportCommand(
+            revision: mapViewportCommand.revision &+ 1,
+            target: .userLocation
+        )
+    }
+
+    func requestStartLiveTrail() {
+        if UserDefaults.standard.bool(forKey: Self.liveTrailExplainedKey) {
+            startLiveTrail()
+        } else {
+            presentedSheet = .liveTrailIntro
+        }
+    }
+
+    func confirmStartLiveTrail() {
+        UserDefaults.standard.set(true, forKey: Self.liveTrailExplainedKey)
+        shouldStartLiveTrailAfterSheetDismisses = true
+        presentedSheet = nil
+    }
+
+    func resumePendingLiveTrailStart() {
+        guard shouldStartLiveTrailAfterSheetDismisses else { return }
+        shouldStartLiveTrailAfterSheetDismisses = false
+        startLiveTrail()
+    }
+
+    func finishLiveTrail() {
+        Task { [weak self] in
+            await self?.liveTrail.finish()
+        }
+    }
+
+    private func startLiveTrail() {
+        selectedWorkoutID = nil
+        liveTrail.start()
+        mapViewportCommand = MapViewportCommand(
+            revision: mapViewportCommand.revision &+ 1,
+            target: .userLocation
         )
     }
 
@@ -317,6 +387,7 @@ final class AppModel {
             let successfulRefreshDate = Date()
             try await repository.saveLastSuccessfulImport(successfulRefreshDate)
             try protectStorage()
+            await liveTrail.reconcile(with: records, now: successfulRefreshDate)
             routeRecords = records
             lastSuccessfulImport = successfulRefreshDate
             clearSelectionIfMissing()

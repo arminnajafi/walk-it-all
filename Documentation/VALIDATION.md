@@ -9,7 +9,8 @@ The verification script must pass:
 - repository replacement, deletion, reset, corruption recovery, cursor, ledger, and timestamp round trips;
 - synchronization addition, invalidation, deletion, cancellation, generation, and refresh-throttle tests;
 - overlay completeness, worldwide bounds, spatial clipping, repeat pass, and selection viewport tests;
-- onboarding, empty state, details, Health help, history, privacy, and Dynamic Type UI tests.
+- Live Trail filtering, discontinuities, compaction, Health association, exact-file persistence, corruption, replacement, and expiry tests;
+- onboarding, empty state, restrained populated map, Live Trail explanation, details, Health help, history, privacy, and Dynamic Type UI tests.
 
 ## Personal-device gate
 
@@ -17,9 +18,10 @@ Before signoff:
 
 1. Rebuild the connected iPhone and confirm 210 drawable workout routes and the 229-workout processed ledger return. The former completion cache contained 211 workout rows, but one row's saved route geometry was an empty array; it was never a route-bearing map record.
 2. Compare at least ten representative routes with Apple Fitness. Confirm that inaccurate points, subway travel, outages, and implausible jumps are not bridged.
-3. Record a new Outdoor Walk, wait until it reaches Health, and verify foreground incremental refresh after five minutes. Verify manual Refresh bypasses the throttle.
-4. Verify a replaced or deleted Health route updates the cached map.
-5. Reinstall after Health synchronization and rebuild the same history.
+3. Start an Apple Watch Outdoor Walk and Live Trail, lock the phone, walk several blocks, and confirm the solid green trail is continuous after reopening. Finish and confirm the system location indicator stops immediately.
+4. Wait for Apple Health and confirm its indigo route replaces rather than duplicates the dashed provisional trail. Verify automatic five-minute refresh and manual bypass.
+5. Exercise denied permission, interruption/relaunch, stationary time, implausible movement, 12-hour timeout, route replacement/deletion, and seven-day cleanup.
+6. Reinstall after Health synchronization and rebuild the same permanent history; confirm no temporary Live Trail is restored from backup.
 
 ## Performance gate
 
@@ -28,7 +30,9 @@ Use a Release build and realistic synthetic history of at least 1,500 workouts w
 - route processing and overlay construction outside the main actor;
 - smooth map pan and zoom;
 - no interaction stall over 100 milliseconds attributable to the app;
-- no unbounded memory growth across workouts.
+- no unbounded memory growth across workouts;
+- no unbounded growth during a multi-hour Live Trail and no excessive map-overlay churn;
+- acceptable battery use during at least one two-hour real walk.
 
 If the density pass misses the gate, retain the same renderer with only the baseline stroke. Do not add a raster-tile system for the MVP.
 
@@ -36,7 +40,7 @@ If the density pass misses the gate, retain the same renderer with only the base
 
 Verify light and dark appearance, high contrast, reduced transparency, reduced motion, VoiceOver, and all Dynamic Type sizes. Confirm 44-point controls and that normal-size layouts remain compact.
 
-On a real device, confirm complete file protection while locked, backup exclusion on the directory/store/sidecars, redacted logs, and no app-originated network activity beyond Apple MapKit.
+On a real device, confirm complete file protection while locked, backup exclusion on history and temporary-trail files, redacted logs, and no app-originated network activity beyond Apple MapKit.
 
 ## Current status
 
@@ -44,10 +48,11 @@ The previous street-completion implementation is preserved on `codex/street-comp
 
 Verified on August 28, 2026:
 
-- 13 core tests, 20 app/storage/map tests, and 7 rendered UI tests pass;
+- 18 core tests, 26 app/storage/map tests, and 8 rendered UI tests pass;
 - the connected iPhone Release rebuild restored 210 drawable routes plus all 229 processed workouts;
 - the active store, WAL, sidecar, and directory are excluded from backup, and the code/test invariant requests complete file protection;
 - a 15-second real-device Time Profiler recording reported no hangs or hang-risk events above its 250-millisecond threshold;
-- the signed tested build is installed over the prior app, and the legacy store files are gone.
+- Live Trail compaction runs away from the main actor, temporary map revisions are rate-limited, and history overlays remain immutable;
+- the signed Release build containing Live Trail and the location background mode is installed and launches on the connected iPhone.
 
-The remaining personal-field checks require a future Health event or visual comparison with Apple Fitness and therefore remain acceptance follow-ups rather than release-blocking code work.
+The remaining field checks require physical movement or elapsed time: a locked-phone Live Trail walk, Health replacement after ending the Watch workout, two-hour battery profiling, and destructive reinstall/recovery checks. They remain explicit personal-device acceptance work rather than claims made from simulator evidence.

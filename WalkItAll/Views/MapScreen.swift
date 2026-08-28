@@ -1,10 +1,11 @@
 import SwiftUI
+import UIKit
 
 struct MapScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let model: AppModel
     @State private var showHealthWaitHelp = false
-    @State private var bottomOverlayHeight: CGFloat = 220
+    @State private var bottomOverlayHeight: CGFloat = 76
 
     var body: some View {
         GeometryReader { geometry in
@@ -13,6 +14,9 @@ struct MapScreen: View {
                     records: model.routeRecords,
                     selectedWorkout: model.selectedWorkout,
                     routeRevision: model.routeRenderRevision,
+                    liveTrailSession: model.liveTrail.session,
+                    liveTrailRevision: model.liveTrail.renderRevision,
+                    showsUserLocation: model.liveTrail.accessState.canShowLocation,
                     viewportCommand: model.mapViewportCommand,
                     mapOrnamentBottomInset: bottomOverlayHeight
                         + geometry.safeAreaInsets.bottom
@@ -36,7 +40,7 @@ struct MapScreen: View {
         .sheet(item: Binding(
             get: { model.presentedSheet },
             set: { model.presentedSheet = $0 }
-        )) { destination in
+        ), onDismiss: model.resumePendingLiveTrailStart) { destination in
             AppSheetHost(destination: destination, model: model)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
@@ -56,6 +60,23 @@ struct MapScreen: View {
         } message: {
             Text("If Apple’s permission sheet is not visible, review the access steps or try again.")
         }
+        .alert(
+            "Location needs attention",
+            isPresented: Binding(
+                get: { model.liveTrail.issueMessage != nil },
+                set: { if !$0 { model.liveTrail.clearIssue() } }
+            )
+        ) {
+            if model.liveTrail.accessState == .denied {
+                Button("Open Settings") {
+                    model.liveTrail.clearIssue()
+                    UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                }
+            }
+            Button("OK", role: .cancel, action: model.liveTrail.clearIssue)
+        } message: {
+            Text(model.liveTrail.issueMessage ?? "Location is unavailable.")
+        }
     }
 
     @ViewBuilder
@@ -65,6 +86,7 @@ struct MapScreen: View {
                 HStack {
                     manhattanButton.buttonStyle(.glass)
                     Spacer()
+                    locationButton.buttonStyle(.glass)
                     infoButton.buttonStyle(.glass)
                 }
             }
@@ -74,9 +96,12 @@ struct MapScreen: View {
                     .buttonStyle(.plain)
                     .walkItAllControlSurface()
                 Spacer()
-                infoButton
-                    .buttonStyle(.plain)
-                    .walkItAllControlSurface()
+                HStack(spacing: 0) {
+                    locationButton
+                    infoButton
+                }
+                .buttonStyle(.plain)
+                .walkItAllControlSurface()
             }
         }
     }
@@ -91,6 +116,17 @@ struct MapScreen: View {
         .accessibilityLabel("Show Manhattan")
         .accessibilityHint("Recenters the map on Manhattan")
         .accessibilityIdentifier("manhattan-recenter")
+    }
+
+    private var locationButton: some View {
+        Button(action: model.showUserLocation) {
+            Image(systemName: "location.fill")
+                .font(.title3.weight(.semibold))
+                .frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("Show current location")
+        .accessibilityHint("Requests location access if needed and recenters the map")
+        .accessibilityIdentifier("current-location")
     }
 
     private var infoButton: some View {
@@ -109,9 +145,17 @@ struct MapScreen: View {
         let card = Group {
             if let workout = model.selectedWorkout {
                 SelectedWorkoutCard(workout: workout, clear: model.clearSelectedWorkout)
-            } else {
+            } else if let session = model.liveTrail.session, session.state == .active {
+                ActiveLiveTrailCard(session: session, finish: model.finishLiveTrail)
+            } else if model.liveTrail.isWaitingForHealth {
+                WaitingForHealthCard(showDetails: { model.presentedSheet = .details })
+            } else if model.importPhase.isWorking {
+                CompactImportCard(phase: model.importPhase, cancel: model.cancelImport)
+            } else if case let .failed(message) = model.importPhase {
+                CompactErrorCard(message: message) { model.presentedSheet = .details }
+            } else if !model.hasMappedWorkouts {
                 LifetimeMapCard(
-                    mappedWorkoutCount: model.mappedWorkoutCount,
+                    mappedWorkoutCount: 0,
                     phase: model.importPhase,
                     lastSuccessfulImport: model.lastSuccessfulImport,
                     hasConnectedHealth: model.hasConnectedHealth,
@@ -119,6 +163,8 @@ struct MapScreen: View {
                     cancel: model.cancelImport,
                     showDetails: { model.presentedSheet = .details }
                 )
+            } else {
+                StartLiveTrailButton(action: model.requestStartLiveTrail)
             }
         }
 
@@ -127,7 +173,7 @@ struct MapScreen: View {
                 ScrollView {
                     card.padding(.vertical, 10)
                 }
-                .frame(maxHeight: availableHeight * 0.62)
+                .frame(maxHeight: availableHeight * 0.5)
                 .padding(.horizontal, 16)
             } else {
                 card

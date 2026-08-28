@@ -10,11 +10,12 @@ Walk It All is a private iPhone app that turns outdoor walking and hiking routes
 - Read-only walking and hiking workout-route import from Apple Health
 - Conservative filtering of inaccurate locations, GPS gaps, large jumps, and implausible speeds
 - Smooth Apple Maps rendering with subtle deepening where routes repeat
+- Optional explicit Live Trail for seeing the current walk immediately, including while the screen locks
 - Incremental foreground refresh, including Health route replacements and deletions
 - Protected, backup-excluded SwiftData cache rebuilt from Apple Health
-- No account, backend, analytics, advertising, background location, CloudKit, or route upload
+- No passive tracking, account, backend, analytics, advertising, CloudKit, or route upload
 
-The app visualizes recorded GPS workouts. It does not claim verified street or sidewalk completion, and ordinary steps or indoor workouts do not appear.
+The app visualizes recorded GPS workouts. Live Trail is only a temporary on-device guide and is never a second permanent route source. The app does not claim verified street or sidewalk completion, and ordinary steps or indoor workouts do not appear.
 
 ## Open and verify
 
@@ -31,7 +32,7 @@ The bundle identifier is provisionally `com.arminnajafi.walkitall` and the deplo
 ## Repository guide
 
 - `WalkItAll/`: iOS app, HealthKit adapter, protected persistence, map renderer, and SwiftUI views
-- `Packages/WalkItAllCore/`: portable route filtering and simplification
+- `Packages/WalkItAllCore/`: portable route filtering, simplification, and temporary-session association
 - `Documentation/`: product, architecture, privacy, and validation decisions
 - `LocalRouteFixtures/`: ignored private device evidence; never commit its contents
 

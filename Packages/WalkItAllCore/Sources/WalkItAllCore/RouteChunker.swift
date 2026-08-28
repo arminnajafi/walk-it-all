@@ -54,32 +54,19 @@ public struct RouteChunker: Sendable {
         }
 
         for point in ordered {
-            guard point.coordinate.isValid,
-                  point.horizontalAccuracy.isFinite,
-                  point.horizontalAccuracy >= 0,
-                  point.horizontalAccuracy <= maximumHorizontalAccuracyMeters
-            else {
+            guard accepts(point) else {
                 finishCurrent()
                 discardedPointCount += 1
                 continue
             }
 
             if let previous = current.last {
-                if previous.timestamp == point.timestamp,
-                   previous.coordinate == point.coordinate
-                {
+                if isExactDuplicate(previous, point) {
                     discardedPointCount += 1
                     continue
                 }
 
-                let elapsed = point.timestamp.timeIntervalSince(previous.timestamp)
-                let distance = GeoMath.distance(previous.coordinate, point.coordinate)
-                let speed = elapsed > 0 ? distance / elapsed : .greatestFiniteMagnitude
-                if elapsed <= 0
-                    || elapsed > maximumTimeGap
-                    || distance > maximumDistanceGapMeters
-                    || speed > maximumImpliedSpeedMetersPerSecond
-                {
+                if requiresSplit(previous, point) {
                     finishCurrent()
                 }
             }
@@ -88,5 +75,26 @@ public struct RouteChunker: Sendable {
 
         finishCurrent()
         return RouteChunkingResult(chunks: chunks, discardedPointCount: discardedPointCount)
+    }
+
+    public func accepts(_ point: RoutePoint) -> Bool {
+        point.coordinate.isValid
+            && point.horizontalAccuracy.isFinite
+            && point.horizontalAccuracy >= 0
+            && point.horizontalAccuracy <= maximumHorizontalAccuracyMeters
+    }
+
+    public func isExactDuplicate(_ previous: RoutePoint, _ point: RoutePoint) -> Bool {
+        previous.timestamp == point.timestamp && previous.coordinate == point.coordinate
+    }
+
+    public func requiresSplit(_ previous: RoutePoint, _ point: RoutePoint) -> Bool {
+        let elapsed = point.timestamp.timeIntervalSince(previous.timestamp)
+        let distance = GeoMath.distance(previous.coordinate, point.coordinate)
+        let speed = elapsed > 0 ? distance / elapsed : .greatestFiniteMagnitude
+        return elapsed <= 0
+            || elapsed > maximumTimeGap
+            || distance > maximumDistanceGapMeters
+            || speed > maximumImpliedSpeedMetersPerSecond
     }
 }

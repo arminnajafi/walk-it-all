@@ -6,6 +6,36 @@ struct MapDetailsSheet: View {
 
     var body: some View {
         List {
+            Section("Live Trail") {
+                switch model.liveTrail.session?.state {
+                case .active:
+                    Label("Active", systemImage: "location.fill")
+                        .foregroundStyle(.green)
+                    Text("Location continues while the screen is locked until you tap Finish. Start an Outdoor Walk on Apple Watch for permanent history.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                case .waitingForHealth:
+                    Label("Waiting for Apple Health", systemImage: "heart.text.square.fill")
+                        .foregroundStyle(.green)
+                    Text("The dashed green trail is temporary. It will disappear when the matching Health route imports, or after seven days.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                case nil:
+                    Text("Start Live Trail from the map when you want an immediate, temporary guide during a walk.")
+                        .foregroundStyle(.secondary)
+                }
+
+                if let date = model.liveTrail.lastExpiredTrailDate {
+                    Label {
+                        Text("A Live Trail from \(date.formatted(date: .abbreviated, time: .omitted)) expired because its Health route was not found. No coordinates were retained.")
+                    } icon: {
+                        Image(systemName: "exclamationmark.circle")
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Apple Health") {
                 LabeledContent("Status", value: model.importPhase.title)
                 LabeledContent("Walks mapped", value: model.mappedWorkoutCount.formatted())
@@ -23,6 +53,7 @@ struct MapDetailsSheet: View {
                     Button("Rebuild full history", systemImage: "arrow.triangle.2.circlepath") {
                         confirmRebuild = true
                     }
+                    .disabled(model.liveTrail.isActive)
                 }
 
                 NavigationLink {

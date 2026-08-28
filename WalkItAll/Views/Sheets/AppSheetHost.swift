@@ -11,6 +11,8 @@ struct AppSheetHost: View {
                 MapDetailsSheet(model: model)
             case .healthAccess:
                 HealthAccessHelpSheet(model: model)
+            case .liveTrailIntro:
+                LiveTrailIntroSheet(model: model)
             }
         }
     }

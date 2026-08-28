@@ -192,3 +192,55 @@ public protocol WalkHistoryRepository: Sendable {
     func saveLastSuccessfulImport(_ date: Date) async throws
     func reset() async throws
 }
+
+public enum LiveTrailState: String, Codable, Hashable, Sendable {
+    case active
+    case waitingForHealth
+}
+
+/// The sole temporary route owned by Walk It All. It exists only while a user
+/// is explicitly tracking or waiting for the corresponding Health workout.
+public struct LiveTrailSession: Codable, Hashable, Sendable, Identifiable {
+    public let id: UUID
+    public let state: LiveTrailState
+    public let start: Date
+    public let end: Date?
+    public let routeParts: [[RoutePoint]]
+    public let lastUpdate: Date
+
+    public init(
+        id: UUID = UUID(),
+        state: LiveTrailState,
+        start: Date,
+        end: Date? = nil,
+        routeParts: [[RoutePoint]] = [],
+        lastUpdate: Date
+    ) {
+        self.id = id
+        self.state = state
+        self.start = start
+        self.end = end
+        self.routeParts = routeParts.compactMap { part in
+            let valid = part.filter { $0.coordinate.isValid }
+            return valid.isEmpty ? nil : valid
+        }
+        self.lastUpdate = lastUpdate
+    }
+
+    public var coordinateParts: [[GeoCoordinate]] {
+        routeParts.compactMap { part in
+            let coordinates = part.map(\.coordinate)
+            return coordinates.count >= 2 ? coordinates : nil
+        }
+    }
+
+    public var duration: TimeInterval {
+        max(0, (end ?? lastUpdate).timeIntervalSince(start))
+    }
+}
+
+public protocol LiveTrailRepository: Sendable {
+    func load() async throws -> LiveTrailSession?
+    func save(_ session: LiveTrailSession) async throws
+    func delete() async throws
+}

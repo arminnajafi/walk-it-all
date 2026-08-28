@@ -8,7 +8,16 @@ public struct RouteSimplifier: Sendable {
     }
 
     public func simplify(_ coordinates: [GeoCoordinate]) -> [GeoCoordinate] {
-        guard coordinates.count > 2 else { return coordinates }
+        indicesToKeep(in: coordinates).map { coordinates[$0] }
+    }
+
+    public func simplify(_ points: [RoutePoint]) -> [RoutePoint] {
+        let indices = indicesToKeep(in: points.map(\.coordinate))
+        return indices.map { points[$0] }
+    }
+
+    public func indicesToKeep(in coordinates: [GeoCoordinate]) -> [Int] {
+        guard coordinates.count > 2 else { return Array(coordinates.indices) }
         var keep = Set([0, coordinates.count - 1])
         var pending = [(0, coordinates.count - 1)]
 
@@ -31,6 +40,6 @@ public struct RouteSimplifier: Sendable {
             pending.append((start, largestIndex))
             pending.append((largestIndex, end))
         }
-        return keep.sorted().map { coordinates[$0] }
+        return keep.sorted()
     }
 }

@@ -28,6 +28,13 @@ struct RootView: View {
             }
         }
         .task { await model.bootstrap() }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            while !Task.isCancelled {
+                model.refreshIfNeeded()
+                do { try await Task.sleep(for: .seconds(5 * 60)) } catch { return }
+            }
+        }
         #if DEBUG
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = scenePhase == .active

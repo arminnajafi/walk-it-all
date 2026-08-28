@@ -103,11 +103,16 @@ final class WalkItAllUITests: XCTestCase {
     }
 
     @MainActor
-    func testHistorySelectionFitsWorkoutAndClearReturnsLifetimeCard() {
+    func testPopulatedMapUsesRestrainedLiveTrailActionAndSupportsHistorySelection() {
         let app = launch(arguments: ["-resetOnboarding", "-skipOnboarding", "-uiTestPopulated"])
-        XCTAssertTrue(app.staticTexts["2 walks mapped"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["start-live-trail"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.staticTexts["2 walks mapped"].exists)
+        XCTAssertTrue(app.buttons["current-location"].exists)
         app.buttons["About Walk It All"].tap()
-        app.buttons["Workout history"].tap()
+        let history = app.buttons["Workout history"]
+        scrollUntilHittable(history, in: app)
+        XCTAssertTrue(history.isHittable)
+        history.tap()
 
         let first = app.buttons.matching(identifier: "workout-history-row").firstMatch
         XCTAssertTrue(first.waitForExistence(timeout: 5))
@@ -117,7 +122,21 @@ final class WalkItAllUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Orange with a contrasting outline shows this workout"].exists)
         attachScreenshot(named: "07-selected-workout", app: app)
         app.buttons["Clear"].tap()
-        XCTAssertTrue(app.staticTexts["2 walks mapped"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["start-live-trail"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testFirstLiveTrailStartExplainsWatchTemporaryStorageAndBackgroundUse() {
+        let app = launch(arguments: ["-resetOnboarding", "-skipOnboarding", "-uiTestPopulated"])
+        let start = app.buttons["start-live-trail"]
+        XCTAssertTrue(start.waitForExistence(timeout: 30))
+        start.tap()
+
+        XCTAssertTrue(app.navigationBars["Live Trail"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Start an Outdoor Walk on Apple Watch"].exists)
+        XCTAssertTrue(app.staticTexts["Then start Live Trail here"].exists)
+        XCTAssertTrue(app.buttons["confirm-start-live-trail"].exists)
+        attachScreenshot(named: "08-live-trail-intro", app: app)
     }
 
     @MainActor
@@ -126,14 +145,15 @@ final class WalkItAllUITests: XCTestCase {
             "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
             "-AppleInterfaceStyle", "Dark",
         ])
-        XCTAssertTrue(app.staticTexts["2 walks mapped"].waitForExistence(timeout: 30))
-        attachScreenshot(named: "08-populated-dark", app: app)
+        XCTAssertTrue(app.buttons["start-live-trail"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.staticTexts["2 walks mapped"].exists)
+        attachScreenshot(named: "09-populated-dark", app: app)
     }
 
     @MainActor
     private func launch(arguments: [String]) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = arguments
+        app.launchArguments = arguments + ["-uiTestResetLiveTrail"]
         app.launch()
         return app
     }

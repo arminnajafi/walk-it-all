@@ -2,7 +2,9 @@
 
 ## Data use
 
-Walk It All requests read-only access to walking and hiking workouts and workout routes. It never writes to Apple Health and never requests live or background location.
+Walk It All requests read-only access to walking and hiking workouts and workout routes. It never writes to Apple Health. Location access is requested only when the user asks to see their position or explicitly starts Live Trail.
+
+There is no passive background tracking. While Live Trail is explicitly active, a When In Use Core Location session continues through screen lock with Apple’s visible location indicator. Finish invalidates it immediately. The app never requests Always location access.
 
 The app has no account, server, analytics, advertising, or CloudKit container. Health-derived routes are not transmitted by Walk It All. Apple Maps may use Apple’s normal MapKit network services to display its basemap.
 
@@ -15,11 +17,13 @@ Full-resolution Health locations exist only while one workout is being processed
 - Health import cursor and processed-workout ledger; and
 - the exact last successful refresh date.
 
+The separate temporary Live Trail file contains only the current active or waiting session: session dates, filtered route parts, and last update. It never contains unfiltered location updates. It is deleted when the associated Health route imports or seven days after Finish. A non-coordinate expiry date may remain so Details can explain that a Health route was not found.
+
 Coordinates and Health identifiers must never appear in logs. Private device evidence belongs only under the ignored `LocalRouteFixtures/` directory.
 
 ## Protection
 
-The history directory, store, and existing WAL/SHM sidecars receive complete file protection and explicit backup exclusion. The app reapplies these attributes after writes. The cache is rebuildable and intentionally does not use device backup or iCloud storage.
+The history directory, store, existing WAL/SHM sidecars, and separate Live Trail file receive complete file protection and explicit backup exclusion. The app reapplies these attributes after writes. None uses device backup or iCloud storage.
 
 ## Recovery
 

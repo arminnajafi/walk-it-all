@@ -11,6 +11,8 @@ final class WalkItAllTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "didCompleteOnboarding")
         UserDefaults.standard.removeObject(forKey: "didConnectAppleHealth")
         UserDefaults.standard.removeObject(forKey: "didBeginLifetimeMapMigration")
+        UserDefaults.standard.removeObject(forKey: "didExplainLiveTrail")
+        UserDefaults.standard.removeObject(forKey: "lastExpiredLiveTrailDate")
     }
 
     func testHealthCursorRoundTripsBothAnchorsAndAssociations() throws {
@@ -227,6 +229,129 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(resourceValues.fileProtection, .complete)
         #endif
         XCTAssertEqual(resourceValues.isExcludedFromBackup, true)
+    }
+
+    func testLiveTrailRepositoryRoundTripsAndDeletesExactProtectedFile() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let file = directory.appendingPathComponent("session.json")
+        let unrelated = directory.appendingPathComponent("keep-me")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = ProtectedLiveTrailRepository(fileURL: file)
+        let session = liveTrailSession(state: .active)
+
+        try await repository.save(session)
+        FileManager.default.createFile(atPath: unrelated.path, contents: Data([1]))
+
+        let loaded = try await repository.load()
+        XCTAssertEqual(loaded, session)
+        let values = try file.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        XCTAssertEqual(values.isExcludedFromBackup, true)
+
+        try await repository.delete()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelated.path))
+    }
+
+    func testCorruptLiveTrailFileIsDiscardedWithoutTouchingHealthHistory() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("session.json")
+        try Data("not-json".utf8).write(to: file)
+        let repository = ProtectedLiveTrailRepository(fileURL: file)
+
+        let loaded = try await repository.load()
+        XCTAssertNil(loaded)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @MainActor
+    func testPendingLiveTrailIsRemovedWhenMatchingHealthRouteAlreadyExists() async throws {
+        let routeRecord = record(id: UUID(), latitude: 40.75)
+        let liveRepository = TestLiveTrailRepository(
+            session: liveTrailSession(state: .waitingForHealth)
+        )
+        let model = makeModel(
+            source: TestRouteSource(batches: []),
+            repository: TestHistoryRepository(records: [routeRecord]),
+            liveTrailRepository: liveRepository
+        )
+
+        await model.bootstrap()
+
+        XCTAssertNil(model.liveTrail.session)
+        let stored = await liveRepository.load()
+        XCTAssertNil(stored)
+    }
+
+    @MainActor
+    func testPendingLiveTrailExpiresAfterSevenDaysAndLeavesOnlyNotice() async throws {
+        let end = Date().addingTimeInterval(-(8 * 24 * 60 * 60))
+        let session = LiveTrailSession(
+            state: .waitingForHealth,
+            start: end.addingTimeInterval(-100),
+            end: end,
+            routeParts: [],
+            lastUpdate: end
+        )
+        let repository = TestLiveTrailRepository(session: session)
+        let controller = LiveTrailController(repository: repository)
+
+        await controller.bootstrap(now: Date())
+
+        XCTAssertNil(controller.session)
+        XCTAssertNotNil(controller.lastExpiredTrailDate)
+        let stored = await repository.load()
+        XCTAssertNil(stored)
+    }
+
+    @MainActor
+    func testRecoveredActiveTrailAutomaticallyFinishesAtTwelveHours() async throws {
+        let start = Date().addingTimeInterval(-(13 * 60 * 60))
+        let active = LiveTrailSession(
+            state: .active,
+            start: start,
+            routeParts: [],
+            lastUpdate: start.addingTimeInterval(100)
+        )
+        let repository = TestLiveTrailRepository(session: active)
+        let controller = LiveTrailController(repository: repository)
+
+        await controller.bootstrap(now: Date())
+
+        XCTAssertEqual(controller.session?.state, .waitingForHealth)
+        XCTAssertEqual(
+            controller.session?.end,
+            start.addingTimeInterval(LiveTrailController.maximumSessionDuration)
+        )
+        let stored = await repository.load()
+        XCTAssertEqual(stored?.state, .waitingForHealth)
+    }
+
+    @MainActor
+    func testFullHealthRebuildIsUnavailableDuringRecoveredActiveTrail() async throws {
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(routes: [])])
+        let active = LiveTrailSession(
+            state: .active,
+            start: Date(),
+            routeParts: [],
+            lastUpdate: Date()
+        )
+        let model = makeModel(
+            source: source,
+            repository: TestHistoryRepository(),
+            liveTrailRepository: TestLiveTrailRepository(session: active)
+        )
+        await model.bootstrap()
+
+        model.rebuildFromHealth()
+        try await Task.sleep(for: .milliseconds(30))
+
+        XCTAssertTrue(model.liveTrail.isActive)
+        let authorizationCount = await source.authorizationRequestCount()
+        XCTAssertEqual(authorizationCount, 0)
     }
 
     func testLifetimeOverlayContainsEveryValidPartAndWorldwideBounds() {
@@ -477,12 +602,15 @@ final class WalkItAllTests: XCTestCase {
     private func makeModel(
         source: any WorkoutRouteSource,
         repository: any WalkHistoryRepository,
+        liveTrailRepository: any LiveTrailRepository = TestLiveTrailRepository(),
         legacyStore: LegacyCoverageStore = LegacyCoverageStore(files: [])
     ) -> AppModel {
         AppModel(dependencies: AppDependencies(
             routeSource: source,
             repository: repository,
             routeProcessor: RouteProcessor(),
+            liveTrailRepository: liveTrailRepository,
+            liveTrailProcessor: LiveTrailProcessor(),
             legacyStore: legacyStore,
             protectStorage: {}
         ))
@@ -536,9 +664,43 @@ final class WalkItAllTests: XCTestCase {
             ]]
         )
     }
+
+    private func liveTrailSession(state: LiveTrailState) -> LiveTrailSession {
+        let start = Date(timeIntervalSince1970: 100)
+        return LiveTrailSession(
+            state: state,
+            start: start,
+            end: state == .waitingForHealth ? start.addingTimeInterval(100) : nil,
+            routeParts: [[
+                RoutePoint(
+                    coordinate: GeoCoordinate(latitude: 40.75, longitude: -73.99),
+                    timestamp: start,
+                    horizontalAccuracy: 5
+                ),
+                RoutePoint(
+                    coordinate: GeoCoordinate(latitude: 40.751, longitude: -73.99),
+                    timestamp: start.addingTimeInterval(100),
+                    horizontalAccuracy: 5
+                ),
+            ]],
+            lastUpdate: start.addingTimeInterval(100)
+        )
+    }
 }
 
 private enum TestError: Error { case failed }
+
+private actor TestLiveTrailRepository: LiveTrailRepository {
+    private var session: LiveTrailSession?
+
+    init(session: LiveTrailSession? = nil) {
+        self.session = session
+    }
+
+    func load() -> LiveTrailSession? { session }
+    func save(_ session: LiveTrailSession) { self.session = session }
+    func delete() { session = nil }
+}
 
 private actor TestRouteSource: WorkoutRouteSource {
     private let batches: [WorkoutRouteBatch]

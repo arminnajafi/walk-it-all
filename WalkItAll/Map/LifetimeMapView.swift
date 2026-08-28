@@ -11,6 +11,9 @@ struct LifetimeMapView: UIViewRepresentable {
     let records: [WorkoutRouteRecord]
     let selectedWorkout: WorkoutRouteRecord?
     let routeRevision: Int
+    let liveTrailSession: LiveTrailSession?
+    let liveTrailRevision: Int
+    let showsUserLocation: Bool
     let viewportCommand: MapViewportCommand
     let mapOrnamentBottomInset: CGFloat
 
@@ -26,6 +29,7 @@ struct LifetimeMapView: UIViewRepresentable {
         mapView.isRotateEnabled = false
         mapView.showsCompass = false
         mapView.showsScale = false
+        mapView.showsUserLocation = showsUserLocation
         let configuration = MKStandardMapConfiguration(elevationStyle: .flat, emphasisStyle: .muted)
         configuration.showsTraffic = false
         mapView.preferredConfiguration = configuration
@@ -34,6 +38,9 @@ struct LifetimeMapView: UIViewRepresentable {
             records: records,
             selectedWorkout: selectedWorkout,
             routeRevision: routeRevision,
+            liveTrailSession: liveTrailSession,
+            liveTrailRevision: liveTrailRevision,
+            showsUserLocation: showsUserLocation,
             viewportCommand: viewportCommand,
             bottomInset: mapOrnamentBottomInset,
             initial: true
@@ -47,6 +54,9 @@ struct LifetimeMapView: UIViewRepresentable {
             records: records,
             selectedWorkout: selectedWorkout,
             routeRevision: routeRevision,
+            liveTrailSession: liveTrailSession,
+            liveTrailRevision: liveTrailRevision,
+            showsUserLocation: showsUserLocation,
             viewportCommand: viewportCommand,
             bottomInset: mapOrnamentBottomInset,
             initial: false
@@ -55,7 +65,8 @@ struct LifetimeMapView: UIViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, MKMapViewDelegate {
-        private var signature: Signature?
+        private var routeSignature: RouteSignature?
+        private var liveTrailSignature: LiveTrailSignature?
         private var viewportRevision: Int?
         private var pendingViewport = MapViewportCommand(revision: 0, target: .manhattan)
         private var pendingSelection: WorkoutRouteRecord?
@@ -74,10 +85,14 @@ struct LifetimeMapView: UIViewRepresentable {
             records: [WorkoutRouteRecord],
             selectedWorkout: WorkoutRouteRecord?,
             routeRevision: Int,
+            liveTrailSession: LiveTrailSession?,
+            liveTrailRevision: Int,
+            showsUserLocation: Bool,
             viewportCommand: MapViewportCommand,
             bottomInset: CGFloat,
             initial: Bool
         ) {
+            mapView.showsUserLocation = showsUserLocation
             mapView.layoutMargins = UIEdgeInsets(
                 top: 92,
                 left: 16,
@@ -94,26 +109,43 @@ struct LifetimeMapView: UIViewRepresentable {
                 scheduleViewport(on: mapView, animated: !initial)
             }
 
-            let nextSignature = Signature(
+            let nextLiveTrailSignature = LiveTrailSignature(
+                revision: liveTrailRevision,
+                sessionID: liveTrailSession?.id,
+                state: liveTrailSession?.state
+            )
+            if nextLiveTrailSignature != liveTrailSignature {
+                liveTrailSignature = nextLiveTrailSignature
+                replaceLiveTrail(liveTrailSession, on: mapView)
+            }
+
+            let nextSignature = RouteSignature(
                 routeRevision: routeRevision,
                 selectedWorkoutID: selectedWorkout?.id
             )
-            guard nextSignature != signature else { return }
-            signature = nextSignature
+            guard nextSignature != routeSignature else { return }
+            routeSignature = nextSignature
             overlayTask?.cancel()
-            mapView.removeOverlays(mapView.overlays)
+            mapView.removeOverlays(mapView.overlays.filter {
+                $0 is LifetimeRouteOverlay
+                    || $0 is SelectedRouteCasingPolyline
+                    || $0 is SelectedRoutePolyline
+            })
 
             overlayTask = Task.detached(priority: .userInitiated) { [weak self, weak mapView] in
                 let overlay = LifetimeRouteOverlay(records: records)
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
-                    guard let self, let mapView, self.signature == nextSignature else { return }
+                    guard let self, let mapView, self.routeSignature == nextSignature else { return }
                     if overlay.polylineCount > 0 {
                         mapView.addOverlay(overlay, level: .aboveRoads)
                     }
                     if let selectedWorkout {
                         self.addSelection(selectedWorkout, to: mapView)
                     }
+                    // Keep the immediate/provisional trail above the immutable
+                    // history even when a Health refresh replaces that history.
+                    self.replaceLiveTrail(liveTrailSession, on: mapView)
                     if initial || self.viewportRevision != viewportCommand.revision {
                         self.scheduleViewport(on: mapView, animated: false)
                     }
@@ -148,7 +180,33 @@ struct LifetimeMapView: UIViewRepresentable {
                 renderer.lineJoin = .round
                 return renderer
             }
+            if let casing = overlay as? LiveTrailCasingPolyline {
+                let renderer = MKPolylineRenderer(polyline: casing)
+                renderer.strokeColor = UIColor.systemBackground.withAlphaComponent(0.92)
+                renderer.lineWidth = 9
+                renderer.lineCap = .round
+                renderer.lineJoin = .round
+                if casing.isPending { renderer.lineDashPattern = [10, 7] }
+                return renderer
+            }
+            if let route = overlay as? LiveTrailPolyline {
+                let renderer = MKPolylineRenderer(polyline: route)
+                renderer.strokeColor = .systemGreen
+                renderer.lineWidth = 5.5
+                renderer.lineCap = .round
+                renderer.lineJoin = .round
+                if route.isPending { renderer.lineDashPattern = [8, 6] }
+                return renderer
+            }
             return MKOverlayRenderer(overlay: overlay)
+        }
+
+        func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+            guard pendingViewport.target == .userLocation,
+                  viewportRevision != pendingViewport.revision,
+                  userLocation.location != nil
+            else { return }
+            applyPendingViewport(to: mapView, animated: true)
         }
 
         private func addSelection(_ workout: WorkoutRouteRecord, to mapView: MKMapView) {
@@ -164,6 +222,28 @@ struct LifetimeMapView: UIViewRepresentable {
                     SelectedRoutePolyline(coordinates: coordinates, count: coordinates.count),
                     level: .aboveRoads
                 )
+            }
+        }
+
+        private func replaceLiveTrail(_ session: LiveTrailSession?, on mapView: MKMapView) {
+            mapView.removeOverlays(mapView.overlays.filter {
+                $0 is LiveTrailCasingPolyline || $0 is LiveTrailPolyline
+            })
+            guard let session else { return }
+            let pending = session.state == .waitingForHealth
+            for part in session.coordinateParts where part.count >= 2 {
+                let coordinates = part.map {
+                    CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                }
+                let casing = LiveTrailCasingPolyline(
+                    coordinates: coordinates,
+                    count: coordinates.count
+                )
+                casing.isPending = pending
+                mapView.addOverlay(casing, level: .aboveRoads)
+                let route = LiveTrailPolyline(coordinates: coordinates, count: coordinates.count)
+                route.isPending = pending
+                mapView.addOverlay(route, level: .aboveRoads)
             }
         }
 
@@ -192,6 +272,17 @@ struct LifetimeMapView: UIViewRepresentable {
                       let bounds = pendingSelection?.geographicBounds
                 else { return }
                 mapRect = Self.mapRect(for: bounds)
+            case .userLocation:
+                guard let location = mapView.userLocation.location else { return }
+                let region = MKCoordinateRegion(
+                    center: location.coordinate,
+                    latitudinalMeters: 1_500,
+                    longitudinalMeters: 1_500
+                )
+                mapView.setRegion(region, animated: animated)
+                viewportRevision = pendingViewport.revision
+                appliedBottomInset = pendingBottomInset
+                return
             }
             mapView.setVisibleMapRect(
                 mapRect,
@@ -246,7 +337,21 @@ private final class LayoutAwareMapView: MKMapView {
 private final class SelectedRouteCasingPolyline: MKPolyline {}
 private final class SelectedRoutePolyline: MKPolyline {}
 
-private struct Signature: Equatable, Sendable {
+private final class LiveTrailCasingPolyline: MKPolyline {
+    var isPending = false
+}
+
+private final class LiveTrailPolyline: MKPolyline {
+    var isPending = false
+}
+
+private struct RouteSignature: Equatable, Sendable {
     let routeRevision: Int
     let selectedWorkoutID: UUID?
+}
+
+private struct LiveTrailSignature: Equatable, Sendable {
+    let revision: Int
+    let sessionID: UUID?
+    let state: LiveTrailState?
 }
