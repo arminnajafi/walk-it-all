@@ -24,10 +24,13 @@ struct RootView: View {
             }
         }
         .task { await model.bootstrap() }
-        .fullScreenCover(isPresented: Binding(
-            get: { model.launchState == .ready && !model.hasCompletedOnboarding },
-            set: { _ in }
-        )) {
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { model.launchState == .ready && !model.hasCompletedOnboarding },
+                set: { _ in }
+            ),
+            onDismiss: model.resumePendingOnboardingImport
+        ) {
             OnboardingView(model: model)
         }
     }
@@ -46,4 +49,3 @@ private struct LaunchPlaceholder: View {
         }
     }
 }
-

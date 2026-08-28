@@ -106,6 +106,46 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
+    func testOnboardingWaitsForCoverDismissalBeforeRequestingHealthAccess() async throws {
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(
+            routes: [],
+            checkpoint: Data([1]),
+            completedCount: 0,
+            totalCount: 0
+        )])
+        let model = makeModel(source: source, repository: TestCoverageRepository())
+        await model.bootstrap()
+
+        model.completeOnboarding(requestHealthAccess: true)
+        await Task.yield()
+        let countBeforeDismissal = await source.currentAuthorizationCount()
+        XCTAssertEqual(countBeforeDismissal, 0)
+
+        model.resumePendingOnboardingImport()
+        try await waitUntilImportStops(model)
+
+        let countAfterDismissal = await source.currentAuthorizationCount()
+        XCTAssertEqual(countAfterDismissal, 1)
+    }
+
+    @MainActor
+    func testCancelledAuthorizationCannotResumeAnOldImport() async throws {
+        let source = TestRouteSource(batches: [], suspendAuthorization: true)
+        let model = makeModel(source: source, repository: TestCoverageRepository())
+        await model.bootstrap()
+
+        model.refresh()
+        try await waitForAuthorizationRequest(source)
+        model.cancelImport()
+        await source.finishAuthorization()
+        try await Task.sleep(for: .milliseconds(50))
+
+        let routeBatchRequestCount = await source.currentRouteBatchRequestCount()
+        XCTAssertEqual(routeBatchRequestCount, 0)
+        XCTAssertEqual(model.importPhase, .idle)
+    }
+
+    @MainActor
     func testBootstrapRestoresLastRefreshDate() async throws {
         let date = Date(timeIntervalSince1970: 123_456)
         let source = TestRouteSource(batches: [])
@@ -178,6 +218,15 @@ final class WalkItAllTests: XCTestCase {
         }
         XCTFail("Import did not finish")
     }
+
+    @MainActor
+    private func waitForAuthorizationRequest(_ source: TestRouteSource) async throws {
+        for _ in 0 ..< 200 {
+            if await source.currentAuthorizationCount() > 0 { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Authorization request did not start")
+    }
 }
 
 private struct EmptyMatcher: MapMatcher {
@@ -194,22 +243,38 @@ private struct EmptyMatcher: MapMatcher {
 
 private actor TestRouteSource: WorkoutRouteSource {
     private(set) var authorizationCount = 0
+    private(set) var routeBatchRequestCount = 0
     let batches: [WorkoutRouteBatch]
+    let suspendAuthorization: Bool
+    private var authorizationContinuation: CheckedContinuation<Void, Never>?
 
-    init(batches: [WorkoutRouteBatch]) {
+    init(batches: [WorkoutRouteBatch], suspendAuthorization: Bool = false) {
         self.batches = batches
+        self.suspendAuthorization = suspendAuthorization
     }
 
     func requestReadAuthorization() async throws {
         authorizationCount += 1
+        if suspendAuthorization {
+            await withCheckedContinuation { continuation in
+                authorizationContinuation = continuation
+            }
+        }
     }
 
     func currentAuthorizationCount() -> Int { authorizationCount }
+    func currentRouteBatchRequestCount() -> Int { routeBatchRequestCount }
+
+    func finishAuthorization() {
+        authorizationContinuation?.resume()
+        authorizationContinuation = nil
+    }
 
     func routeBatches(
         since checkpoint: Data?,
         excluding workoutIDs: Set<UUID>
     ) async -> AsyncThrowingStream<WorkoutRouteBatch, Error> {
+        routeBatchRequestCount += 1
         let batches = self.batches
         return AsyncThrowingStream { continuation in
             for batch in batches { continuation.yield(batch) }

@@ -32,6 +32,7 @@
 		997DDF242768B8519DDDC941 /* WalkItAllUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492C52D4F9EF866E16526CCF /* WalkItAllUITests.swift */; };
 		9F775BE05BA74554735045A0 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8100120032C826D8CAFA518 /* AppModel.swift */; };
 		ACA9D156625EC7DAF9E89C5F /* SQLiteCityPackLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F745868D274433532D71FDA4 /* SQLiteCityPackLoader.swift */; };
+		B5AC9CC528D1C64AB767B87A /* HealthAccessHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFEE4016432BD4ADFD2BD156 /* HealthAccessHelpSheet.swift */; };
 		C691B3B6540554A1EEF7A2FC /* AppSheetHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E30468590D4D9726DDFB35 /* AppSheetHost.swift */; };
 		D4CA4A9C7C1A5A6C6E9451A5 /* CoverageDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9329091AFFFFA96D1AF1B262 /* CoverageDetailsSheet.swift */; };
 		DDC1A44F88C8A4E0C7EE8ECD /* DebugRouteInspectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9C761A83C3D8700F89E5B9 /* DebugRouteInspectorSheet.swift */; };
@@ -88,6 +89,7 @@
 		D367A9FE158602470A886865 /* PersistedModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistedModels.swift; sourceTree = "<group>"; };
 		DABD328367D5C28075FE1BF9 /* HealthKitWorkoutRouteSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitWorkoutRouteSource.swift; sourceTree = "<group>"; };
 		DAE481DC24847009E19197AE /* SwiftDataCoverageRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataCoverageRepository.swift; sourceTree = "<group>"; };
+		DFEE4016432BD4ADFD2BD156 /* HealthAccessHelpSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthAccessHelpSheet.swift; sourceTree = "<group>"; };
 		E859A7C657582260DBF36425 /* ProgressCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressCard.swift; sourceTree = "<group>"; };
 		E8BF0207B065346AC05141A3 /* CoverageMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageMapView.swift; sourceTree = "<group>"; };
 		ECB635380CE9E629086CE486 /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
@@ -210,6 +212,7 @@
 				17E30468590D4D9726DDFB35 /* AppSheetHost.swift */,
 				9329091AFFFFA96D1AF1B262 /* CoverageDetailsSheet.swift */,
 				9F9C761A83C3D8700F89E5B9 /* DebugRouteInspectorSheet.swift */,
+				DFEE4016432BD4ADFD2BD156 /* HealthAccessHelpSheet.swift */,
 				9E2179330C71F7193E3AF290 /* MethodologySheet.swift */,
 				81478E450E3A9547982D0DCA /* PrivacySheet.swift */,
 				07510A3D027DD1B78300B46C /* WorkoutHistorySheet.swift */,
@@ -422,6 +425,7 @@
 				483F55B8C510400EE6F88D72 /* CoverageNetworkOverlay.swift in Sources */,
 				DDC1A44F88C8A4E0C7EE8ECD /* DebugRouteInspectorSheet.swift in Sources */,
 				4FBA7F88E1113AA285EFAD0B /* FloatingSurface.swift in Sources */,
+				B5AC9CC528D1C64AB767B87A /* HealthAccessHelpSheet.swift in Sources */,
 				F1F3115EE0992110C4C31275 /* HealthKitWorkoutRouteSource.swift in Sources */,
 				10557EC7241C285E39ACDF5D /* MapScreen.swift in Sources */,
 				E7B912EC74668C826D9E327C /* MethodologySheet.swift in Sources */,

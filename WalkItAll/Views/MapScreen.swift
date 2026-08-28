@@ -4,6 +4,7 @@ import WalkItAllCore
 struct MapScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let model: AppModel
+    @State private var showHealthWaitHelp = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -39,6 +40,25 @@ struct MapScreen: View {
             AppSheetHost(destination: destination, model: model)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+        .task(id: model.importPhase) {
+            guard model.importPhase == .requestingHealthAccess else { return }
+            do {
+                try await Task.sleep(for: .seconds(10))
+            } catch {
+                return
+            }
+            guard model.importPhase == .requestingHealthAccess else { return }
+            showHealthWaitHelp = true
+        }
+        .alert("Still waiting for Apple Health?", isPresented: $showHealthWaitHelp) {
+            Button("Review Access") {
+                model.cancelImport()
+                model.presentedSheet = .healthAccess
+            }
+            Button("Keep Waiting", role: .cancel) {}
+        } message: {
+            Text("If the Apple Health permission sheet is not visible, review the access steps or try the request again.")
         }
     }
 

@@ -31,6 +31,11 @@ struct CoverageDetailsSheet: View {
                     confirmRebuild = true
                 }
                 .disabled(model.importPhase.isWorking)
+                NavigationLink {
+                    HealthAccessHelpSheet(model: model)
+                } label: {
+                    Label("Review Health access", systemImage: "heart.text.square")
+                }
             }
 
             if model.workoutRecords.isEmpty {

@@ -5,6 +5,7 @@ import WalkItAllCore
 
 enum AppSheet: Identifiable, Hashable {
     case details
+    case healthAccess
     #if DEBUG
     case debugInspector
     #endif
@@ -12,6 +13,7 @@ enum AppSheet: Identifiable, Hashable {
     var id: String {
         switch self {
         case .details: "details"
+        case .healthAccess: "health-access"
         #if DEBUG
         case .debugInspector: "debug-inspector"
         #endif
@@ -88,6 +90,8 @@ final class AppModel {
     @ObservationIgnored private let routeSimplifier: RouteSimplifier
     @ObservationIgnored private let routeChunker: RouteChunker
     @ObservationIgnored private var importTask: Task<Void, Never>?
+    @ObservationIgnored private var importGeneration = 0
+    @ObservationIgnored private var shouldImportAfterOnboardingDismisses = false
 
     private(set) var cityPack: (any CityCoveragePack)?
 
@@ -150,10 +154,15 @@ final class AppModel {
         }
     }
 
-    func connectHealthAndImport() {
-        guard !importPhase.isWorking else { return }
+    func completeOnboarding(requestHealthAccess: Bool) {
+        shouldImportAfterOnboardingDismisses = requestHealthAccess
         hasCompletedOnboarding = true
-        beginAuthorizedImport(resetFirst: false)
+    }
+
+    func resumePendingOnboardingImport() {
+        guard shouldImportAfterOnboardingDismisses else { return }
+        shouldImportAfterOnboardingDismisses = false
+        refresh()
     }
 
     func refresh() {
@@ -167,11 +176,16 @@ final class AppModel {
     }
 
     private func beginAuthorizedImport(resetFirst: Bool) {
+        importGeneration &+= 1
+        let generation = importGeneration
+        importTask?.cancel()
         importTask = Task { [weak self] in
             guard let self else { return }
             importPhase = .requestingHealthAccess
             do {
                 try await routeSource.requestReadAuthorization()
+                try Task.checkCancellation()
+                guard generation == importGeneration else { return }
                 if resetFirst {
                     try await repository.resetDerivedCoverage()
                     workoutRecords = []
@@ -180,10 +194,12 @@ final class AppModel {
                     if let cityPack { coverage = .empty(pack: cityPack) }
                     coverageRenderRevision &+= 1
                 }
-                await performImport()
+                await performImport(generation: generation)
             } catch is CancellationError {
+                guard generation == importGeneration else { return }
                 importPhase = .idle
             } catch {
+                guard generation == importGeneration else { return }
                 logger.error("Health import setup failed: \(error.localizedDescription, privacy: .private)")
                 importPhase = .failed(error.localizedDescription)
             }
@@ -191,6 +207,7 @@ final class AppModel {
     }
 
     func cancelImport() {
+        importGeneration &+= 1
         importTask?.cancel()
         importTask = nil
         importPhase = .idle
@@ -205,8 +222,9 @@ final class AppModel {
         selectedWorkoutID = nil
     }
 
-    private func performImport() async {
+    private func performImport(generation: Int) async {
         guard let pack = cityPack else { return }
+        guard generation == importGeneration else { return }
         importPhase = .findingWorkouts
         do {
             let checkpoint = try await repository.loadCheckpoint()
@@ -280,6 +298,7 @@ final class AppModel {
             coverageRenderRevision &+= 1
             importPhase = .complete(imported: imported, unmatched: unmatched)
         } catch is CancellationError {
+            guard generation == importGeneration else { return }
             coverage = coverageCalculator.snapshot(
                 pack: pack,
                 contributions: workoutRecords.map(\.contribution)
@@ -287,6 +306,7 @@ final class AppModel {
             coverageRenderRevision &+= 1
             importPhase = .idle
         } catch {
+            guard generation == importGeneration else { return }
             coverage = coverageCalculator.snapshot(
                 pack: pack,
                 contributions: workoutRecords.map(\.contribution)

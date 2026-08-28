@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let model: AppModel
     @State private var page = 0
@@ -19,8 +18,7 @@ struct OnboardingView: View {
                 HStack {
                     Spacer()
                     Button("Explore first") {
-                        model.hasCompletedOnboarding = true
-                        dismiss()
+                        model.completeOnboarding(requestHealthAccess: false)
                     }
                     .font(.subheadline.weight(.semibold))
                 }
@@ -124,8 +122,7 @@ struct OnboardingView: View {
             .frame(maxWidth: .infinity)
         } else if #available(iOS 26.0, *) {
             Button {
-                model.connectHealthAndImport()
-                dismiss()
+                model.completeOnboarding(requestHealthAccess: true)
             } label: {
                 Label("Connect Apple Health", systemImage: "heart.fill")
                     .frame(maxWidth: .infinity)
@@ -134,8 +131,7 @@ struct OnboardingView: View {
             .controlSize(.large)
         } else {
             Button {
-                model.connectHealthAndImport()
-                dismiss()
+                model.completeOnboarding(requestHealthAccess: true)
             } label: {
                 Label("Connect Apple Health", systemImage: "heart.fill")
                     .frame(maxWidth: .infinity)

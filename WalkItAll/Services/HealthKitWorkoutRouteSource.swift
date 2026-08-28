@@ -32,6 +32,11 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
             HKObjectType.workoutType(),
             HKSeriesType.workoutRoute(),
         ]
+        let status = try await healthStore.statusForAuthorizationRequest(
+            toShare: [],
+            read: readTypes
+        )
+        guard status != .unnecessary else { return }
         try await healthStore.requestAuthorization(toShare: [], read: readTypes)
     }
 

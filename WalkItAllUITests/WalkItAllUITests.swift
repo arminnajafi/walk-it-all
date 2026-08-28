@@ -75,6 +75,13 @@ final class WalkItAllUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["How a walk is matched"].exists)
         app.navigationBars["How Coverage Works"].buttons["Coverage"].tap()
 
+        let healthAccess = app.buttons["Review Health access"]
+        XCTAssertTrue(healthAccess.waitForExistence(timeout: 5))
+        healthAccess.tap()
+        XCTAssertTrue(app.navigationBars["Health Access"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Request Apple Health Access"].exists)
+        app.navigationBars["Health Access"].buttons["Coverage"].tap()
+
         let history = app.buttons["Workout history"]
         XCTAssertTrue(history.waitForExistence(timeout: 5))
         history.tap()
