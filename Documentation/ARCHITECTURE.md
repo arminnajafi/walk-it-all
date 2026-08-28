@@ -26,7 +26,7 @@ Live updates reuse the same 50-meter accuracy and time/distance/speed gap rules 
 
 Pause immediately invalidates location delivery and the background activity session while preserving the filtered temporary trail. Resume creates a new route part before restarting delivery, so time spent paused can never become an artificial connecting line. Finish is final. The 12-hour limit covers the whole wall-clock session, including paused time.
 
-The app bootstraps the controller on every launch. Normal backgrounding and screen lock keep an active session alive, while recovery after process termination starts a new route part when the app is next launched. Force-quitting the app stops location delivery; When In Use authorization does not promise an automatic relaunch.
+The app bootstraps the controller on every launch. Live Trail recovery runs before the permanent history cache is opened, and that cache is opened lazily only when protected data is available. This lets a locked background relaunch recover an explicit Live Trail without weakening the permanent cache's protection. A foreground retry after unlock opens the lifetime history without reloading an older trail checkpoint. Normal backgrounding and screen lock keep an active session alive, while recovery after process termination starts a new route part when the app is next launched. Force-quitting the app stops location delivery; When In Use authorization does not promise an automatic relaunch.
 
 Finish immediately stores a waiting-for-Health session. A Health record replaces it when the workout overlaps at least 80 percent of the temporary time interval; maximum overlap wins, followed by minimum excess workout duration. This associates sessions only and never compares or snaps geometry. Unmatched coordinates are deleted after seven days.
 
@@ -49,9 +49,9 @@ These rules deliberately preserve the recorded shape rather than guessing a stre
 
 `Application Support/WalkItAllHistory/history.store`
 
-The directory, store, and SQLite sidecars use complete file protection and are excluded from backup. SwiftData CloudKit is disabled.
+The directory, store, SQLite sidecars, and SwiftData external-data support tree use complete file protection and are excluded from backup. SwiftData CloudKit is disabled. Exact-store corruption recovery and legacy cleanup include that support tree without touching unrelated files.
 
-The former `coverage.store` is not migrated. On the first pivot launch, a previously connected user performs a resumable full Health import into the new store. The exact legacy store, WAL, and shared-memory files are deleted only after a successful nonempty rebuild. Failure or cancellation preserves them.
+The former `coverage.store` is not migrated. On the first pivot launch, a previously connected user performs a resumable full Health import into the new store. The exact legacy store, WAL, shared-memory files, and external-data support directory are deleted only after a successful nonempty rebuild. Failure or cancellation preserves them.
 
 The sole active or pending Live Trail is stored separately at:
 

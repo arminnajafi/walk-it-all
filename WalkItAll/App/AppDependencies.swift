@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 import WalkItAllCore
 
 struct AppDependencies {
@@ -12,10 +11,9 @@ struct AppDependencies {
     let protectStorage: @Sendable () throws -> Void
 
     static func live() throws -> AppDependencies {
-        let container = try ProtectedModelContainer.make()
         return AppDependencies(
             routeSource: HealthKitWorkoutRouteSource(),
-            repository: SwiftDataWalkHistoryRepository(modelContainer: container),
+            repository: ProtectedWalkHistoryRepository(),
             routeProcessor: RouteProcessor(),
             liveTrailRepository: try ProtectedLiveTrailRepository.live(),
             liveTrailProcessor: LiveTrailProcessor(),

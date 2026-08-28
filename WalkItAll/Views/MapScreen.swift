@@ -43,7 +43,9 @@ struct MapScreen: View {
             set: { model.presentedSheet = $0 }
         ), onDismiss: model.resumePendingLiveTrailStart) { destination in
             AppSheetHost(destination: destination, model: model)
-                .presentationDetents([.medium, .large])
+                .presentationDetents(
+                    destination == .liveTrailIntro ? [.large] : [.medium, .large]
+                )
                 .presentationDragIndicator(.visible)
         }
         .task(id: model.importPhase) {

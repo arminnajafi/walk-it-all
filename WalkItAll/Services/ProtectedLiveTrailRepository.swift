@@ -34,6 +34,10 @@ actor ProtectedLiveTrailRepository: LiveTrailRepository {
         do {
             let data = try Data(contentsOf: fileURL)
             let session = try decoder.decode(LiveTrailSession.self, from: data)
+            guard Self.isValid(session) else {
+                try? FileManager.default.removeItem(at: fileURL)
+                return nil
+            }
             try protectFiles()
             return session
         } catch is DecodingError {
@@ -72,6 +76,27 @@ actor ProtectedLiveTrailRepository: LiveTrailRepository {
                 fileURL,
                 protection: Self.protection
             )
+        }
+    }
+
+    private static func isValid(_ session: LiveTrailSession) -> Bool {
+        guard session.start <= session.lastUpdate else { return false }
+        switch session.state {
+        case .active, .paused:
+            guard session.end == nil else { return false }
+        case .waitingForHealth:
+            guard let end = session.end, end >= session.start else { return false }
+        }
+
+        return session.routeParts.allSatisfy { part in
+            zip(part, part.dropFirst()).allSatisfy { $0.timestamp < $1.timestamp }
+                && part.allSatisfy {
+                    $0.coordinate.isValid
+                        && $0.horizontalAccuracy.isFinite
+                        && (0 ... 50).contains($0.horizontalAccuracy)
+                        && $0.timestamp >= session.start
+                        && $0.timestamp <= session.lastUpdate
+                }
         }
     }
 }

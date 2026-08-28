@@ -48,6 +48,11 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     @ObservationIgnored private var lastPersistenceDate: Date?
     @ObservationIgnored private var lastRenderDate: Date?
     @ObservationIgnored private var persistenceTask: Task<Void, Never>?
+    /// Accumulates every accepted point without invalidating SwiftUI for each
+    /// GPS update. `session` receives immutable snapshots at render cadence.
+    @ObservationIgnored private var workingSession: LiveTrailSession?
+    @ObservationIgnored private var bootstrapInProgress = false
+    @ObservationIgnored private var hasBootstrapped = false
 
     init(
         repository: any LiveTrailRepository,
@@ -71,6 +76,9 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     var isWaitingForHealth: Bool { session?.state == .waitingForHealth }
 
     func bootstrap(now: Date = Date()) async {
+        guard !hasBootstrapped, !bootstrapInProgress else { return }
+        bootstrapInProgress = true
+        defer { bootstrapInProgress = false }
         do {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-uiTestResetLiveTrail") {
@@ -82,7 +90,11 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
                 try await repository.save(Self.uiTestSession(state: .waitingForHealth, now: now))
             }
             #endif
-            guard let stored = try await repository.load() else { return }
+            guard let stored = try await repository.load() else {
+                hasBootstrapped = true
+                return
+            }
+            workingSession = stored
             session = stored
             renderRevision &+= 1
             switch stored.state {
@@ -104,6 +116,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             case .waitingForHealth:
                 await expirePendingTrailIfNeeded(now: now)
             }
+            hasBootstrapped = true
         } catch {
             logger.error("Temporary trail recovery failed: \(error.localizedDescription, privacy: .private)")
             issueMessage = "The temporary Live Trail could not be recovered. Your Apple Health history is unaffected."
@@ -133,7 +146,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     }
 
     func pause(at date: Date = Date()) async {
-        guard let active = session, active.state == .active else { return }
+        guard let active = workingSession ?? session, active.state == .active else { return }
         stopLocationDelivery()
 
         // Publish the paused state immediately so no in-flight location work
@@ -145,6 +158,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             routeParts: active.routeParts,
             lastUpdate: max(date, active.lastUpdate)
         )
+        workingSession = pausedSnapshot
         session = pausedSnapshot
         renderRevision &+= 1
 
@@ -153,6 +167,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             processor.pausing(active, at: date)
         }.value
         guard session?.id == compacted.id, session?.state == .paused else { return }
+        workingSession = compacted
         session = compacted
         queuePersistence(compacted, failureMessage: "Live Trail paused, but its recovery file could not be updated.")
         scheduleTimeout()
@@ -183,14 +198,16 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     }
 
     func finish(at date: Date = Date()) async {
-        guard let session, session.state == .active || session.state == .paused else { return }
+        guard let session = workingSession ?? self.session,
+              session.state == .active || session.state == .paused
+        else { return }
         stopLocationDelivery()
         pendingResume = false
         let effectiveEnd = session.state == .paused ? session.lastUpdate : date
 
         // Finish is intentionally final. Publishing this state immediately
         // prevents a late update or a second tap from reopening the session.
-        self.session = LiveTrailSession(
+        let finishingSnapshot = LiveTrailSession(
             id: session.id,
             state: .waitingForHealth,
             start: session.start,
@@ -198,6 +215,8 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             routeParts: session.routeParts,
             lastUpdate: max(effectiveEnd, session.lastUpdate)
         )
+        workingSession = finishingSnapshot
+        self.session = finishingSnapshot
         renderRevision &+= 1
         await persistenceTask?.value
         persistenceTask = nil
@@ -205,6 +224,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         let pending = await Task.detached(priority: .userInitiated) {
             processor.finishing(session, at: effectiveEnd)
         }.value
+        workingSession = pending
         self.session = pending
         do {
             try await repository.save(pending)
@@ -222,6 +242,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
                 await persistenceTask?.value
                 persistenceTask = nil
                 try await repository.delete()
+                workingSession = nil
                 self.session = nil
                 renderRevision &+= 1
             } catch {
@@ -297,6 +318,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         lastPersistenceDate = date
         lastRenderDate = nil
         let started = LiveTrailSession(state: .active, start: date, lastUpdate: date)
+        workingSession = started
         session = started
         renderRevision &+= 1
         beginLocationDelivery()
@@ -316,6 +338,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         lastPersistenceDate = date
         lastRenderDate = nil
         let resumed = processor.resuming(paused, at: date)
+        workingSession = resumed
         session = resumed
         renderRevision &+= 1
         beginLocationDelivery()
@@ -349,7 +372,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     }
 
     private func consume(_ location: CLLocation) async {
-        guard let session, session.state == .active else { return }
+        guard let session = workingSession ?? self.session, session.state == .active else { return }
         if location.timestamp.timeIntervalSince(session.start) >= Self.maximumSessionDuration {
             await finish(at: session.start.addingTimeInterval(Self.maximumSessionDuration))
             issueMessage = "Live Trail finished automatically after 12 hours."
@@ -366,11 +389,12 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         let result = processor.appending(point, to: session, forceNewPart: requiresNewPart)
         requiresNewPart = result.requiresNewPart
         guard result.accepted else { return }
-        self.session = result.session
+        workingSession = result.session
         acceptedSincePersistence += 1
 
         let now = Date()
         if lastRenderDate.map({ now.timeIntervalSince($0) >= Self.renderInterval }) ?? true {
+            self.session = result.session
             renderRevision &+= 1
             lastRenderDate = now
         }
@@ -382,9 +406,10 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
                 processor.compacting(result.session)
             }.value
             guard !Task.isCancelled,
-                  self.session?.id == compacted.id,
-                  self.session?.state == .active
+                  workingSession?.id == compacted.id,
+                  workingSession?.state == .active
             else { return }
+            workingSession = compacted
             self.session = compacted
             acceptedSincePersistence = 0
             lastPersistenceDate = now
@@ -436,6 +461,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             await persistenceTask?.value
             persistenceTask = nil
             try await repository.delete()
+            workingSession = nil
             self.session = nil
             renderRevision &+= 1
             lastExpiredTrailDate = now

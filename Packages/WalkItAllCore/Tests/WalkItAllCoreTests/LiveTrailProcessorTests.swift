@@ -51,6 +51,22 @@ final class LiveTrailProcessorTests: XCTestCase {
         XCTAssertEqual(session.routeParts.count, 3)
     }
 
+    func testRejectsCachedLocationFromBeforeExplicitStart() {
+        let processor = LiveTrailProcessor()
+        let result = processor.appending(
+            RoutePoint(
+                coordinate: GeoCoordinate(latitude: 40.75, longitude: -73.99),
+                timestamp: start.addingTimeInterval(-1),
+                horizontalAccuracy: 5
+            ),
+            to: activeSession()
+        )
+
+        XCTAssertFalse(result.accepted)
+        XCTAssertTrue(result.requiresNewPart)
+        XCTAssertTrue(result.session.routeParts.isEmpty)
+    }
+
     func testCompactionPreservesPointTimesAndEndpoints() {
         let processor = LiveTrailProcessor(simplifier: RouteSimplifier(toleranceMeters: 3))
         let points = (0 ... 100).map {

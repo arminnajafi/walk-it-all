@@ -136,7 +136,9 @@ final class WalkItAllUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Start an Outdoor Walk on Apple Watch"].exists)
         XCTAssertTrue(app.staticTexts["Then start Live Trail here"].exists)
         XCTAssertTrue(app.staticTexts["Pause briefly, or Finish when done"].exists)
-        XCTAssertTrue(app.buttons["confirm-start-live-trail"].exists)
+        let confirm = app.buttons["confirm-start-live-trail"]
+        XCTAssertTrue(confirm.exists)
+        XCTAssertTrue(confirm.isHittable, "The primary Live Trail action must stay above the fold")
         attachScreenshot(named: "08-live-trail-intro", app: app)
     }
 

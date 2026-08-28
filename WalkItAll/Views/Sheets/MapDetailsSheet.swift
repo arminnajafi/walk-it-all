@@ -23,7 +23,7 @@ struct MapDetailsSheet: View {
                 case .waitingForHealth:
                     Label("Finished — syncing from Apple Health", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("Background trail tracking is no longer running. The dashed green trail is temporary and will disappear when the finished Apple Watch route imports, or after seven days.")
+                    Text("Background trail tracking is no longer running. The dashed green trail is temporary and will disappear when the finished workout route imports, or after seven days.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 case nil:

@@ -93,7 +93,7 @@ enum HealthImportCursorCodec {
         if let cursor = try? JSONDecoder().decode(HealthImportCursor.self, from: data) {
             return DecodingResult(
                 cursor: cursor,
-                requiresFullRouteReconciliation: cursor.version < HealthImportCursor.currentVersion
+                requiresFullRouteReconciliation: cursor.version != HealthImportCursor.currentVersion
                     || cursor.routeAnchorData == nil
             )
         }

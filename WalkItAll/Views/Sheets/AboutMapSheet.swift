@@ -18,7 +18,7 @@ struct AboutMapSheet: View {
             Section("Live Trail") {
                 Text("Live Trail is an optional temporary guide for seeing the path of your current walk before Apple Health has a finished workout route.")
                 Text("Pause stops trail tracking for a short break and Resume continues in a new part. Finish ends the Live Trail permanently and starts checking Apple Health.")
-                Text("It does not create or replace an Apple Watch workout. A green trail becomes permanent only when the corresponding walking or hiking route arrives from Apple Health.")
+                Text("It does not create or replace a workout. The green trail is replaced only when the corresponding walking or hiking route arrives from Apple Health.")
             }
         }
         .navigationTitle("About This Map")

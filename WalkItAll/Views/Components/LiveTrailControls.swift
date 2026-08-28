@@ -153,7 +153,7 @@ struct WaitingForHealthCard: View {
                 .accessibilityLabel("About Health sync")
             }
 
-            Text("The dashed trail stays until your Apple Watch workout syncs into the permanent map.")
+            Text("The dashed trail stays until your finished workout route syncs into the permanent map.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -6,10 +6,10 @@ The verification script must pass:
 
 - pure-Swift route filtering, gap separation, simplification, bounds, and stress tests;
 - Health cursor migration and route-association tests;
-- repository replacement, deletion, reset, corruption recovery, cursor, ledger, and timestamp round trips;
+- repository replacement, deletion, reset, corruption recovery, locked-data deferral, external-support-tree protection, cursor, ledger, and timestamp round trips;
 - synchronization addition, invalidation, deletion, cancellation, generation, and refresh-throttle tests;
 - overlay completeness, worldwide bounds, spatial clipping, repeat pass, and selection viewport tests;
-- Live Trail filtering, discontinuities, Pause/Resume separation, final Finish, Health association, exact-file persistence, corruption, replacement, and expiry tests;
+- Live Trail filtering, pre-session/stale-location rejection, discontinuities, Pause/Resume separation, final Finish, Health association, exact-file persistence, structural corruption, idempotent locked relaunch ordering, replacement, and expiry tests;
 - onboarding, empty state, restrained populated map, Live Trail explanation, paused and finished states, details, Health help, history, privacy, and Dynamic Type UI tests.
 
 ## Personal-device gate
@@ -48,11 +48,13 @@ The previous street-completion implementation is preserved on `codex/street-comp
 
 Verified on August 28, 2026:
 
-- 19 core tests, 29 app/storage/map tests, and 10 rendered UI tests pass;
+- 20 core tests, 36 app/storage/map tests, and 10 rendered UI tests pass;
+- Xcode static analysis and clean Debug and Release simulator builds pass without diagnostics;
 - the connected iPhone Release rebuild restored 210 drawable routes plus all 229 processed workouts;
-- the active store, WAL, sidecar, temporary trail, and their directories are excluded from backup; code/test invariants request complete protection for permanent history and locked-screen-compatible protection for the temporary trail;
+- the active store, WAL, sidecar, SwiftData external-data support tree, temporary trail, and their directories are excluded from backup; code/test invariants request complete protection for permanent history and locked-screen-compatible protection for the temporary trail;
 - a 15-second real-device Time Profiler recording reported no hangs or hang-risk events above its 250-millisecond threshold;
+- a symbolicated 25-second simulator map-pan trace spent 23.887 seconds idle and 1.086 seconds active on the main thread; MapKit and Metal dominated the active samples and no first-party hot path appeared;
 - Live Trail compaction runs away from the main actor, Pause/Resume cannot bridge a gap, temporary map revisions are rate-limited, and history overlays remain immutable;
-- the signed Release build containing Live Trail and the location background mode is installed and launches on the connected iPhone.
+- the signed Release build containing the final recovery, privacy, Live Trail, and location-background-mode changes is installed and launches on the connected iPhone.
 
 The remaining field checks require physical movement or elapsed time: a locked-phone Live Trail walk including Pause/Resume, Health replacement after ending the Watch workout, two-hour battery profiling, and destructive reinstall/recovery checks. They remain explicit personal-device acceptance work rather than claims made from simulator evidence.

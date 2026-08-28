@@ -37,6 +37,9 @@ public struct LiveTrailProcessor: Sendable {
         guard chunker.accepts(point) else {
             return LiveTrailAppendResult(session: session, accepted: false, requiresNewPart: true)
         }
+        guard point.timestamp >= session.start else {
+            return LiveTrailAppendResult(session: session, accepted: false, requiresNewPart: true)
+        }
 
         var parts = session.routeParts
         let previous = parts.last?.last

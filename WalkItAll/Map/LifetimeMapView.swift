@@ -106,7 +106,10 @@ struct LifetimeMapView: UIViewRepresentable {
             if viewportRevision != viewportCommand.revision
                 || appliedBottomInset.map({ abs($0 - bottomInset) > 1 }) ?? true
             {
-                scheduleViewport(on: mapView, animated: !initial)
+                scheduleViewport(
+                    on: mapView,
+                    animated: !initial && !UIAccessibility.isReduceMotionEnabled
+                )
             }
 
             let nextLiveTrailSignature = LiveTrailSignature(
@@ -206,7 +209,10 @@ struct LifetimeMapView: UIViewRepresentable {
                   viewportRevision != pendingViewport.revision,
                   userLocation.location != nil
             else { return }
-            applyPendingViewport(to: mapView, animated: true)
+            applyPendingViewport(
+                to: mapView,
+                animated: !UIAccessibility.isReduceMotionEnabled
+            )
         }
 
         private func addSelection(_ workout: WorkoutRouteRecord, to mapView: MKMapView) {

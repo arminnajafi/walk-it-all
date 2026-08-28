@@ -12,9 +12,9 @@ struct LiveTrailIntroSheet: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Use Live Trail while gap-hunting")
+                    Text("See this walk as you go")
                         .font(.title2.bold())
-                    Text("It draws this walk immediately so you can see where you have just been.")
+                    Text("Live Trail draws your current path immediately while Apple Health records the permanent workout.")
                         .foregroundStyle(.secondary)
                 }
 
@@ -41,9 +41,14 @@ struct LiveTrailIntroSheet: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                startButton
             }
             .padding(24)
+        }
+        .safeAreaInset(edge: .bottom) {
+            startButton
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(.regularMaterial)
         }
         .navigationTitle("Live Trail")
         .navigationBarTitleDisplayMode(.inline)

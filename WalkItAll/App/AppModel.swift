@@ -148,6 +148,10 @@ final class AppModel {
         bootstrapInProgress = true
         defer { bootstrapInProgress = false }
         launchState = .loading
+        // Recover an explicitly active temporary trail before touching the
+        // stronger `.complete` lifetime-history store. iOS may relaunch the
+        // app for location delivery while that permanent store is still locked.
+        await liveTrail.bootstrap()
         do {
             routeRecords = try await repository.loadRecords()
             #if DEBUG
@@ -158,7 +162,6 @@ final class AppModel {
             }
             #endif
             lastSuccessfulImport = try await repository.loadLastSuccessfulImport()
-            await liveTrail.bootstrap()
             await liveTrail.reconcile(with: routeRecords)
             try protectStorage()
             routeRenderRevision &+= 1

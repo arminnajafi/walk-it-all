@@ -65,6 +65,20 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertFalse(migration.requiresFullRouteReconciliation)
     }
 
+    func testFutureHealthCursorRequestsSafeRouteReconciliation() throws {
+        let cursor = HealthImportCursor(
+            version: HealthImportCursor.currentVersion + 1,
+            workoutAnchorData: Data([1]),
+            routeAnchorData: Data([2])
+        )
+
+        let migration = HealthImportCursorCodec.decodeForImport(
+            try HealthImportCursorCodec.encode(cursor)
+        )
+
+        XCTAssertTrue(migration.requiresFullRouteReconciliation)
+    }
+
     func testRouteAssociationReplacementAndDeletionAffectParentWorkout() {
         let workoutID = UUID()
         let deletedWorkoutID = UUID()
@@ -193,7 +207,7 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertNil(date)
     }
 
-    func testLegacyCleanupDeletesOnlyExactStoreFiles() throws {
+    func testLegacyCleanupDeletesOnlyExactStoreFilesAndExternalData() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -202,13 +216,19 @@ final class WalkItAllTests: XCTestCase {
             directory.appendingPathComponent($0)
         }
         let unrelated = directory.appendingPathComponent("keep-me")
+        let support = directory.appendingPathComponent(".coverage_SUPPORT", isDirectory: true)
+        let externalData = support.appendingPathComponent("_EXTERNAL_DATA", isDirectory: true)
+        let externalRoute = externalData.appendingPathComponent("route")
+        try FileManager.default.createDirectory(at: externalData, withIntermediateDirectories: true)
         for file in exact + [unrelated] {
             FileManager.default.createFile(atPath: file.path, contents: Data([1]))
         }
+        FileManager.default.createFile(atPath: externalRoute.path, contents: Data([2]))
 
-        try LegacyCoverageStore(files: exact).removeAfterSuccessfulRebuild()
+        try LegacyCoverageStore(files: exact, directories: [support]).removeAfterSuccessfulRebuild()
 
         XCTAssertTrue(exact.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
+        XCTAssertFalse(FileManager.default.fileExists(atPath: support.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: unrelated.path))
     }
 
@@ -229,6 +249,65 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(resourceValues.fileProtection, .complete)
         #endif
         XCTAssertEqual(resourceValues.isExcludedFromBackup, true)
+    }
+
+    func testExternalRouteTreeIsProtectedAndExcludedFromBackup() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let nested = root.appendingPathComponent("_EXTERNAL_DATA", isDirectory: true)
+        let route = nested.appendingPathComponent("route")
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: route.path, contents: Data([1]))
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try ProtectedModelContainer.protectTreeAndExcludeFromBackup(root)
+
+        for url in [root, nested, route] {
+            let values = try url.resourceValues(forKeys: [
+                .fileProtectionKey,
+                .isExcludedFromBackupKey,
+            ])
+            #if !targetEnvironment(simulator)
+            XCTAssertEqual(values.fileProtection, .complete)
+            #endif
+            XCTAssertEqual(values.isExcludedFromBackup, true)
+        }
+    }
+
+    func testProtectedHistoryDefersStoreCreationUntilDataIsAvailable() async throws {
+        let probe = FactoryInvocationProbe()
+        let repository = ProtectedWalkHistoryRepository(
+            isProtectedDataAvailable: { false },
+            factory: {
+                probe.recordInvocation()
+                return TestHistoryRepository()
+            }
+        )
+
+        do {
+            _ = try await repository.loadRecords()
+            XCTFail("Locked protected data should prevent history-store creation")
+        } catch ProtectedHistoryError.dataUnavailable {
+            // Expected.
+        }
+
+        XCTAssertEqual(probe.invocationCount, 0)
+    }
+
+    func testProtectedHistoryCreatesAndReusesOneRepositoryAfterUnlock() async throws {
+        let probe = FactoryInvocationProbe()
+        let repository = ProtectedWalkHistoryRepository(
+            isProtectedDataAvailable: { true },
+            factory: {
+                probe.recordInvocation()
+                return TestHistoryRepository()
+            }
+        )
+
+        _ = try await repository.loadRecords()
+        _ = try await repository.loadCheckpoint()
+
+        XCTAssertEqual(probe.invocationCount, 1)
     }
 
     func testLiveTrailRepositoryRoundTripsAndDeletesExactProtectedFile() async throws {
@@ -277,6 +356,32 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
     }
 
+    func testStructurallyInvalidLiveTrailFileIsDiscarded() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("session.json")
+        let start = Date()
+        let invalid = LiveTrailSession(
+            state: .active,
+            start: start,
+            routeParts: [[RoutePoint(
+                coordinate: GeoCoordinate(latitude: 40.75, longitude: -73.99),
+                timestamp: start,
+                horizontalAccuracy: 75
+            )]],
+            lastUpdate: start
+        )
+        try JSONEncoder().encode(invalid).write(to: file)
+        let repository = ProtectedLiveTrailRepository(fileURL: file)
+
+        let loaded = try await repository.load()
+
+        XCTAssertNil(loaded)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
     @MainActor
     func testPendingLiveTrailIsRemovedWhenMatchingHealthRouteAlreadyExists() async throws {
         let routeRecord = record(id: UUID(), latitude: 40.75)
@@ -294,6 +399,30 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertNil(model.liveTrail.session)
         let stored = await liveRepository.load()
         XCTAssertNil(stored)
+    }
+
+    @MainActor
+    func testLiveTrailRecoversBeforeLockedHistoryFailure() async throws {
+        let now = Date()
+        let active = LiveTrailSession(
+            state: .active,
+            start: now.addingTimeInterval(-60),
+            routeParts: [],
+            lastUpdate: now
+        )
+        let model = makeModel(
+            source: TestRouteSource(batches: []),
+            repository: FailingHistoryRepository(),
+            liveTrailRepository: TestLiveTrailRepository(session: active)
+        )
+
+        await model.bootstrap()
+
+        XCTAssertEqual(model.liveTrail.session?.id, active.id)
+        XCTAssertTrue(model.liveTrail.hasInProgressSession)
+        guard case .failed = model.launchState else {
+            return XCTFail("Permanent history should remain unavailable while locked")
+        }
     }
 
     @MainActor
@@ -362,6 +491,31 @@ final class WalkItAllTests: XCTestCase {
         )
         let stored = await repository.load()
         XCTAssertEqual(stored?.state, .waitingForHealth)
+    }
+
+    @MainActor
+    func testRepeatedBootstrapDoesNotOverwriteRecoveredLiveTrail() async throws {
+        let now = Date()
+        let paused = LiveTrailSession(
+            state: .paused,
+            start: now.addingTimeInterval(-300),
+            routeParts: [],
+            lastUpdate: now.addingTimeInterval(-30)
+        )
+        let repository = TestLiveTrailRepository(session: paused)
+        let controller = LiveTrailController(repository: repository)
+
+        await controller.bootstrap(now: now)
+        try await repository.save(LiveTrailSession(
+            state: .waitingForHealth,
+            start: now.addingTimeInterval(-300),
+            end: now,
+            lastUpdate: now
+        ))
+        await controller.bootstrap(now: now.addingTimeInterval(1))
+
+        XCTAssertEqual(controller.session?.id, paused.id)
+        XCTAssertEqual(controller.session?.state, .paused)
     }
 
     @MainActor
@@ -769,6 +923,33 @@ final class WalkItAllTests: XCTestCase {
 }
 
 private enum TestError: Error { case failed }
+
+private final class FactoryInvocationProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var invocationCount: Int {
+        lock.withLock { count }
+    }
+
+    func recordInvocation() {
+        lock.withLock { count += 1 }
+    }
+}
+
+private actor FailingHistoryRepository: WalkHistoryRepository {
+    func loadRecords() async throws -> [WorkoutRouteRecord] { throw ProtectedHistoryError.dataUnavailable }
+    func save(record: WorkoutRouteRecord) async throws { throw ProtectedHistoryError.dataUnavailable }
+    func removeRouteRecords(workoutIDs: [UUID]) async throws { throw ProtectedHistoryError.dataUnavailable }
+    func removeWorkouts(workoutIDs: [UUID]) async throws { throw ProtectedHistoryError.dataUnavailable }
+    func loadProcessedWorkoutIDs() async throws -> Set<UUID> { throw ProtectedHistoryError.dataUnavailable }
+    func markWorkoutProcessed(id: UUID, end: Date) async throws { throw ProtectedHistoryError.dataUnavailable }
+    func loadCheckpoint() async throws -> Data? { throw ProtectedHistoryError.dataUnavailable }
+    func saveCheckpoint(_ checkpoint: Data?) async throws { throw ProtectedHistoryError.dataUnavailable }
+    func loadLastSuccessfulImport() async throws -> Date? { throw ProtectedHistoryError.dataUnavailable }
+    func saveLastSuccessfulImport(_ date: Date) async throws { throw ProtectedHistoryError.dataUnavailable }
+    func reset() async throws { throw ProtectedHistoryError.dataUnavailable }
+}
 
 private actor TestLiveTrailRepository: LiveTrailRepository {
     private var session: LiveTrailSession?

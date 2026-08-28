@@ -37,6 +37,7 @@
 		AD0438F640ED5AC80C5B75B2 /* ProtectedLiveTrailRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B4B05BBF08BC0B42AD86BFA /* ProtectedLiveTrailRepository.swift */; };
 		B5AC9CC528D1C64AB767B87A /* HealthAccessHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFEE4016432BD4ADFD2BD156 /* HealthAccessHelpSheet.swift */; };
 		C691B3B6540554A1EEF7A2FC /* AppSheetHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E30468590D4D9726DDFB35 /* AppSheetHost.swift */; };
+		C85A45D452EC32070BFA289F /* ProtectedWalkHistoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BB96553502A3CBDFCBDED8F /* ProtectedWalkHistoryRepository.swift */; };
 		DDE80A0219F548016BF64321 /* LiveTrailIntroSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F3DB0BA4769580F1882440 /* LiveTrailIntroSheet.swift */; };
 		E1396F76D748166FC83178F9 /* PersistedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D367A9FE158602470A886865 /* PersistedModels.swift */; };
 		F1F3115EE0992110C4C31275 /* HealthKitWorkoutRouteSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = DABD328367D5C28075FE1BF9 /* HealthKitWorkoutRouteSource.swift */; };
@@ -65,6 +66,7 @@
 		1705B6CE9C379711F18EBD1B /* WalkItAllUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WalkItAllUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		17E30468590D4D9726DDFB35 /* AppSheetHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSheetHost.swift; sourceTree = "<group>"; };
 		19021ECDD743539F735E97EB /* FloatingSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingSurface.swift; sourceTree = "<group>"; };
+		1BB96553502A3CBDFCBDED8F /* ProtectedWalkHistoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedWalkHistoryRepository.swift; sourceTree = "<group>"; };
 		1DBEAAB8EF76A38A17ED42D8 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		348319A7785B2E3556FDE7FE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3B4B05BBF08BC0B42AD86BFA /* ProtectedLiveTrailRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedLiveTrailRepository.swift; sourceTree = "<group>"; };
@@ -238,6 +240,7 @@
 				9244A0DC041C76F61B34659B /* LiveTrailController.swift */,
 				3B4B05BBF08BC0B42AD86BFA /* ProtectedLiveTrailRepository.swift */,
 				077BA6556C2F7B4B7071A680 /* ProtectedModelContainer.swift */,
+				1BB96553502A3CBDFCBDED8F /* ProtectedWalkHistoryRepository.swift */,
 				E7BBD32E835A9E48F49F04B8 /* SwiftDataWalkHistoryRepository.swift */,
 			);
 			path = Services;
@@ -427,6 +430,7 @@
 				03AEC17F7115392866B9154A /* PrivacySheet.swift in Sources */,
 				AD0438F640ED5AC80C5B75B2 /* ProtectedLiveTrailRepository.swift in Sources */,
 				3E143D15AC4609EC8283ED76 /* ProtectedModelContainer.swift in Sources */,
+				C85A45D452EC32070BFA289F /* ProtectedWalkHistoryRepository.swift in Sources */,
 				0D629F6DD05C5320C8464DFC /* RootView.swift in Sources */,
 				93565D919F418B83A9DB9603 /* SwiftDataWalkHistoryRepository.swift in Sources */,
 				03E8583FAEF3E021BC27A6B0 /* WalkItAllApp.swift in Sources */,

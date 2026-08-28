@@ -69,7 +69,7 @@ struct OnboardingView: View {
                 Text("Private by design.")
                     .font(pageTitleFont)
                     .multilineTextAlignment(.center)
-                Text("Walk It All reads routes from Apple Health and prepares the map on this iPhone. There is no account, tracking, or route upload.")
+                Text("Walk It All reads routes from Apple Health and prepares the map on this iPhone. There is no account, passive tracking, or route upload.")
                     .font(pageBodyFont)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
