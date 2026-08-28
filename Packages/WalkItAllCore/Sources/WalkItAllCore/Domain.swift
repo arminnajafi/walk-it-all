@@ -205,6 +205,8 @@ public struct MapPackMetadata: Codable, Hashable, Sendable {
     public let sourceDate: Date
     public let sourceURL: URL?
     public let attribution: String
+    public let attributionURL: URL?
+    public let licenseURL: URL?
 
     public init(
         identifier: String,
@@ -212,7 +214,9 @@ public struct MapPackMetadata: Codable, Hashable, Sendable {
         version: Int,
         sourceDate: Date,
         sourceURL: URL?,
-        attribution: String
+        attribution: String,
+        attributionURL: URL? = nil,
+        licenseURL: URL? = nil
     ) {
         self.identifier = identifier
         self.displayName = displayName
@@ -220,6 +224,8 @@ public struct MapPackMetadata: Codable, Hashable, Sendable {
         self.sourceDate = sourceDate
         self.sourceURL = sourceURL
         self.attribution = attribution
+        self.attributionURL = attributionURL
+        self.licenseURL = licenseURL
     }
 }
 

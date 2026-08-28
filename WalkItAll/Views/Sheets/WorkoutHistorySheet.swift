@@ -112,6 +112,7 @@ private struct WorkoutRow: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .accessibilityLabel("Uniquely credited distance")
+                .accessibilityValue(distance(record.contribution.uniqueCoveredDistanceMeters))
         }
         .contentShape(Rectangle())
         .padding(.vertical, 3)

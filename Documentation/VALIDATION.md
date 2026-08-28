@@ -4,6 +4,7 @@ This file records reproducible engineering evidence without workout coordinates,
 
 ## Automated baseline
 
+- Complete verification run: August 28, 2026
 - `WalkItAllCore`: 20 unit tests plus the executable core checks
 - `CityPackBuilder`: 13 tests
 - iOS app: 25 unit tests
@@ -33,7 +34,9 @@ A focused, symbolicated ETTrace 1.1.0 cold-launch-to-map capture ran for 13.174 
 
 Apple's `xctrace` command-line Time Profiler failed to finalize two simulator recordings after their requested time limits under Xcode 26.6. The incomplete traces were discarded. A native Instruments capture on the real phone remains part of the final personal-device pass.
 
-Visual and automated checks cover normal light appearance plus dark, increased-contrast, and accessibility XXXL layouts. At accessibility sizes the progress card and onboarding become scrollable, decorative imagery yields to content, controls remain reachable, and the map controls retain VoiceOver labels. The map measures the floating card and reserves that space through `MKMapView` layout margins, keeping Apple Maps attribution visible instead of relying on a device-specific fixed inset.
+Visual and automated checks cover normal light appearance plus dark, increased-contrast, and accessibility XXXL layouts. At accessibility sizes the progress card and onboarding become scrollable, decorative imagery yields to content, controls remain reachable, and the map controls retain VoiceOver labels. The map measures the floating card and reserves that space through `MKMapView` layout margins, keeping Apple Maps attribution visible instead of relying on a device-specific fixed inset. The current screenshot audit also covers onboarding, the empty map, coverage details, methodology and ODbL links, Health-access instructions, privacy, and workout history.
+
+Matching, GPS chunking, route simplification, aggregate calculation, and overlay construction are isolated from the main actor. The August 28 Release build succeeded for a generic iPhone target with an iOS 17 deployment target; the signed app is 22 MB and links only Apple system frameworks plus SQLite.
 
 ## Privacy and recovery
 
@@ -42,6 +45,7 @@ Visual and automated checks cover normal light appearance plus dark, increased-c
 - Simulator inspection confirms the backup-exclusion marker covers the SwiftData store, WAL, and shared-memory sidecar files
 - No coordinates, routes, or Health UUIDs are logged
 - The signed device bundle contains HealthKit entitlement and no profiler framework
+- The bundled offline-map metadata contains direct OpenStreetMap attribution and ODbL license URLs, both exposed in the methodology screen
 - Coverage remains derived from per-workout contributions and can be rebuilt from authorized Apple Health history
 
 ## Personal-device evidence and remaining human gate

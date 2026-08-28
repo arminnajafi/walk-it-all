@@ -68,7 +68,9 @@ actor SQLiteCityPackLoader {
             version: version,
             sourceDate: sourceDate,
             sourceURL: metadataValues["source_url"].flatMap(URL.init(string:)),
-            attribution: attribution
+            attribution: attribution,
+            attributionURL: metadataValues["attribution_url"].flatMap(URL.init(string:)),
+            licenseURL: metadataValues["license_url"].flatMap(URL.init(string:))
         )
         return InMemoryCityCoveragePack(
             metadata: metadata,
@@ -201,7 +203,9 @@ enum PreviewCityPack {
                 version: 1,
                 sourceDate: Date(timeIntervalSince1970: 0),
                 sourceURL: URL(string: "https://www.openstreetmap.org"),
-                attribution: "© OpenStreetMap contributors"
+                attribution: "© OpenStreetMap contributors",
+                attributionURL: URL(string: "https://www.openstreetmap.org/copyright"),
+                licenseURL: URL(string: "https://opendatacommons.org/licenses/odbl/1-0/")
             ),
             segments: segments
         )

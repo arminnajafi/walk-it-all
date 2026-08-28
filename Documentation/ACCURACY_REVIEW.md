@@ -8,6 +8,8 @@ The MVP is not accuracy-signed-off until at least ten real Health routes have be
 4. Mark credited segments that were not walked and candidate segments that were clearly walked but missed.
 5. Save the local review fixture only after the visual review is complete. Never add the fixture, route screenshots, coordinates, or Health IDs to Git.
 
+The nearby-network review layer intentionally searches wider than the production matcher and includes segments that never became matcher candidates. This makes true no-candidate recall failures reviewable without making production matching less conservative.
+
 If a route has a substantial unexplained failure, use **Save private diagnostic route** only for that route. Unlike the normal review fixture, this diagnostic contains the full Health route and must remain in protected, backup-excluded app storage or the ignored `LocalRouteFixtures` directory. Never share or commit it; delete it after a non-sensitive synthetic regression test reproduces the fix.
 
 Choose routes that collectively cover:

@@ -109,22 +109,28 @@ struct DebugRouteInspectorSheet: View {
         nearbySegmentIDs: Set<SegmentID>,
         pack: any CityCoveragePack
     ) -> some View {
-        let creditedIDs = Set(match.intervals.map(\.segmentID))
-        let missedCandidates = match.candidateSegmentIDs.subtracting(creditedIDs)
+        let reviewContribution = WorkoutCoverageContribution(
+            workoutID: route.id,
+            intervals: match.intervals,
+            confidence: match.averageConfidence
+        )
+        let creditedIDs = Set(reviewContribution.intervals.map(\.segmentID))
+        // Include the wider review network as well as matcher candidates. A
+        // segment that never became a candidate is exactly the kind of recall
+        // failure this screen needs to make reviewable.
+        let missedCandidates = nearbySegmentIDs
+            .union(match.candidateSegmentIDs)
+            .subtracting(creditedIDs)
         let displayRejections = UnmatchedPortion.coalesced(match.unmatchedPortions)
         let measurement = MatchAccuracyEvaluator().evaluate(
-            contribution: WorkoutCoverageContribution(
-                workoutID: route.id,
-                intervals: match.intervals,
-                confidence: match.averageConfidence
-            ),
+            contribution: reviewContribution,
             incorrectCreditedSegmentIDs: incorrectCredited,
             clearlyWalkedMissedSegmentIDs: clearlyWalkedMissed,
             in: pack
         )
 
         return VStack(spacing: 0) {
-            Map(initialPosition: .region(region(for: route))) {
+            Map(initialPosition: .region(region(for: route, pack: pack))) {
                 if showNearbyNetwork {
                     segmentPolylines(
                         ids: nearbySegmentIDs,
@@ -151,7 +157,7 @@ struct DebugRouteInspectorSheet: View {
                 }
 
                 if showCredited {
-                    ForEach(Array(match.intervals.enumerated()), id: \.offset) { _, interval in
+                    ForEach(Array(reviewContribution.intervals.enumerated()), id: \.offset) { _, interval in
                         if let segment = pack.segment(id: interval.segmentID) {
                             MapPolyline(coordinates: GeoMath.slice(
                                 polyline: segment.coordinates,
@@ -188,13 +194,10 @@ struct DebugRouteInspectorSheet: View {
                     LabeledContent("Accepted GPS points", value: match.acceptedPointCount.formatted())
                     LabeledContent("Rejected GPS points", value: match.rejectedPointCount.formatted())
                     LabeledContent("Candidate segments", value: match.candidateSegmentIDs.count.formatted())
-                    LabeledContent("Credited distance", value: distance(
-                        WorkoutCoverageContribution(
-                            workoutID: route.id,
-                            intervals: match.intervals,
-                            confidence: match.averageConfidence
-                        ).uniqueCoveredDistanceMeters
-                    ))
+                    LabeledContent(
+                        "Credited distance",
+                        value: distance(reviewContribution.uniqueCoveredDistanceMeters)
+                    )
                     if let precision = measurement.precision {
                         LabeledContent("Reviewed precision") {
                             Text(precision, format: .percent.precision(.fractionLength(1)))
@@ -442,9 +445,31 @@ struct DebugRouteInspectorSheet: View {
         CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude)
     }
 
-    private func region(for route: WorkoutRoute) -> MKCoordinateRegion {
-        let latitudes = route.points.map(\.coordinate.latitude)
-        let longitudes = route.points.map(\.coordinate.longitude)
+    private func region(
+        for route: WorkoutRoute,
+        pack: any CityCoveragePack
+    ) -> MKCoordinateRegion {
+        let validPoints = route.points.filter {
+            $0.coordinate.isValid
+                && $0.horizontalAccuracy >= 0
+                && $0.horizontalAccuracy <= 50
+        }
+        let focusedPoints: [RoutePoint]
+        if let bounds = pack.geographicBounds {
+            let margin = 0.01
+            let inArea = validPoints.filter {
+                $0.coordinate.latitude >= bounds.minimumLatitude - margin
+                    && $0.coordinate.latitude <= bounds.maximumLatitude + margin
+                    && $0.coordinate.longitude >= bounds.minimumLongitude - margin
+                    && $0.coordinate.longitude <= bounds.maximumLongitude + margin
+            }
+            focusedPoints = inArea.count >= 2 ? inArea : validPoints
+        } else {
+            focusedPoints = validPoints
+        }
+        let regionPoints = focusedPoints.count >= 2 ? focusedPoints : route.points
+        let latitudes = regionPoints.map(\.coordinate.latitude)
+        let longitudes = regionPoints.map(\.coordinate.longitude)
         let minLatitude = latitudes.min() ?? 40.70
         let maxLatitude = latitudes.max() ?? 40.88
         let minLongitude = longitudes.min() ?? -74.02

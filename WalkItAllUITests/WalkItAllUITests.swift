@@ -69,6 +69,7 @@ final class WalkItAllUITests: XCTestCase {
         let connectButton = app.buttons["Connect Apple Health"]
         scrollUntilHittable(connectButton, in: app)
         XCTAssertTrue(connectButton.isHittable)
+        attachScreenshot(named: "10-onboarding-accessibility-xxxl", app: app)
     }
 
     @MainActor
@@ -98,6 +99,12 @@ final class WalkItAllUITests: XCTestCase {
         methodology.tap()
         XCTAssertTrue(app.navigationBars["How Coverage Works"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["How a walk is matched"].exists)
+        attachScreenshot(named: "07-methodology", app: app)
+        let licenseLink = app.descendants(matching: .any)["Open Database License"]
+        scrollUntilHittable(licenseLink, in: app)
+        XCTAssertTrue(licenseLink.isHittable)
+        XCTAssertTrue(app.descendants(matching: .any)["OpenStreetMap attribution"].exists)
+        attachScreenshot(named: "07b-methodology-attribution", app: app)
         app.navigationBars["How Coverage Works"].buttons["Coverage"].tap()
 
         let healthAccess = app.buttons["Review Health access"]
@@ -105,12 +112,18 @@ final class WalkItAllUITests: XCTestCase {
         healthAccess.tap()
         XCTAssertTrue(app.navigationBars["Health Access"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Request Apple Health Access"].exists)
+        attachScreenshot(named: "08-health-access", app: app)
+        let finalAccessStep = app.staticTexts["Turn on all available read permissions."]
+        scrollUntilHittable(finalAccessStep, in: app)
+        XCTAssertTrue(finalAccessStep.isHittable)
+        attachScreenshot(named: "08b-health-access-instructions", app: app)
         app.navigationBars["Health Access"].buttons["Coverage"].tap()
 
         let history = app.buttons["Workout history"]
         XCTAssertTrue(history.waitForExistence(timeout: 5))
         history.tap()
         XCTAssertTrue(app.staticTexts["No workout routes"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "09-workout-history-empty", app: app)
     }
 
     @MainActor

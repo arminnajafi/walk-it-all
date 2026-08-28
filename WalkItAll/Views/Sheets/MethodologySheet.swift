@@ -22,8 +22,11 @@ struct MethodologySheet: View {
                     LabeledContent("Version", value: metadata.version.formatted())
                     LabeledContent("Source date", value: metadata.sourceDate.formatted(date: .abbreviated, time: .omitted))
                     Text(metadata.attribution)
-                    if let sourceURL = metadata.sourceURL {
-                        Link("OpenStreetMap source", destination: sourceURL)
+                    if let attributionURL = metadata.attributionURL {
+                        Link("OpenStreetMap attribution", destination: attributionURL)
+                    }
+                    if let licenseURL = metadata.licenseURL {
+                        Link("Open Database License", destination: licenseURL)
                     }
                 }
             }

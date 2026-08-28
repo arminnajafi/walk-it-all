@@ -64,6 +64,11 @@ enum ImportPhase: Equatable {
     }
 }
 
+private struct ProcessedWorkoutRoute: Sendable {
+    let record: WorkoutCoverageRecord
+    let unmatchedPortionCount: Int
+}
+
 #if DEBUG
 enum DebugInspectionState {
     case idle
@@ -314,23 +319,14 @@ final class AppModel {
                 for route in batch.routes {
                     try Task.checkCancellation()
                     importPhase = .matching(completed: batch.completedCount, total: batch.totalCount)
-                    let result = try await matcher.match(points: route.points, in: pack)
-                    let contribution = WorkoutCoverageContribution(
-                        workoutID: route.id,
-                        intervals: result.intervals,
-                        confidence: result.averageConfidence
+                    let processed = try await Self.process(
+                        route: route,
+                        matcher: matcher,
+                        pack: pack,
+                        routeChunker: routeChunker,
+                        routeSimplifier: routeSimplifier
                     )
-                    let record = WorkoutCoverageRecord(
-                        id: route.id,
-                        start: route.start,
-                        end: route.end,
-                        sourceName: route.sourceName,
-                        simplifiedRouteParts: routeChunker.chunks(from: route.points).map {
-                            routeSimplifier.simplify($0.map(\.coordinate))
-                        },
-                        contribution: contribution,
-                        unmatchedPortions: result.unmatchedPortions
-                    )
+                    let record = processed.record
                     try await repository.save(
                         record: record,
                         packIdentifier: pack.metadata.identifier,
@@ -340,7 +336,7 @@ final class AppModel {
                     workoutRecords.append(record)
                     workoutRecords.sort { $0.start > $1.start }
                     imported += 1
-                    unmatched += result.unmatchedPortions.count
+                    unmatched += processed.unmatchedPortionCount
                 }
                 for processed in batch.processedWorkouts {
                     try await repository.markWorkoutProcessed(id: processed.id, end: processed.end)
@@ -419,7 +415,7 @@ final class AppModel {
                 var ids = Set<SegmentID>()
                 for index in stride(from: 0, to: route.points.count, by: strideLength) {
                     ids.formUnion(
-                        pack.segments(near: route.points[index].coordinate, radiusMeters: 45).map(\.id)
+                        pack.segments(near: route.points[index].coordinate, radiusMeters: 75).map(\.id)
                     )
                 }
                 return ids
@@ -482,5 +478,40 @@ final class AppModel {
         await Task.detached(priority: .userInitiated) {
             calculator.snapshot(pack: pack, contributions: contributions)
         }.value
+    }
+
+    /// Matching, chunking, and route simplification must all stay off the main
+    /// actor. A long Health route can contain thousands of locations even when
+    /// its final stored representation is small.
+    private nonisolated static func process(
+        route: WorkoutRoute,
+        matcher: any MapMatcher,
+        pack: any CityCoveragePack,
+        routeChunker: RouteChunker,
+        routeSimplifier: RouteSimplifier
+    ) async throws -> ProcessedWorkoutRoute {
+        let result = try await matcher.match(points: route.points, in: pack)
+        try Task.checkCancellation()
+        let contribution = WorkoutCoverageContribution(
+            workoutID: route.id,
+            intervals: result.intervals,
+            confidence: result.averageConfidence
+        )
+        let routeParts = routeChunker.chunks(from: route.points).map {
+            routeSimplifier.simplify($0.map(\.coordinate))
+        }
+        try Task.checkCancellation()
+        return ProcessedWorkoutRoute(
+            record: WorkoutCoverageRecord(
+                id: route.id,
+                start: route.start,
+                end: route.end,
+                sourceName: route.sourceName,
+                simplifiedRouteParts: routeParts,
+                contribution: contribution,
+                unmatchedPortions: result.unmatchedPortions
+            ),
+            unmatchedPortionCount: result.unmatchedPortions.count
+        )
     }
 }

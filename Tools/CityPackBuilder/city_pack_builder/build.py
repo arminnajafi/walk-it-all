@@ -741,7 +741,9 @@ def build(args: argparse.Namespace) -> None:
         "boundary_url": args.boundary_url,
         "boundary_sha256": boundary_checksum,
         "attribution": "© OpenStreetMap contributors, ODbL 1.0",
-        "builder_schema_version": "3",
+        "attribution_url": "https://www.openstreetmap.org/copyright",
+        "license_url": "https://opendatacommons.org/licenses/odbl/1-0/",
+        "builder_schema_version": "4",
         "exclusions_scope": "largest Manhattan borough polygon",
     }
     write_database(args.output, metadata, segments)

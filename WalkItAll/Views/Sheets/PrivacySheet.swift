@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct PrivacySheet: View {
-    let model: AppModel
-
     var body: some View {
         List {
             Section {

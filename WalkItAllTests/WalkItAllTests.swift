@@ -156,6 +156,14 @@ final class WalkItAllTests: XCTestCase {
 
         XCTAssertEqual(pack.metadata.identifier, "manhattan-island")
         XCTAssertEqual(pack.metadata.version, 2)
+        XCTAssertEqual(
+            pack.metadata.attributionURL?.absoluteString,
+            "https://www.openstreetmap.org/copyright"
+        )
+        XCTAssertEqual(
+            pack.metadata.licenseURL?.absoluteString,
+            "https://opendatacommons.org/licenses/odbl/1-0/"
+        )
         XCTAssertEqual(pack.segments.count, 36_827)
         XCTAssertEqual(pack.totalLengthMeters / 1_609.344, 760.8771434590388, accuracy: 0.000_001)
         XCTAssertNotNil(Bundle.main.url(

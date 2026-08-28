@@ -61,7 +61,7 @@ struct CoverageDetailsSheet: View {
                     Label("How coverage works", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
                 }
                 NavigationLink {
-                    PrivacySheet(model: model)
+                    PrivacySheet()
                 } label: {
                     Label("Privacy and data", systemImage: "hand.raised.fill")
                 }
