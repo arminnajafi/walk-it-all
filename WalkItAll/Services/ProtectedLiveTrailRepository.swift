@@ -4,6 +4,7 @@ import WalkItAllCore
 actor ProtectedLiveTrailRepository: LiveTrailRepository {
     static let directoryName = "WalkItAllLiveTrail"
     static let fileName = "session.json"
+    static let protection = FileProtectionType.completeUntilFirstUserAuthentication
 
     private let fileURL: URL
     private let directoryURL: URL
@@ -48,7 +49,10 @@ actor ProtectedLiveTrailRepository: LiveTrailRepository {
             at: directoryURL,
             withIntermediateDirectories: true
         )
-        try ProtectedModelContainer.protectAndExcludeFromBackup(directoryURL)
+        try ProtectedModelContainer.protectAndExcludeFromBackup(
+            directoryURL,
+            protection: Self.protection
+        )
         try encoder.encode(session).write(to: fileURL, options: .atomic)
         try protectFiles()
     }
@@ -59,9 +63,15 @@ actor ProtectedLiveTrailRepository: LiveTrailRepository {
     }
 
     private func protectFiles() throws {
-        try ProtectedModelContainer.protectAndExcludeFromBackup(directoryURL)
+        try ProtectedModelContainer.protectAndExcludeFromBackup(
+            directoryURL,
+            protection: Self.protection
+        )
         if FileManager.default.fileExists(atPath: fileURL.path) {
-            try ProtectedModelContainer.protectAndExcludeFromBackup(fileURL)
+            try ProtectedModelContainer.protectAndExcludeFromBackup(
+                fileURL,
+                protection: Self.protection
+            )
         }
     }
 }

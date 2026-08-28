@@ -42,6 +42,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     @ObservationIgnored private var timeoutTask: Task<Void, Never>?
     @ObservationIgnored private var backgroundSession: CLBackgroundActivitySession?
     @ObservationIgnored private var pendingStart = false
+    @ObservationIgnored private var pendingResume = false
     @ObservationIgnored private var requiresNewPart = true
     @ObservationIgnored private var acceptedSincePersistence = 0
     @ObservationIgnored private var lastPersistenceDate: Date?
@@ -65,6 +66,8 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     }
 
     var isActive: Bool { session?.state == .active }
+    var isPaused: Bool { session?.state == .paused }
+    var hasInProgressSession: Bool { isActive || isPaused }
     var isWaitingForHealth: Bool { session?.state == .waitingForHealth }
 
     func bootstrap(now: Date = Date()) async {
@@ -72,6 +75,11 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-uiTestResetLiveTrail") {
                 try await repository.delete()
+            }
+            if ProcessInfo.processInfo.arguments.contains("-uiTestPausedLiveTrail") {
+                try await repository.save(Self.uiTestSession(state: .paused, now: now))
+            } else if ProcessInfo.processInfo.arguments.contains("-uiTestWaitingLiveTrail") {
+                try await repository.save(Self.uiTestSession(state: .waitingForHealth, now: now))
             }
             #endif
             guard let stored = try await repository.load() else { return }
@@ -86,6 +94,12 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
                     beginLocationDelivery()
                 } else {
                     issueMessage = "Live Trail could not resume because location access is unavailable. You can finish it safely."
+                }
+            case .paused:
+                if now.timeIntervalSince(stored.start) >= Self.maximumSessionDuration {
+                    await finish(at: stored.start.addingTimeInterval(Self.maximumSessionDuration))
+                } else {
+                    scheduleTimeout()
                 }
             case .waitingForHealth:
                 await expirePendingTrailIfNeeded(now: now)
@@ -118,17 +132,80 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         }
     }
 
-    func finish(at date: Date = Date()) async {
-        guard let session, session.state == .active else { return }
+    func pause(at date: Date = Date()) async {
+        guard let active = session, active.state == .active else { return }
         stopLocationDelivery()
+
+        // Publish the paused state immediately so no in-flight location work
+        // can overwrite it after background delivery has stopped.
+        let pausedSnapshot = LiveTrailSession(
+            id: active.id,
+            state: .paused,
+            start: active.start,
+            routeParts: active.routeParts,
+            lastUpdate: max(date, active.lastUpdate)
+        )
+        session = pausedSnapshot
+        renderRevision &+= 1
+
+        let processor = processor
+        let compacted = await Task.detached(priority: .userInitiated) {
+            processor.pausing(active, at: date)
+        }.value
+        guard session?.id == compacted.id, session?.state == .paused else { return }
+        session = compacted
+        queuePersistence(compacted, failureMessage: "Live Trail paused, but its recovery file could not be updated.")
+        scheduleTimeout()
+    }
+
+    func resume(now: Date = Date()) {
+        guard let session, session.state == .paused else { return }
+        if now.timeIntervalSince(session.start) >= Self.maximumSessionDuration {
+            Task { [weak self] in
+                await self?.finish(at: session.start.addingTimeInterval(Self.maximumSessionDuration))
+            }
+            return
+        }
+
+        pendingResume = true
+        switch accessState {
+        case .authorized:
+            beginResumedSession(at: now)
+        case .notDetermined:
+            locationManager.requestWhenInUseAuthorization()
+        case .denied:
+            pendingResume = false
+            issueMessage = "Location access is off. Allow it in Settings to resume Live Trail."
+        case .restricted:
+            pendingResume = false
+            issueMessage = "Location access is restricted on this iPhone."
+        }
+    }
+
+    func finish(at date: Date = Date()) async {
+        guard let session, session.state == .active || session.state == .paused else { return }
+        stopLocationDelivery()
+        pendingResume = false
+        let effectiveEnd = session.state == .paused ? session.lastUpdate : date
+
+        // Finish is intentionally final. Publishing this state immediately
+        // prevents a late update or a second tap from reopening the session.
+        self.session = LiveTrailSession(
+            id: session.id,
+            state: .waitingForHealth,
+            start: session.start,
+            end: max(effectiveEnd, session.start),
+            routeParts: session.routeParts,
+            lastUpdate: max(effectiveEnd, session.lastUpdate)
+        )
+        renderRevision &+= 1
         await persistenceTask?.value
         persistenceTask = nil
         let processor = processor
         let pending = await Task.detached(priority: .userInitiated) {
-            processor.finishing(session, at: date)
+            processor.finishing(session, at: effectiveEnd)
         }.value
         self.session = pending
-        renderRevision &+= 1
         do {
             try await repository.save(pending)
         } catch {
@@ -142,6 +219,8 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         guard let session, session.state == .waitingForHealth else { return }
         if LiveTrailHealthAssociator.matchingWorkoutID(for: session, among: records) != nil {
             do {
+                await persistenceTask?.value
+                persistenceTask = nil
                 try await repository.delete()
                 self.session = nil
                 renderRevision &+= 1
@@ -157,7 +236,16 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         issueMessage = nil
     }
 
-    func resumeIfNeeded() {
+    func resumeIfNeeded(now: Date = Date()) {
+        guard hasInProgressSession else { return }
+        if let session,
+           now.timeIntervalSince(session.start) >= Self.maximumSessionDuration
+        {
+            Task { [weak self] in
+                await self?.finish(at: session.start.addingTimeInterval(Self.maximumSessionDuration))
+            }
+            return
+        }
         guard isActive, accessState == .authorized, updateTask == nil else { return }
         requiresNewPart = true
         beginLocationDelivery()
@@ -166,8 +254,26 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         accessState = Self.accessState(for: manager.authorizationStatus)
         if isActive, accessState != .authorized {
-            stopLocationDelivery()
-            issueMessage = "Live Trail paused because location access is unavailable. You can finish it safely."
+            Task { [weak self] in
+                guard let self else { return }
+                await self.pause()
+                self.issueMessage = "Live Trail paused because location access is unavailable."
+            }
+        }
+        if pendingResume {
+            switch accessState {
+            case .authorized:
+                beginResumedSession(at: Date())
+            case .denied:
+                pendingResume = false
+                issueMessage = "Location access is off. Allow it in Settings to resume Live Trail."
+            case .restricted:
+                pendingResume = false
+                issueMessage = "Location access is restricted on this iPhone."
+            case .notDetermined:
+                break
+            }
+            return
         }
         guard pendingStart else { return }
         switch accessState {
@@ -190,18 +296,33 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         acceptedSincePersistence = 0
         lastPersistenceDate = date
         lastRenderDate = nil
-        session = LiveTrailSession(state: .active, start: date, lastUpdate: date)
+        let started = LiveTrailSession(state: .active, start: date, lastUpdate: date)
+        session = started
         renderRevision &+= 1
         beginLocationDelivery()
-        persistenceTask = Task { [weak self] in
-            guard let self, let session = self.session else { return }
-            do {
-                try await repository.save(session)
-            } catch {
-                logger.error("Temporary trail start save failed: \(error.localizedDescription, privacy: .private)")
-                issueMessage = "Live Trail started, but its recovery file could not be saved."
-            }
-        }
+        queuePersistence(
+            started,
+            failureMessage: "Live Trail started, but its recovery file could not be saved."
+        )
+    }
+
+    private func beginResumedSession(at date: Date) {
+        guard let paused = session, paused.state == .paused else { return }
+        pendingResume = false
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        requiresNewPart = true
+        acceptedSincePersistence = 0
+        lastPersistenceDate = date
+        lastRenderDate = nil
+        let resumed = processor.resuming(paused, at: date)
+        session = resumed
+        renderRevision &+= 1
+        beginLocationDelivery()
+        queuePersistence(
+            resumed,
+            failureMessage: "Live Trail resumed, but its recovery file could not be updated."
+        )
     }
 
     private func beginLocationDelivery() {
@@ -221,8 +342,8 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             } catch {
                 guard let self else { return }
                 self.logger.error("Live location delivery failed: \(error.localizedDescription, privacy: .private)")
-                self.issueMessage = "Live Trail location updates stopped unexpectedly. Reopen the app to resume."
-                self.stopLocationDelivery()
+                await self.pause()
+                self.issueMessage = "Live Trail paused because location updates stopped unexpectedly."
             }
         }
     }
@@ -267,11 +388,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             self.session = compacted
             acceptedSincePersistence = 0
             lastPersistenceDate = now
-            do {
-                try await repository.save(compacted)
-            } catch {
-                logger.error("Temporary trail checkpoint failed: \(error.localizedDescription, privacy: .private)")
-            }
+            queuePersistence(compacted)
         }
     }
 
@@ -316,6 +433,8 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
               now.timeIntervalSince(end) >= Self.pendingRetentionDuration
         else { return }
         do {
+            await persistenceTask?.value
+            persistenceTask = nil
             try await repository.delete()
             self.session = nil
             renderRevision &+= 1
@@ -335,4 +454,45 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         @unknown default: .restricted
         }
     }
+
+    private func queuePersistence(
+        _ session: LiveTrailSession,
+        failureMessage: String? = nil
+    ) {
+        let previous = persistenceTask
+        persistenceTask = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            do {
+                try await repository.save(session)
+            } catch {
+                logger.error("Temporary trail checkpoint failed: \(error.localizedDescription, privacy: .private)")
+                if let failureMessage { issueMessage = failureMessage }
+            }
+        }
+    }
+
+    #if DEBUG
+    private static func uiTestSession(state: LiveTrailState, now: Date) -> LiveTrailSession {
+        let start = now.addingTimeInterval(-20 * 60)
+        return LiveTrailSession(
+            state: state,
+            start: start,
+            end: state == .waitingForHealth ? now.addingTimeInterval(-60) : nil,
+            routeParts: [[
+                RoutePoint(
+                    coordinate: GeoCoordinate(latitude: 40.7530, longitude: -73.9900),
+                    timestamp: start,
+                    horizontalAccuracy: 5
+                ),
+                RoutePoint(
+                    coordinate: GeoCoordinate(latitude: 40.7580, longitude: -73.9850),
+                    timestamp: start.addingTimeInterval(10 * 60),
+                    horizontalAccuracy: 5
+                ),
+            ]],
+            lastUpdate: now.addingTimeInterval(-60)
+        )
+    }
+    #endif
 }

@@ -80,6 +80,27 @@ public struct LiveTrailProcessor: Sendable {
         )
     }
 
+    public func pausing(_ session: LiveTrailSession, at date: Date) -> LiveTrailSession {
+        let compacted = compacting(session)
+        return LiveTrailSession(
+            id: compacted.id,
+            state: .paused,
+            start: compacted.start,
+            routeParts: compacted.routeParts,
+            lastUpdate: max(date, compacted.lastUpdate)
+        )
+    }
+
+    public func resuming(_ session: LiveTrailSession, at date: Date) -> LiveTrailSession {
+        LiveTrailSession(
+            id: session.id,
+            state: .active,
+            start: session.start,
+            routeParts: session.routeParts,
+            lastUpdate: max(date, session.lastUpdate)
+        )
+    }
+
     public func finishing(_ session: LiveTrailSession, at date: Date) -> LiveTrailSession {
         let compacted = compacting(session)
         return LiveTrailSession(

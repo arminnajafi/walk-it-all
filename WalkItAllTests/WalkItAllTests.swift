@@ -245,7 +245,17 @@ final class WalkItAllTests: XCTestCase {
 
         let loaded = try await repository.load()
         XCTAssertEqual(loaded, session)
-        let values = try file.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        let values = try file.resourceValues(forKeys: [
+            .fileProtectionKey,
+            .isExcludedFromBackupKey,
+        ])
+        XCTAssertEqual(
+            ProtectedLiveTrailRepository.protection,
+            .completeUntilFirstUserAuthentication
+        )
+        #if !targetEnvironment(simulator)
+        XCTAssertEqual(values.fileProtection, .completeUntilFirstUserAuthentication)
+        #endif
         XCTAssertEqual(values.isExcludedFromBackup, true)
 
         try await repository.delete()
@@ -331,6 +341,52 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
+    func testRecoveredPausedTrailAutomaticallyFinishesAtTwelveHours() async throws {
+        let start = Date().addingTimeInterval(-(13 * 60 * 60))
+        let paused = LiveTrailSession(
+            state: .paused,
+            start: start,
+            routeParts: [],
+            lastUpdate: start.addingTimeInterval(100)
+        )
+        let repository = TestLiveTrailRepository(session: paused)
+        let controller = LiveTrailController(repository: repository)
+
+        await controller.bootstrap(now: Date())
+
+        XCTAssertEqual(controller.session?.state, .waitingForHealth)
+        XCTAssertEqual(
+            controller.session?.end,
+            start.addingTimeInterval(100),
+            "Finishing a paused trail must not include unattended paused time"
+        )
+        let stored = await repository.load()
+        XCTAssertEqual(stored?.state, .waitingForHealth)
+    }
+
+    @MainActor
+    func testFinishingPausedTrailUsesPauseTimeAndIsFinal() async throws {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let pauseDate = start.addingTimeInterval(600)
+        let paused = LiveTrailSession(
+            state: .paused,
+            start: start,
+            routeParts: [],
+            lastUpdate: pauseDate
+        )
+        let repository = TestLiveTrailRepository(session: paused)
+        let controller = LiveTrailController(repository: repository)
+        await controller.bootstrap(now: pauseDate)
+
+        await controller.finish(at: start.addingTimeInterval(3_600))
+
+        XCTAssertEqual(controller.session?.state, .waitingForHealth)
+        XCTAssertEqual(controller.session?.end, pauseDate)
+        let stored = await repository.load()
+        XCTAssertEqual(stored?.end, pauseDate)
+    }
+
+    @MainActor
     func testFullHealthRebuildIsUnavailableDuringRecoveredActiveTrail() async throws {
         let source = TestRouteSource(batches: [WorkoutRouteBatch(routes: [])])
         let active = LiveTrailSession(
@@ -350,6 +406,30 @@ final class WalkItAllTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(30))
 
         XCTAssertTrue(model.liveTrail.isActive)
+        let authorizationCount = await source.authorizationRequestCount()
+        XCTAssertEqual(authorizationCount, 0)
+    }
+
+    @MainActor
+    func testFullHealthRebuildIsUnavailableDuringRecoveredPausedTrail() async throws {
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(routes: [])])
+        let paused = LiveTrailSession(
+            state: .paused,
+            start: Date(),
+            routeParts: [],
+            lastUpdate: Date()
+        )
+        let model = makeModel(
+            source: source,
+            repository: TestHistoryRepository(),
+            liveTrailRepository: TestLiveTrailRepository(session: paused)
+        )
+        await model.bootstrap()
+
+        model.rebuildFromHealth()
+        try await Task.sleep(for: .milliseconds(30))
+
+        XCTAssertTrue(model.liveTrail.isPaused)
         let authorizationCount = await source.authorizationRequestCount()
         XCTAssertEqual(authorizationCount, 0)
     }

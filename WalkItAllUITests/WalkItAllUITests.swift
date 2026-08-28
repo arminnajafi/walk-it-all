@@ -135,8 +135,44 @@ final class WalkItAllUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Live Trail"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Start an Outdoor Walk on Apple Watch"].exists)
         XCTAssertTrue(app.staticTexts["Then start Live Trail here"].exists)
+        XCTAssertTrue(app.staticTexts["Pause briefly, or Finish when done"].exists)
         XCTAssertTrue(app.buttons["confirm-start-live-trail"].exists)
         attachScreenshot(named: "08-live-trail-intro", app: app)
+    }
+
+    @MainActor
+    func testPausedLiveTrailClearlyOffersResumeOrFinalFinish() {
+        let app = launch(arguments: [
+            "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
+            "-uiTestPausedLiveTrail",
+        ])
+
+        XCTAssertTrue(app.descendants(matching: .any)["paused-live-trail"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["Live Trail paused"].exists)
+        XCTAssertTrue(app.staticTexts["Live Trail tracking is off"].exists)
+        XCTAssertTrue(app.buttons["resume-live-trail"].isHittable)
+        XCTAssertTrue(app.buttons["finish-paused-live-trail"].isHittable)
+        attachScreenshot(named: "09-live-trail-paused", app: app)
+
+        app.buttons["finish-paused-live-trail"].tap()
+        XCTAssertTrue(app.staticTexts["Finish Live Trail?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Finish is final. Use Pause instead if you only need a short break."].exists)
+        app.buttons["Keep Trail"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["paused-live-trail"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testFinishedLiveTrailExplainsHealthReplacementAndImmediateCheck() {
+        let app = launch(arguments: [
+            "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
+            "-uiTestWaitingLiveTrail",
+        ])
+
+        XCTAssertTrue(app.descendants(matching: .any)["waiting-for-health"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["Live Trail finished"].exists)
+        XCTAssertTrue(app.staticTexts["Trail tracking is off. You can close the app."].exists)
+        XCTAssertTrue(app.buttons["Check Apple Health Now"].isHittable)
+        attachScreenshot(named: "10-live-trail-finished", app: app)
     }
 
     @MainActor
@@ -147,7 +183,7 @@ final class WalkItAllUITests: XCTestCase {
         ])
         XCTAssertTrue(app.buttons["start-live-trail"].waitForExistence(timeout: 30))
         XCTAssertFalse(app.staticTexts["2 walks mapped"].exists)
-        attachScreenshot(named: "09-populated-dark", app: app)
+        attachScreenshot(named: "11-populated-dark", app: app)
     }
 
     @MainActor

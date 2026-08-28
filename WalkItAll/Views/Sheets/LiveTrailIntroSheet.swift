@@ -30,13 +30,13 @@ struct LiveTrailIntroSheet: View {
                         symbol: "location.fill"
                     )
                     instruction(
-                        "Tap Finish when you are done",
-                        detail: "Location continues when the screen locks until you finish, with Apple’s visible location indicator.",
-                        symbol: "stop.circle"
+                        "Pause briefly, or Finish when done",
+                        detail: "Pause turns location off and can be resumed. Finish is final and waits for the Apple Health route.",
+                        symbol: "pause.circle"
                     )
                 }
 
-                Text("Walk It All requests When In Use access only. It never tracks passively and deletes the temporary trail after Apple Health supplies the workout route—or after seven days.")
+                Text("While active, location continues when the screen locks with Apple’s visible indicator. Walk It All requests When In Use access only, never tracks passively, and deletes the temporary trail after Apple Health supplies the workout route—or after seven days.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -24,9 +24,11 @@ After the user has connected Health, the app refreshes at launch, on foreground 
 
 Live updates reuse the same 50-meter accuracy and time/distance/speed gap rules as Health routes. Invalid updates force a new part, accepted points are simplified at periodic protected checkpoints, and map snapshots are published no more than once every two seconds. Fitness-mode stationary handling lets Core Location suspend unnecessary delivery. A 12-hour task plus an update-time check closes forgotten sessions.
 
-The app delegate bootstraps the controller during a location-driven relaunch. Recovery always starts a new route part, so suspension or unavailable GPS can never create an artificial bridge.
+Pause immediately invalidates location delivery and the background activity session while preserving the filtered temporary trail. Resume creates a new route part before restarting delivery, so time spent paused can never become an artificial connecting line. Finish is final. The 12-hour limit covers the whole wall-clock session, including paused time.
 
-Finish immediately invalidates location delivery and the background activity session, then stores a waiting-for-Health session. A Health record replaces it when the workout overlaps at least 80 percent of the temporary time interval; maximum overlap wins, followed by minimum excess workout duration. This associates sessions only and never compares or snaps geometry. Unmatched coordinates are deleted after seven days.
+The app bootstraps the controller on every launch. Normal backgrounding and screen lock keep an active session alive, while recovery after process termination starts a new route part when the app is next launched. Force-quitting the app stops location delivery; When In Use authorization does not promise an automatic relaunch.
+
+Finish immediately stores a waiting-for-Health session. A Health record replaces it when the workout overlaps at least 80 percent of the temporary time interval; maximum overlap wins, followed by minimum excess workout duration. This associates sessions only and never compares or snaps geometry. Unmatched coordinates are deleted after seven days.
 
 ## Route processing
 
@@ -55,12 +57,12 @@ The sole active or pending Live Trail is stored separately at:
 
 `Application Support/WalkItAllLiveTrail/session.json`
 
-The file and directory receive the same complete protection and backup exclusion as history. It contains only filtered, periodically simplified points and is deleted after Health replacement or seven-day expiry.
+The file and directory use complete-until-first-user-authentication protection and backup exclusion. This is intentionally narrower than the permanent history cache: it permits checkpoint writes during an explicitly active locked-screen walk after the device has been unlocked once since boot. It remains unavailable before that first unlock, stays local, and contains only filtered, periodically simplified points. It is deleted after Health replacement or seven-day expiry.
 
 ## Map rendering
 
 `LifetimeRouteOverlay` is an immutable snapshot with a fixed-grid spatial lookup. `LifetimeRouteRenderer` queries only polylines intersecting MapKit’s requested rectangle, clips drawing to that rectangle, and performs no mutation while concurrent tiles render.
 
-All visible parts receive a baseline indigo stroke. A low-opacity per-route pass lets repeat walks deepen naturally. Selected workout parts use an orange stroke with a contrasting casing. Active Live Trail parts use solid green with a casing; waiting parts use dashed green with the same non-color distinction. The standard MapKit user-location annotation remains the blue position indicator.
+All visible parts receive a baseline indigo stroke. A low-opacity per-route pass lets repeat walks deepen naturally. Selected workout parts use an orange stroke with a contrasting casing. Active and paused Live Trail parts use solid green with a casing; waiting parts use dashed green with the same non-color distinction. The standard MapKit user-location annotation remains the blue position indicator.
 
 Historical overlay construction and Health route processing run away from the main actor; the app replaces a complete history overlay after import completion, cancellation, or failure rather than rebuilding per workout. The temporary overlay has an independent revision and is updated at a bounded cadence, preserving the history snapshot and map interaction performance.

@@ -14,10 +14,16 @@ struct MapDetailsSheet: View {
                     Text("Location continues while the screen is locked until you tap Finish. Start an Outdoor Walk on Apple Watch for permanent history.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                case .paused:
+                    Label("Paused — trail tracking is off", systemImage: "pause.circle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Resume from the map after a short break. Finish instead if the walk is over or you are switching to transit.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 case .waitingForHealth:
-                    Label("Waiting for Apple Health", systemImage: "heart.text.square.fill")
+                    Label("Finished — syncing from Apple Health", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("The dashed green trail is temporary. It will disappear when the matching Health route imports, or after seven days.")
+                    Text("Background trail tracking is no longer running. The dashed green trail is temporary and will disappear when the finished Apple Watch route imports, or after seven days.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 case nil:
@@ -53,7 +59,7 @@ struct MapDetailsSheet: View {
                     Button("Rebuild full history", systemImage: "arrow.triangle.2.circlepath") {
                         confirmRebuild = true
                     }
-                    .disabled(model.liveTrail.isActive)
+                    .disabled(model.liveTrail.hasInProgressSession)
                 }
 
                 NavigationLink {

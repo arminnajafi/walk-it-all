@@ -12,7 +12,7 @@ The primary experience is a calm lifetime route map. Manhattan is the opening ca
 
 Indigo lines are simplified GPS paths from Apple Health walking or hiking workouts. Repeated walks deepen subtly. An orange, outlined line is the selected workout. The standard blue MapKit dot shows the current position after the user requests location access.
 
-For intentional gap-hunting, the user may explicitly start Live Trail after starting an Outdoor Walk on Apple Watch. A solid, outlined green line shows the current walk immediately and continues through screen lock. After Finish, it becomes dashed while waiting for Apple Health. The temporary trail disappears when the matching Health route imports and never becomes permanent by itself.
+For intentional gap-hunting, the user may explicitly start Live Trail after starting an Outdoor Walk on Apple Watch. A solid, outlined green line shows the current walk immediately and continues through screen lock. Pause stops background trail tracking but keeps the session resumable; Resume starts a new trail part so the gap is never bridged. Finish is final. The trail then becomes dashed while waiting for Apple Health, disappears when the matching Health route imports, and never becomes permanent by itself.
 
 The app does not claim street, sidewalk, block, or city completion. Ordinary steps, indoor workouts, activities without GPS routes, and portions rejected by the safety filters do not appear.
 
@@ -23,7 +23,7 @@ Keep:
 - one map-first screen;
 - two-step onboarding;
 - Apple Health refresh, rebuild, history, help, privacy, and limitations;
-- explicit Live Trail with a 12-hour safety limit and seven-day provisional retention;
+- explicit Live Trail with Pause/Resume, a 12-hour wall-clock safety limit, and seven-day provisional retention;
 - local-first recovery and no recurring service cost.
 
 Defer until user evidence justifies them:
@@ -33,7 +33,7 @@ Defer until user evidence justifies them:
 - manual drawing or corrections;
 - passive or automatic background recording;
 - starting or mirroring an Apple Watch workout;
-- Live Activities, pause controls, workout metrics, and fitness coaching;
+- Live Activities, workout metrics, and fitness coaching;
 - sharing, social, playback, and gamification;
 - additional map databases, accounts, and monetization.
 

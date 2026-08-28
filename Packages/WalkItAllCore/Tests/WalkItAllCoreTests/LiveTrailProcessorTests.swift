@@ -87,6 +87,43 @@ final class LiveTrailProcessorTests: XCTestCase {
         XCTAssertEqual(finished.coordinateParts.count, 1)
     }
 
+    func testPauseRejectsUpdatesAndResumeStartsANewPart() {
+        let processor = LiveTrailProcessor()
+        let active = LiveTrailSession(
+            state: .active,
+            start: start,
+            routeParts: [[
+                point(40.7500, -73.9900, seconds: 0),
+                point(40.7501, -73.9900, seconds: 10),
+            ]],
+            lastUpdate: start.addingTimeInterval(10)
+        )
+        let pauseDate = start.addingTimeInterval(20)
+
+        let paused = processor.pausing(active, at: pauseDate)
+        XCTAssertEqual(paused.state, .paused)
+        XCTAssertEqual(paused.lastUpdate, pauseDate)
+        XCTAssertFalse(
+            processor.appending(
+                point(40.7502, -73.9900, seconds: 30),
+                to: paused
+            ).accepted
+        )
+
+        let resumed = processor.resuming(paused, at: start.addingTimeInterval(40))
+        let appended = processor.appending(
+            point(40.7503, -73.9900, seconds: 50),
+            to: resumed,
+            forceNewPart: true
+        )
+
+        XCTAssertEqual(appended.session.state, .active)
+        XCTAssertTrue(appended.accepted)
+        XCTAssertEqual(appended.session.routeParts.count, 2)
+        XCTAssertEqual(appended.session.routeParts[0].count, 2)
+        XCTAssertEqual(appended.session.routeParts[1].count, 1)
+    }
+
     func testHealthAssociationUsesCoverageThenOverlapThenSmallestExcess() {
         let trail = LiveTrailSession(
             state: .waitingForHealth,

@@ -21,8 +21,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Bootstrap immediately on a Core Location relaunch so an explicitly
-        // active session can recreate its background activity and update stream.
+        // Bootstrap on every launch. If an active session is recoverable, it
+        // resumes in a new route part rather than bridging an interruption.
         Task { await model?.bootstrap() }
         return true
     }

@@ -5,6 +5,7 @@ struct MapScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let model: AppModel
     @State private var showHealthWaitHelp = false
+    @State private var confirmFinishLiveTrail = false
     @State private var bottomOverlayHeight: CGFloat = 76
 
     var body: some View {
@@ -77,6 +78,15 @@ struct MapScreen: View {
         } message: {
             Text(model.liveTrail.issueMessage ?? "Location is unavailable.")
         }
+        .alert(
+            "Finish Live Trail?",
+            isPresented: $confirmFinishLiveTrail
+        ) {
+            Button("Finish Live Trail", role: .destructive, action: model.finishLiveTrail)
+            Button("Keep Trail", role: .cancel) {}
+        } message: {
+            Text("Finish is final. Use Pause instead if you only need a short break.")
+        }
     }
 
     @ViewBuilder
@@ -146,13 +156,25 @@ struct MapScreen: View {
             if let workout = model.selectedWorkout {
                 SelectedWorkoutCard(workout: workout, clear: model.clearSelectedWorkout)
             } else if let session = model.liveTrail.session, session.state == .active {
-                ActiveLiveTrailCard(session: session, finish: model.finishLiveTrail)
-            } else if model.liveTrail.isWaitingForHealth {
-                WaitingForHealthCard(showDetails: { model.presentedSheet = .details })
+                ActiveLiveTrailCard(
+                    session: session,
+                    pause: model.pauseLiveTrail,
+                    finish: { confirmFinishLiveTrail = true }
+                )
+            } else if model.liveTrail.isPaused {
+                PausedLiveTrailCard(
+                    resume: model.resumeLiveTrail,
+                    finish: { confirmFinishLiveTrail = true }
+                )
             } else if model.importPhase.isWorking {
                 CompactImportCard(phase: model.importPhase, cancel: model.cancelImport)
             } else if case let .failed(message) = model.importPhase {
                 CompactErrorCard(message: message) { model.presentedSheet = .details }
+            } else if model.liveTrail.isWaitingForHealth {
+                WaitingForHealthCard(
+                    refresh: model.refresh,
+                    showDetails: { model.presentedSheet = .details }
+                )
             } else if !model.hasMappedWorkouts {
                 LifetimeMapCard(
                     mappedWorkoutCount: 0,

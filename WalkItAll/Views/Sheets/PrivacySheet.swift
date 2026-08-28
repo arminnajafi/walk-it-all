@@ -11,7 +11,8 @@ struct PrivacySheet: View {
             }
             Section("On this iPhone") {
                 Text("Walk It All keeps only a simplified copy of each mapped workout route in a protected local cache. Full-resolution Health locations are discarded after processing.")
-                Text("Location runs in the background only while you explicitly have a Live Trail active. Its filtered temporary coordinates remain on this iPhone and are deleted after Health replaces them or after seven days.")
+                Text("Location runs in the background only while you explicitly have a Live Trail active. Pause or Finish stops background trail tracking immediately; Resume starts it again only after you tap it.")
+                Text("Filtered Live Trail coordinates stay on this iPhone. Its temporary protected file can update while the screen is locked after you have unlocked the phone once since restarting it. The file is deleted after Health replaces it or after seven days.")
                 Text("The cache is excluded from device backup. If you reinstall or change phones, the app can rebuild from whatever route history Apple Health has synchronized and you authorize.")
             }
             Section("Apple Health") {

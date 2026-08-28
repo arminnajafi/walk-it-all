@@ -10,7 +10,7 @@ Walk It All is a private iPhone app that turns outdoor walking and hiking routes
 - Read-only walking and hiking workout-route import from Apple Health
 - Conservative filtering of inaccurate locations, GPS gaps, large jumps, and implausible speeds
 - Smooth Apple Maps rendering with subtle deepening where routes repeat
-- Optional explicit Live Trail for seeing the current walk immediately, including while the screen locks
+- Optional explicit Live Trail for seeing the current walk immediately, with Pause/Resume and locked-screen recording
 - Incremental foreground refresh, including Health route replacements and deletions
 - Protected, backup-excluded SwiftData cache rebuilt from Apple Health
 - No passive tracking, account, backend, analytics, advertising, CloudKit, or route upload

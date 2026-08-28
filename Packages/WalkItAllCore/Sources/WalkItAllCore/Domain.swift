@@ -195,6 +195,7 @@ public protocol WalkHistoryRepository: Sendable {
 
 public enum LiveTrailState: String, Codable, Hashable, Sendable {
     case active
+    case paused
     case waitingForHealth
 }
 

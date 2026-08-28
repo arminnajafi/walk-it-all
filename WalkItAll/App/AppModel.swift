@@ -197,12 +197,12 @@ final class AppModel {
     }
 
     func rebuildFromHealth() {
-        guard !importPhase.isWorking, !liveTrail.isActive else { return }
+        guard !importPhase.isWorking, !liveTrail.hasInProgressSession else { return }
         beginAuthorizedImport(resetFirst: true, isAutomatic: false)
     }
 
     func refreshIfNeeded(now: Date = Date()) {
-        liveTrail.resumeIfNeeded()
+        liveTrail.resumeIfNeeded(now: now)
         #if DEBUG
         // Synthetic records exercise populated UI without opening a real
         // Health authorization sheet in UI tests.
@@ -281,6 +281,20 @@ final class AppModel {
         Task { [weak self] in
             await self?.liveTrail.finish()
         }
+    }
+
+    func pauseLiveTrail() {
+        Task { [weak self] in
+            await self?.liveTrail.pause()
+        }
+    }
+
+    func resumeLiveTrail() {
+        liveTrail.resume()
+        mapViewportCommand = MapViewportCommand(
+            revision: mapViewportCommand.revision &+ 1,
+            target: .userLocation
+        )
     }
 
     private func startLiveTrail() {

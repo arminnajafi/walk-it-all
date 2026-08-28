@@ -32,29 +32,42 @@ struct StartLiveTrailButton: View {
 
 struct ActiveLiveTrailCard: View {
     let session: LiveTrailSession
+    let pause: () -> Void
     let finish: () -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(.green)
-                    .frame(width: 10, height: 10)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Live Trail")
-                        .font(.subheadline.weight(.semibold))
-                    Text(elapsed(at: context.date))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+            VStack(spacing: 10) {
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 10, height: 10)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Live Trail")
+                            .font(.subheadline.weight(.semibold))
+                        Text(elapsed(at: context.date))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
                 }
-                Spacer(minLength: 8)
-                Button("Finish", systemImage: "stop.fill", action: finish)
-                    .font(.subheadline.weight(.semibold))
-                    .buttonStyle(.bordered)
-                    .tint(.red)
-                    .frame(minHeight: 44)
-                    .accessibilityIdentifier("finish-live-trail")
+
+                HStack(spacing: 10) {
+                    Button("Pause", systemImage: "pause.fill", action: pause)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.indigo)
+                        .accessibilityHint("Stops location until you resume")
+                        .accessibilityIdentifier("pause-live-trail")
+                    Button("Finish", systemImage: "stop.fill", action: finish)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                        .accessibilityHint("Ends this Live Trail and waits for Apple Health")
+                        .accessibilityIdentifier("finish-live-trail")
+                }
+                .font(.subheadline.weight(.semibold))
             }
             .padding(14)
             .walkItAllContentSurface(cornerRadius: 20)
@@ -71,29 +84,87 @@ struct ActiveLiveTrailCard: View {
     }
 }
 
+struct PausedLiveTrailCard: View {
+    let resume: () -> Void
+    let finish: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Live Trail paused")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Live Trail tracking is off")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: "pause.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.orange)
+            }
+
+            HStack(spacing: 10) {
+                Button("Resume", systemImage: "play.fill", action: resume)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .accessibilityHint("Starts location again in a new trail part")
+                    .accessibilityIdentifier("resume-live-trail")
+                Button("Finish", systemImage: "stop.fill", action: finish)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                    .accessibilityHint("Ends this Live Trail and waits for Apple Health")
+                    .accessibilityIdentifier("finish-paused-live-trail")
+            }
+            .font(.subheadline.weight(.semibold))
+        }
+        .padding(14)
+        .walkItAllContentSurface(cornerRadius: 20)
+        .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("paused-live-trail")
+    }
+}
+
 struct WaitingForHealthCard: View {
+    let refresh: () -> Void
     let showDetails: () -> Void
 
     var body: some View {
-        Button(action: showDetails) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 11) {
-                Image(systemName: "heart.text.square.fill")
+                Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Waiting for Apple Health")
+                    Text("Live Trail finished")
                         .font(.subheadline.weight(.semibold))
-                    Text("The dashed trail is temporary")
+                    Text("Trail tracking is off. You can close the app.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "chevron.up")
-                    .foregroundStyle(.secondary)
+                Button(action: showDetails) {
+                    Image(systemName: "info.circle")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("About Health sync")
             }
-            .padding(14)
-            .walkItAllContentSurface(cornerRadius: 20)
+
+            Text("The dashed trail stays until your Apple Watch workout syncs into the permanent map.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Check Apple Health Now", systemImage: "arrow.clockwise", action: refresh)
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .buttonStyle(.bordered)
         }
-        .buttonStyle(.plain)
+        .padding(14)
+        .walkItAllContentSurface(cornerRadius: 20)
         .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
         .accessibilityIdentifier("waiting-for-health")
     }

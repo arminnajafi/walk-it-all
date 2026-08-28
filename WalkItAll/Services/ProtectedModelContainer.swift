@@ -78,9 +78,12 @@ enum ProtectedModelContainer {
         }
     }
 
-    static func protectAndExcludeFromBackup(_ url: URL) throws {
+    static func protectAndExcludeFromBackup(
+        _ url: URL,
+        protection: FileProtectionType = cacheProtection
+    ) throws {
         try FileManager.default.setAttributes(
-            [.protectionKey: cacheProtection],
+            [.protectionKey: protection],
             ofItemAtPath: url.path
         )
         var values = URLResourceValues()
