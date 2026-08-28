@@ -71,6 +71,8 @@ final class CoverageNetworkOverlay: NSObject, MKOverlay, @unchecked Sendable {
 
     private let covered: PolylineStore
     private let remaining: PolylineStore
+    let coveredPolylineCount: Int
+    let remainingPolylineCount: Int
     let boundingMapRect: MKMapRect
     let coordinate: CLLocationCoordinate2D
 
@@ -80,10 +82,6 @@ final class CoverageNetworkOverlay: NSObject, MKOverlay, @unchecked Sendable {
 
         for segment in pack.segments {
             guard segment.countsTowardCoverage else { continue }
-            if coverage?.completedSegmentIDs.contains(segment.id) == true {
-                covered.append(Polyline(coordinates: segment.coordinates))
-                continue
-            }
             let coveredIntervals = coverage?.coveredIntervalsBySegment[segment.id] ?? []
             if coveredIntervals.isEmpty {
                 remaining.append(Polyline(coordinates: segment.coordinates))
@@ -122,6 +120,8 @@ final class CoverageNetworkOverlay: NSObject, MKOverlay, @unchecked Sendable {
 
         self.covered = PolylineStore(covered)
         self.remaining = PolylineStore(remaining)
+        coveredPolylineCount = covered.count
+        remainingPolylineCount = remaining.count
         let all = covered + remaining
         boundingMapRect = all.reduce(MKMapRect.null) { $0.union($1.boundingMapRect) }
         coordinate = MKCoordinateRegion(boundingMapRect).center
@@ -142,6 +142,7 @@ final class CoverageNetworkRenderer: MKOverlayRenderer {
         guard let overlay = overlay as? CoverageNetworkOverlay else { return }
         context.saveGState()
         defer { context.restoreGState() }
+        context.clip(to: rect(for: mapRect))
         context.setLineCap(.round)
         context.setLineJoin(.round)
 

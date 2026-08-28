@@ -20,10 +20,12 @@ For each imported workout, the app retains:
 - Health workout UUID and dates
 - Source application/device name
 - Simplified route geometry
-- Matched network intervals and confidence
-- Unmatched time portions
+- Normalized matched network intervals and compact confidence diagnostics
+- Coalesced unmatched time portions
 
 Full-resolution route locations are discarded after matching. The aggregate coverage snapshot is derived from per-workout intervals.
+
+In DEBUG builds only, opening the historical route inspector reloads full-resolution points from Health into memory for that inspector session. Loading is cancelled when the workout changes or the inspector closes. A saved local review fixture contains segment IDs and a Health workout UUID but no coordinates; it is protected, excluded from backup, and belongs only in the Git-ignored `LocalRouteFixtures` workflow.
 
 The SwiftData store is created with complete file protection and excluded from device backup. Error details are privacy-redacted in unified logging; logs never contain coordinates, route geometry, or Health UUIDs.
 

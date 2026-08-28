@@ -15,7 +15,8 @@ struct MapScreen: View {
                         coverage: model.coverage,
                         selectedWorkout: model.selectedWorkout,
                         coverageRevision: model.coverageRenderRevision,
-                        bottomMapInset: dynamicTypeSize.isAccessibilitySize ? 520 : 300
+                        viewportCommand: model.mapViewportCommand,
+                        bottomMapInset: bottomMapInset
                     )
                     .ignoresSafeArea()
                 }
@@ -67,7 +68,8 @@ struct MapScreen: View {
         if #available(iOS 26.0, *) {
             GlassEffectContainer(spacing: 12) {
                 HStack {
-                    areaLabel
+                    areaButton
+                        .buttonStyle(.glass)
                     Spacer()
                     Button {
                         model.presentedSheet = .details
@@ -82,7 +84,9 @@ struct MapScreen: View {
             }
         } else {
             HStack {
-                areaLabel
+                areaButton
+                    .buttonStyle(.plain)
+                    .walkItAllControlSurface()
                 Spacer()
                 Button {
                     model.presentedSheet = .details
@@ -90,7 +94,7 @@ struct MapScreen: View {
                     Image(systemName: "info.circle")
                         .font(.title3.weight(.semibold))
                         .frame(width: 44, height: 44)
-                        .walkItAllFloatingSurface(cornerRadius: 18)
+                        .walkItAllControlSurface()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("About Walk It All")
@@ -98,38 +102,42 @@ struct MapScreen: View {
         }
     }
 
-    private var areaLabel: some View {
-        Group {
-            if dynamicTypeSize >= .accessibility4 {
-                Image(systemName: "map.fill")
-                    .frame(width: 44, height: 44)
-            } else {
-                Label("Manhattan", systemImage: "map.fill")
+    private var areaButton: some View {
+        Button(action: model.showAllManhattan) {
+            Group {
+                if dynamicTypeSize >= .accessibility4 {
+                    Image(systemName: "map.fill")
+                        .frame(width: 44, height: 44)
+                } else {
+                    Label("Manhattan", systemImage: "map.fill")
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 11)
+                }
             }
+            .font(.subheadline.weight(.semibold))
         }
-        .font(.subheadline.weight(.semibold))
-        .padding(.horizontal, 15)
-        .padding(.vertical, 11)
-        .walkItAllFloatingSurface(cornerRadius: 18)
-        .accessibilityLabel("Current completion area: Manhattan Island")
+        .accessibilityLabel("Show all Manhattan")
+        .accessibilityHint("Recenters the map on the full completion area")
         .accessibilityIdentifier("current-completion-area")
     }
 
     @ViewBuilder
     private func progressCard(_ coverage: CoverageSnapshot, availableHeight: CGFloat) -> some View {
-        let card = ProgressCard(
-            coverage: coverage,
-            phase: model.importPhase,
-            selectedWorkoutName: model.selectedWorkout.map {
-                $0.start.formatted(date: .abbreviated, time: .shortened)
-            },
-            lastSuccessfulImport: model.lastSuccessfulImport,
-            hasMappedWorkouts: !model.workoutRecords.isEmpty,
-            refresh: model.refresh,
-            cancel: model.cancelImport,
-            showDetails: { model.presentedSheet = .details },
-            clearSelection: model.clearSelectedWorkout
-        )
+        let card = Group {
+            if let workout = model.selectedWorkout {
+                SelectedWorkoutCard(workout: workout, clear: model.clearSelectedWorkout)
+            } else {
+                ProgressCard(
+                    coverage: coverage,
+                    phase: model.importPhase,
+                    lastSuccessfulImport: model.lastSuccessfulImport,
+                    hasMappedWorkouts: !model.workoutRecords.isEmpty,
+                    refresh: model.refresh,
+                    cancel: model.cancelImport,
+                    showDetails: { model.presentedSheet = .details }
+                )
+            }
+        }
 
         if dynamicTypeSize.isAccessibilitySize {
             ScrollView {
@@ -143,5 +151,12 @@ struct MapScreen: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
         }
+    }
+
+    private var bottomMapInset: CGFloat {
+        if model.selectedWorkout != nil {
+            return dynamicTypeSize.isAccessibilitySize ? 360 : 210
+        }
+        return dynamicTypeSize.isAccessibilitySize ? 520 : 300
     }
 }

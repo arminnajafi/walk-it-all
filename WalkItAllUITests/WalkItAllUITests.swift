@@ -4,7 +4,7 @@ final class WalkItAllUITests: XCTestCase {
     @MainActor
     func testMapFirstLaunchSurface() {
         let app = XCUIApplication()
-        app.launchArguments = ["-skipOnboarding"]
+        app.launchArguments = ["-resetOnboarding", "-skipOnboarding"]
         app.launch()
 
         let completionArea = app.descendants(matching: .any)["current-completion-area"]
@@ -47,9 +47,34 @@ final class WalkItAllUITests: XCTestCase {
     }
 
     @MainActor
+    func testAccessibilityXXXLOnboardingKeepsEveryActionReachable() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-resetOnboarding",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL",
+        ]
+        app.launch()
+
+        let explanation = app.staticTexts[
+            "Turn the walks already in Apple Health into a lifetime map of Manhattan—then walk what remains."
+        ]
+        XCTAssertTrue(explanation.waitForExistence(timeout: 30))
+        let continueButton = app.buttons["Continue"]
+        scrollUntilHittable(continueButton, in: app)
+        XCTAssertTrue(continueButton.isHittable)
+        continueButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Your history stays yours."].waitForExistence(timeout: 5))
+        let connectButton = app.buttons["Connect Apple Health"]
+        scrollUntilHittable(connectButton, in: app)
+        XCTAssertTrue(connectButton.isHittable)
+    }
+
+    @MainActor
     func testCoverageDetailsExplainHistoryMethodologyAndPrivacy() {
         let app = XCUIApplication()
-        app.launchArguments = ["-skipOnboarding"]
+        app.launchArguments = ["-resetOnboarding", "-skipOnboarding"]
         app.launch()
 
         let about = app.buttons["About Walk It All"]
@@ -94,5 +119,12 @@ final class WalkItAllUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    @MainActor
+    private func scrollUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0 ..< 4 where !element.isHittable {
+            app.swipeUp()
+        }
     }
 }

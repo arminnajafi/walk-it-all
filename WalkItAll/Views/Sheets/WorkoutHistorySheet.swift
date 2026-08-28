@@ -15,13 +15,25 @@ struct WorkoutHistorySheet: View {
                 )
             } else {
                 List(model.workoutRecords) { record in
-                    Button {
-                        model.selectWorkout(record.id)
-                        dismiss()
-                    } label: {
-                        WorkoutRow(record: record, isSelected: model.selectedWorkoutID == record.id)
+                    HStack(spacing: 8) {
+                        Button {
+                            model.selectWorkout(record.id)
+                            dismiss()
+                        } label: {
+                            WorkoutRow(record: record, isSelected: model.selectedWorkoutID == record.id)
+                        }
+                        .buttonStyle(.plain)
+
+                        #if DEBUG
+                        NavigationLink {
+                            DebugRouteInspectorSheet(model: model, workoutID: record.id)
+                        } label: {
+                            Image(systemName: "ladybug")
+                                .frame(width: 44, height: 44)
+                        }
+                        .accessibilityLabel("Inspect route matching")
+                        #endif
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -42,22 +54,28 @@ private struct WorkoutRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(record.start.formatted(date: .abbreviated, time: .shortened))
                     .font(.body.weight(.semibold))
-                Text("\(record.sourceName) · \(record.contribution.intervals.count) matched portions")
+                Text("\(record.sourceName) · \(duration(record.duration))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if !record.unmatchedPortions.isEmpty {
-                    Text("\(record.unmatchedPortions.count) uncertain portion\(record.unmatchedPortions.count == 1 ? "" : "s") skipped")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                }
             }
             Spacer()
-            Text(record.contribution.confidence, format: .percent.precision(.fractionLength(0)))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("Average match confidence")
+            Text(distance(record.contribution.uniqueCoveredDistanceMeters))
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(.indigo)
+                .accessibilityLabel("Uniquely credited distance")
         }
         .contentShape(Rectangle())
         .padding(.vertical, 3)
+    }
+
+    private func distance(_ meters: Double) -> String {
+        let miles = Measurement(value: meters, unit: UnitLength.meters).converted(to: .miles)
+        return "\(miles.value.formatted(.number.precision(.fractionLength(2)))) mi"
+    }
+
+    private func duration(_ interval: TimeInterval) -> String {
+        Duration.seconds(interval).formatted(
+            .time(pattern: interval >= 3_600 ? .hourMinute : .minuteSecond)
+        )
     }
 }

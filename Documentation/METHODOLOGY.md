@@ -2,7 +2,7 @@
 
 ## Completion area
 
-Version 1 uses the largest polygon in NYC Open Data’s Manhattan borough boundary, corresponding to Manhattan Island. Roosevelt Island, Governors Island, Randall’s/Wards Island, and Marble Hill are excluded.
+Version 2 uses the largest polygon in NYC Open Data’s Manhattan borough boundary, corresponding to Manhattan Island. Roosevelt Island, Governors Island, Randall’s/Wards Island, and Marble Hill are excluded.
 
 ## Eligible ways
 
@@ -46,7 +46,7 @@ Each accepted traversal becomes a distance interval on one or more network segme
 completion = unique covered meters / total eligible meters
 ```
 
-A segment is visually complete at 70% covered, while the headline percentage uses continuous covered distance. This prevents short map fragments from having the same weight as long avenues or greenways.
+The headline percentage and visible map use the exact unioned intervals. A segment enters the secondary “completed map segments” diagnostic when at least 70% is covered; that threshold never paints the unwalked remainder or changes the distance-weighted headline.
 
 ## Accuracy gate
 
@@ -59,3 +59,5 @@ Target acceptance:
 - No unexplained parallel-street or gap-crossing errors
 
 Precision is the priority: uncertain coverage remains unmarked.
+
+The DEBUG-only historical inspector can reload any stored workout from Health on demand. Its switchable layers show raw GPS, nearby eligible geometry, matcher candidates, exact credited intervals, and rejected trace portions with their reason. A reviewer can mark incorrect credit and clearly walked missed segments; the app calculates meter-weighted precision and recall and saves an ignored, protected local fixture containing segment IDs but no coordinates.

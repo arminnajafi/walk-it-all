@@ -66,15 +66,6 @@ struct CoverageDetailsSheet: View {
                 }
             }
 
-            #if DEBUG
-            if model.debugLastRoute != nil {
-                Section("Development") {
-                    Button("Inspect last route match", systemImage: "ladybug") {
-                        model.presentedSheet = .debugInspector
-                    }
-                }
-            }
-            #endif
         }
         .navigationTitle("Coverage")
         .navigationBarTitleDisplayMode(.inline)

@@ -3,6 +3,96 @@ import XCTest
 @testable import WalkItAllCore
 
 final class CoverageCalculatorTests: XCTestCase {
+    func testContributionNormalizesOverlappingAndAdjacentIntervals() throws {
+        let workoutID = UUID()
+        let contribution = WorkoutCoverageContribution(
+            workoutID: workoutID,
+            intervals: [
+                SegmentInterval(segmentID: "b", lowerBoundMeters: 20, upperBoundMeters: 30, confidence: 0.7),
+                SegmentInterval(segmentID: "a", lowerBoundMeters: 25, upperBoundMeters: 60, confidence: 0.8),
+                SegmentInterval(segmentID: "a", lowerBoundMeters: -10, upperBoundMeters: 25, confidence: 1),
+                SegmentInterval(segmentID: "a", lowerBoundMeters: 60.005, upperBoundMeters: 70, confidence: 0.9),
+            ],
+            confidence: 1.4
+        )
+
+        XCTAssertEqual(contribution.workoutID, workoutID)
+        XCTAssertEqual(contribution.intervals.map(\.segmentID), ["a", "b"])
+        XCTAssertEqual(contribution.intervals[0].lowerBoundMeters, 0, accuracy: 0.001)
+        XCTAssertEqual(contribution.intervals[0].upperBoundMeters, 70, accuracy: 0.001)
+        XCTAssertEqual(contribution.uniqueCoveredDistanceMeters, 80, accuracy: 0.001)
+        XCTAssertEqual(contribution.confidence, 1)
+
+        let decoded = try JSONDecoder().decode(
+            WorkoutCoverageContribution.self,
+            from: JSONEncoder().encode(contribution)
+        )
+        XCTAssertEqual(decoded.intervals, contribution.intervals)
+    }
+
+    func testUnmatchedPortionsCoalesceOnlyForTheSameReason() {
+        let start = Date(timeIntervalSince1970: 100)
+        let portions = [
+            UnmatchedPortion(start: start, end: start.addingTimeInterval(2), reason: .routeGap),
+            UnmatchedPortion(start: start.addingTimeInterval(2.5), end: start.addingTimeInterval(4), reason: .routeGap),
+            UnmatchedPortion(start: start.addingTimeInterval(4), end: start.addingTimeInterval(5), reason: .lowConfidence),
+        ]
+
+        let result = UnmatchedPortion.coalesced(portions)
+
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0].start, start)
+        XCTAssertEqual(result[0].end, start.addingTimeInterval(4))
+        XCTAssertEqual(result[0].reason, .routeGap)
+        XCTAssertEqual(result[1].reason, .lowConfidence)
+    }
+
+    func testAccuracyEvaluationUsesReviewedMetersAndCombinesRoutes() {
+        let first = WalkableSegment(
+            id: "first",
+            startNode: NodeID(1),
+            endNode: NodeID(2),
+            coordinates: [
+                GeoCoordinate(latitude: 40.75, longitude: -73.99),
+                GeoCoordinate(latitude: 40.751, longitude: -73.99),
+            ],
+            lengthMeters: 100,
+            kind: .street
+        )
+        let second = WalkableSegment(
+            id: "second",
+            startNode: NodeID(2),
+            endNode: NodeID(3),
+            coordinates: [
+                GeoCoordinate(latitude: 40.751, longitude: -73.99),
+                GeoCoordinate(latitude: 40.752, longitude: -73.99),
+            ],
+            lengthMeters: 100,
+            kind: .street
+        )
+        let pack = InMemoryCityCoveragePack(metadata: .fixture, segments: [first, second])
+        let contribution = WorkoutCoverageContribution(
+            workoutID: UUID(),
+            intervals: [
+                SegmentInterval(segmentID: first.id, lowerBoundMeters: 0, upperBoundMeters: 100, confidence: 1),
+                SegmentInterval(segmentID: second.id, lowerBoundMeters: 0, upperBoundMeters: 50, confidence: 1),
+            ],
+            confidence: 1
+        )
+
+        let measurement = MatchAccuracyEvaluator().evaluate(
+            contribution: contribution,
+            clearlyWalkedSegmentIDs: [first.id],
+            in: pack
+        )
+        let combined = MatchAccuracyMeasurement.combined([measurement, measurement])
+
+        XCTAssertEqual(try XCTUnwrap(measurement.precision), 2.0 / 3.0, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(measurement.recall), 1, accuracy: 0.001)
+        XCTAssertEqual(combined.precision, measurement.precision)
+        XCTAssertEqual(combined.recall, measurement.recall)
+    }
+
     func testUnionsRepeatedIntervalsInsteadOfDoubleCountingDistance() {
         let segment = WalkableSegment(
             id: "street-a",

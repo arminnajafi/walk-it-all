@@ -6,29 +6,14 @@ struct ProgressCard: View {
 
     let coverage: CoverageSnapshot
     let phase: ImportPhase
-    let selectedWorkoutName: String?
     let lastSuccessfulImport: Date?
     let hasMappedWorkouts: Bool
     let refresh: () -> Void
     let cancel: () -> Void
     let showDetails: () -> Void
-    let clearSelection: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if let selectedWorkoutName {
-                HStack(spacing: 8) {
-                    Image(systemName: "figure.walk")
-                    Text(selectedWorkoutName)
-                        .lineLimit(1)
-                    Spacer()
-                    Button("Clear", systemImage: "xmark", action: clearSelection)
-                        .labelStyle(.iconOnly)
-                        .accessibilityLabel("Clear selected workout")
-                }
-                .font(.subheadline.weight(.medium))
-            }
-
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(coverage.completionFraction, format: .percent.precision(.fractionLength(1)))
@@ -117,7 +102,7 @@ struct ProgressCard: View {
             .foregroundStyle(.secondary)
         }
         .padding(18)
-        .walkItAllFloatingSurface()
+        .walkItAllContentSurface()
         .shadow(color: .black.opacity(0.12), radius: 16, y: 8)
     }
 
@@ -167,5 +152,72 @@ struct ProgressCard: View {
             destination: URL(string: "https://www.openstreetmap.org/copyright")!
         )
         .accessibilityIdentifier("osm-attribution")
+    }
+}
+
+struct SelectedWorkoutCard: View {
+    let workout: WorkoutCoverageRecord
+    let clear: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(workout.start.formatted(date: .abbreviated, time: .shortened))
+                        .font(.headline)
+                    Text(workout.sourceName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Button("Clear", systemImage: "xmark", action: clear)
+                    .labelStyle(.titleAndIcon)
+                    .font(.subheadline.weight(.semibold))
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 18) {
+                    metric("Duration", value: duration(workout.duration))
+                    metric("Credited", value: distance(workout.contribution.uniqueCoveredDistanceMeters))
+                    Spacer(minLength: 0)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    metric("Duration", value: duration(workout.duration))
+                    metric("Credited", value: distance(workout.contribution.uniqueCoveredDistanceMeters))
+                }
+            }
+
+            Label("Orange shows the recorded workout route", systemImage: "line.diagonal")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .accessibilityLabel("The orange line shows the recorded workout route")
+        }
+        .padding(16)
+        .walkItAllContentSurface(cornerRadius: 22)
+        .shadow(color: .black.opacity(0.12), radius: 16, y: 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("selected-workout-card")
+    }
+
+    private func metric(_ label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+        }
+    }
+
+    private func distance(_ meters: Double) -> String {
+        let miles = Measurement(value: meters, unit: UnitLength.meters).converted(to: .miles)
+        return "\(miles.value.formatted(.number.precision(.fractionLength(2)))) mi"
+    }
+
+    private func duration(_ interval: TimeInterval) -> String {
+        Duration.seconds(interval).formatted(
+            .time(pattern: interval >= 3_600 ? .hourMinute : .minuteSecond)
+        )
     }
 }

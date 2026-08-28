@@ -13,7 +13,7 @@ uv run pytest -q
 
 cd "$project_root"
 xcodegen generate
-sqlite3 WalkItAll/Resources/OfflineMaps/manhattan-v1.sqlite \
+sqlite3 WalkItAll/Resources/OfflineMaps/manhattan-v2.sqlite \
   "PRAGMA integrity_check; SELECT count(*) FROM segments;"
 
 if [[ -d /Applications/Xcode.app ]]; then

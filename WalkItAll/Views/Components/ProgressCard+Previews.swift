@@ -17,13 +17,11 @@ import WalkItAllCore
                 averageConfidence: 0.94
             ),
             phase: .complete(imported: 37, unmatched: 3),
-            selectedWorkoutName: nil,
             lastSuccessfulImport: .now,
             hasMappedWorkouts: true,
             refresh: {},
             cancel: {},
-            showDetails: {},
-            clearSelection: {}
+            showDetails: {}
         )
         .padding()
     }
@@ -42,13 +40,11 @@ import WalkItAllCore
             averageConfidence: 0
         ),
         phase: .matching(completed: 18, total: 37),
-        selectedWorkoutName: nil,
         lastSuccessfulImport: nil,
         hasMappedWorkouts: false,
         refresh: {},
         cancel: {},
-        showDetails: {},
-        clearSelection: {}
+        showDetails: {}
     )
     .padding()
 }

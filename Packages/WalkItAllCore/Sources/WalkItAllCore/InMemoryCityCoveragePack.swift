@@ -20,6 +20,7 @@ public final class InMemoryCityCoveragePack: CityCoveragePack, @unchecked Sendab
     public let metadata: MapPackMetadata
     public let segments: [WalkableSegment]
     public let totalLengthMeters: Double
+    public let geographicBounds: GeoBounds?
 
     private let segmentByID: [SegmentID: WalkableSegment]
     private let grid: [GridKey: [SegmentID]]
@@ -41,8 +42,20 @@ public final class InMemoryCityCoveragePack: CityCoveragePack, @unchecked Sendab
 
         var mutableGrid: [GridKey: Set<SegmentID>] = [:]
         var mutableAdjacency: [NodeID: [Edge]] = [:]
+        var minimumLatitude = Double.greatestFiniteMagnitude
+        var minimumLongitude = Double.greatestFiniteMagnitude
+        var maximumLatitude = -Double.greatestFiniteMagnitude
+        var maximumLongitude = -Double.greatestFiniteMagnitude
 
         for segment in segments {
+            if segment.countsTowardCoverage {
+                for coordinate in segment.coordinates {
+                    minimumLatitude = min(minimumLatitude, coordinate.latitude)
+                    minimumLongitude = min(minimumLongitude, coordinate.longitude)
+                    maximumLatitude = max(maximumLatitude, coordinate.latitude)
+                    maximumLongitude = max(maximumLongitude, coordinate.longitude)
+                }
+            }
             let points = segment.coordinates.map { GeoMath.globalMeters($0) }
             guard let minX = points.map(\.x).min(),
                   let maxX = points.map(\.x).max(),
@@ -66,6 +79,14 @@ public final class InMemoryCityCoveragePack: CityCoveragePack, @unchecked Sendab
             )
         }
 
+        geographicBounds = minimumLatitude.isFinite && minimumLatitude != .greatestFiniteMagnitude
+            ? GeoBounds(
+                minimumLatitude: minimumLatitude,
+                minimumLongitude: minimumLongitude,
+                maximumLatitude: maximumLatitude,
+                maximumLongitude: maximumLongitude
+            )
+            : nil
         grid = mutableGrid.mapValues(Array.init)
         adjacency = mutableAdjacency
     }

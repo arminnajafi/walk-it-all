@@ -11,10 +11,6 @@ struct AppSheetHost: View {
                 CoverageDetailsSheet(model: model)
             case .healthAccess:
                 HealthAccessHelpSheet(model: model)
-            #if DEBUG
-            case .debugInspector:
-                DebugRouteInspectorSheet(model: model)
-            #endif
             }
         }
     }

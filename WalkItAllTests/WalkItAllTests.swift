@@ -1,9 +1,130 @@
 import XCTest
 import SwiftData
+@preconcurrency import HealthKit
+import MapKit
 import WalkItAllCore
 @testable import WalkItAll
 
 final class WalkItAllTests: XCTestCase {
+    func testHealthCursorRoundTripsBothAnchorsAndAssociations() throws {
+        let routeID = UUID()
+        let workoutID = UUID()
+        let cursor = HealthImportCursor(
+            version: 99,
+            workoutAnchorData: Data([1, 2]),
+            routeAnchorData: Data([3, 4]),
+            routeToWorkout: [routeID: workoutID]
+        )
+
+        let decoded = HealthImportCursorCodec.decode(try HealthImportCursorCodec.encode(cursor))
+
+        XCTAssertEqual(decoded.version, 99)
+        XCTAssertEqual(decoded.workoutAnchorData, Data([1, 2]))
+        XCTAssertEqual(decoded.routeAnchorData, Data([3, 4]))
+        XCTAssertEqual(decoded.routeToWorkout[routeID], workoutID)
+    }
+
+    func testLegacyWorkoutAnchorMigratesWithoutDiscardingIt() throws {
+        let anchor = HKQueryAnchor(fromValue: 42)
+        let legacy = try NSKeyedArchiver.archivedData(
+            withRootObject: anchor,
+            requiringSecureCoding: true
+        )
+
+        let decoded = HealthImportCursorCodec.decode(legacy)
+
+        XCTAssertEqual(decoded.version, HealthImportCursor.currentVersion)
+        XCTAssertEqual(decoded.workoutAnchorData, legacy)
+        XCTAssertNil(decoded.routeAnchorData)
+        XCTAssertTrue(decoded.routeToWorkout.isEmpty)
+    }
+
+    func testCorruptHealthCursorFallsBackToRebuildableEmptyState() {
+        let decoded = HealthImportCursorCodec.decode(Data("not a cursor".utf8))
+
+        XCTAssertNil(decoded.workoutAnchorData)
+        XCTAssertNil(decoded.routeAnchorData)
+        XCTAssertTrue(decoded.routeToWorkout.isEmpty)
+    }
+
+    func testRouteAssociationReplacementAndDeletionAffectTheParentWorkout() {
+        let workoutID = UUID()
+        let deletedWorkoutID = UUID()
+        let oldRouteID = UUID()
+        let replacementRouteID = UUID()
+        let deletedWorkoutRouteID = UUID()
+
+        let update = HealthRouteAssociationReconciler.applying(
+            deletedRouteIDs: [oldRouteID],
+            addedAssociations: [replacementRouteID: workoutID],
+            deletedWorkoutIDs: [deletedWorkoutID],
+            to: [
+                oldRouteID: workoutID,
+                deletedWorkoutRouteID: deletedWorkoutID,
+            ]
+        )
+
+        XCTAssertEqual(update.routeToWorkout, [replacementRouteID: workoutID])
+        XCTAssertEqual(update.affectedWorkoutIDs, [workoutID])
+    }
+
+    func testCoverageOverlayDrawsExactIntervalsEvenForCompletedSegments() {
+        let segment = WalkableSegment(
+            id: "exact-interval",
+            startNode: NodeID(1),
+            endNode: NodeID(2),
+            coordinates: [
+                GeoCoordinate(latitude: 40.75, longitude: -73.99),
+                GeoCoordinate(latitude: 40.751, longitude: -73.99),
+            ],
+            lengthMeters: 100,
+            kind: .street
+        )
+        let pack = InMemoryCityCoveragePack(
+            metadata: MapPackMetadata(
+                identifier: "test",
+                displayName: "Test",
+                version: 1,
+                sourceDate: .distantPast,
+                sourceURL: nil,
+                attribution: "Test"
+            ),
+            segments: [segment]
+        )
+        let coverage = CoverageSnapshot(
+            packIdentifier: pack.metadata.identifier,
+            packVersion: pack.metadata.version,
+            totalDistanceMeters: 100,
+            coveredDistanceMeters: 70,
+            completedSegmentIDs: [segment.id],
+            coveredMetersBySegment: [segment.id: 70],
+            coveredIntervalsBySegment: [segment.id: [SegmentInterval(
+                segmentID: segment.id,
+                lowerBoundMeters: 10,
+                upperBoundMeters: 80,
+                confidence: 1
+            )]],
+            averageConfidence: 1
+        )
+
+        let overlay = CoverageNetworkOverlay(pack: pack, coverage: coverage)
+
+        XCTAssertEqual(overlay.coveredPolylineCount, 1)
+        XCTAssertEqual(overlay.remainingPolylineCount, 2)
+    }
+
+    func testBundledCoverageOverlayHasManhattanSizedBounds() async throws {
+        let pack = try await SQLiteCityPackLoader().loadBundledManhattan()
+        let overlay = CoverageNetworkOverlay(pack: pack, coverage: .empty(pack: pack))
+        let region = MKCoordinateRegion(overlay.boundingMapRect)
+
+        XCTAssertFalse(overlay.boundingMapRect.isNull)
+        XCTAssertGreaterThan(region.center.latitude, 40.7)
+        XCTAssertLessThan(region.center.latitude, 40.9)
+        XCTAssertLessThan(region.span.latitudeDelta, 0.25)
+        XCTAssertLessThan(region.span.longitudeDelta, 0.15)
+    }
+
     func testPreviewMapHasAStableCoverageDenominator() {
         let pack = PreviewCityPack.manhattanSample
         let snapshot = CoverageCalculator().snapshot(pack: pack, contributions: [])
@@ -17,8 +138,13 @@ final class WalkItAllTests: XCTestCase {
         let pack = try await SQLiteCityPackLoader().loadBundledManhattan()
 
         XCTAssertEqual(pack.metadata.identifier, "manhattan-island")
-        XCTAssertGreaterThan(pack.segments.count, 10_000)
-        XCTAssertGreaterThan(pack.totalLengthMeters, 500_000)
+        XCTAssertEqual(pack.metadata.version, 2)
+        XCTAssertEqual(pack.segments.count, 36_827)
+        XCTAssertEqual(pack.totalLengthMeters / 1_609.344, 760.8771434590388, accuracy: 0.000_001)
+        XCTAssertNotNil(Bundle.main.url(
+            forResource: "manhattan-v\(pack.metadata.version)",
+            withExtension: "sqlite"
+        ))
     }
 
     @MainActor
@@ -83,6 +209,32 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertTrue(recordsAfterInvalidation.isEmpty)
         XCTAssertTrue(processedAfterInvalidation.isEmpty)
         XCTAssertNil(checkpointAfterInvalidation)
+    }
+
+    @MainActor
+    func testRepositoryClearsLegacyAggregateSnapshotDuringPreparation() async throws {
+        let schema = Schema([
+            PersistedWorkoutCoverage.self,
+            PersistedAppState.self,
+            PersistedWorkoutImportState.self,
+        ])
+        let container = try ModelContainer(
+            for: schema,
+            configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]
+        )
+        let context = ModelContext(container)
+        context.insert(PersistedAppState(
+            snapshotData: Data([1, 2, 3]),
+            packIdentifier: "manhattan",
+            packVersion: 1
+        ))
+        try context.save()
+        let repository = SwiftDataCoverageRepository(modelContainer: container)
+
+        try await repository.prepareForPack(identifier: "manhattan", version: 1)
+
+        let state = try XCTUnwrap(context.fetch(FetchDescriptor<PersistedAppState>()).first)
+        XCTAssertNil(state.snapshotData)
     }
 
     @MainActor
@@ -157,12 +309,16 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(model.lastSuccessfulImport, date)
         let prepared = await repository.preparedPack
         XCTAssertEqual(prepared?.identifier, "manhattan-island")
-        XCTAssertEqual(prepared?.version, 1)
+        XCTAssertEqual(prepared?.version, 2)
     }
 
     @MainActor
     func testDeletedWorkoutIsRemovedDuringRefresh() async throws {
         let id = UUID()
+        let bundledPack = try await SQLiteCityPackLoader().loadBundledManhattan()
+        let segment = try XCTUnwrap(
+            bundledPack.segments.first(where: \.countsTowardCoverage)
+        )
         let record = WorkoutCoverageRecord(
             id: id,
             start: Date(timeIntervalSince1970: 100),
@@ -171,8 +327,13 @@ final class WalkItAllTests: XCTestCase {
             simplifiedRouteParts: [],
             contribution: WorkoutCoverageContribution(
                 workoutID: id,
-                intervals: [],
-                confidence: 0
+                intervals: [SegmentInterval(
+                    segmentID: segment.id,
+                    lowerBoundMeters: 0,
+                    upperBoundMeters: segment.lengthMeters,
+                    confidence: 1
+                )],
+                confidence: 1
             ),
             unmatchedPortions: []
         )
@@ -185,25 +346,156 @@ final class WalkItAllTests: XCTestCase {
         let model = makeModel(source: source, repository: repository)
         await model.bootstrap()
         XCTAssertEqual(model.workoutRecords.map(\.id), [id])
+        XCTAssertGreaterThan(model.coverage?.coveredDistanceMeters ?? 0, 0)
 
         model.refresh()
         try await waitUntilImportStops(model)
 
         XCTAssertTrue(model.workoutRecords.isEmpty)
+        XCTAssertEqual(model.coverage?.coveredDistanceMeters, 0)
         let repositoryIsEmpty = await repository.isEmpty
         XCTAssertTrue(repositoryIsEmpty)
     }
 
     @MainActor
+    func testRouteInvalidationRemovesCoverageButKeepsProcessedWorkout() async throws {
+        let id = UUID()
+        let record = WorkoutCoverageRecord(
+            id: id,
+            start: Date(timeIntervalSince1970: 100),
+            end: Date(timeIntervalSince1970: 200),
+            sourceName: "Test",
+            simplifiedRouteParts: [],
+            contribution: WorkoutCoverageContribution(workoutID: id, intervals: [], confidence: 0),
+            unmatchedPortions: []
+        )
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(
+            routes: [],
+            routeInvalidatedWorkoutIDs: [id],
+            processedWorkouts: [.init(id: id, end: record.end)],
+            checkpoint: Data([3])
+        )])
+        let repository = TestCoverageRepository(records: [record], processedIDs: [id])
+        let model = makeModel(source: source, repository: repository)
+        await model.bootstrap()
+
+        model.refresh()
+        try await waitUntilImportStops(model)
+
+        XCTAssertTrue(model.workoutRecords.isEmpty)
+        let processedIDs = await repository.currentProcessedIDs()
+        XCTAssertEqual(processedIDs, [id])
+    }
+
+    @MainActor
+    func testAutomaticRefreshUsesFiveMinuteThrottleAndManualRefreshBypassesIt() async throws {
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(routes: [], checkpoint: Data([4]))])
+        let repository = TestCoverageRepository()
+        let model = makeModel(source: source, repository: repository)
+        await model.bootstrap()
+
+        model.refresh()
+        try await waitUntilImportStops(model)
+        let firstRefresh = try XCTUnwrap(model.lastSuccessfulImport)
+
+        model.refreshIfNeeded(now: firstRefresh.addingTimeInterval(301))
+        try await waitForRouteBatchRequestCount(source, count: 2)
+        try await waitUntilImportStops(model)
+
+        model.refreshIfNeeded(now: firstRefresh.addingTimeInterval(302))
+        try await Task.sleep(for: .milliseconds(30))
+        let throttledRequestCount = await source.currentRouteBatchRequestCount()
+        XCTAssertEqual(throttledRequestCount, 2)
+
+        model.refresh()
+        try await waitForRouteBatchRequestCount(source, count: 3)
+        try await waitUntilImportStops(model)
+        let manualRequestCount = await source.currentRouteBatchRequestCount()
+        XCTAssertEqual(manualRequestCount, 3)
+    }
+
+    @MainActor
+    func testSuccessfulRefreshPersistsAndPublishesTheSameDate() async throws {
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(routes: [], checkpoint: Data([5]))])
+        let repository = TestCoverageRepository()
+        let model = makeModel(source: source, repository: repository)
+        await model.bootstrap()
+
+        model.refresh()
+        try await waitUntilImportStops(model)
+
+        let persistedDate = await repository.currentLastSuccessfulImport()
+        XCTAssertEqual(model.lastSuccessfulImport, persistedDate)
+    }
+
+    @MainActor
+    func testInterruptedImportDoesNotPublishItsCheckpoint() async throws {
+        let route = WorkoutRoute(
+            id: UUID(),
+            start: Date(timeIntervalSince1970: 100),
+            end: Date(timeIntervalSince1970: 120),
+            sourceName: "Test",
+            points: [
+                RoutePoint(
+                    coordinate: GeoCoordinate(latitude: 40.75, longitude: -73.99),
+                    timestamp: Date(timeIntervalSince1970: 100),
+                    horizontalAccuracy: 5
+                ),
+                RoutePoint(
+                    coordinate: GeoCoordinate(latitude: 40.751, longitude: -73.99),
+                    timestamp: Date(timeIntervalSince1970: 120),
+                    horizontalAccuracy: 5
+                ),
+            ]
+        )
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(
+            routes: [route],
+            processedWorkouts: [.init(id: route.id, end: route.end)],
+            checkpoint: Data([42]),
+            completedCount: 1,
+            totalCount: 1
+        )])
+        let repository = TestCoverageRepository()
+        let matcher = SuspendingMatcher()
+        let model = makeModel(source: source, repository: repository, matcher: matcher)
+        await model.bootstrap()
+
+        model.refresh()
+        try await waitForMatcher(matcher)
+        model.cancelImport()
+        await matcher.finish()
+        try await Task.sleep(for: .milliseconds(30))
+
+        let checkpoint = await repository.currentCheckpoint()
+        XCTAssertNil(checkpoint)
+        XCTAssertTrue(model.workoutRecords.isEmpty)
+    }
+
+    @MainActor
+    func testWorkoutSelectionPublishesExplicitViewportCommands() async {
+        let model = makeModel(source: TestRouteSource(batches: []), repository: TestCoverageRepository())
+        let id = UUID()
+
+        model.selectWorkout(id)
+        XCTAssertEqual(model.mapViewportCommand.target, .workout(id))
+        let selectedRevision = model.mapViewportCommand.revision
+
+        model.clearSelectedWorkout()
+        XCTAssertEqual(model.mapViewportCommand.target, .manhattan)
+        XCTAssertGreaterThan(model.mapViewportCommand.revision, selectedRevision)
+    }
+
+    @MainActor
     private func makeModel(
         source: TestRouteSource,
-        repository: TestCoverageRepository
+        repository: TestCoverageRepository,
+        matcher: any MapMatcher = EmptyMatcher()
     ) -> AppModel {
         AppModel(dependencies: AppDependencies(
             routeSource: source,
             repository: repository,
             cityPackLoader: SQLiteCityPackLoader(),
-            matcher: EmptyMatcher(),
+            matcher: matcher,
             coverageCalculator: CoverageCalculator(),
             routeSimplifier: RouteSimplifier(),
             routeChunker: RouteChunker()
@@ -227,6 +519,24 @@ final class WalkItAllTests: XCTestCase {
         }
         XCTFail("Authorization request did not start")
     }
+
+    @MainActor
+    private func waitForRouteBatchRequestCount(_ source: TestRouteSource, count: Int) async throws {
+        for _ in 0 ..< 200 {
+            if await source.currentRouteBatchRequestCount() >= count { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Expected \(count) route batch requests")
+    }
+
+    @MainActor
+    private func waitForMatcher(_ matcher: SuspendingMatcher) async throws {
+        for _ in 0 ..< 200 {
+            if await matcher.hasStarted() { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Matcher did not start")
+    }
 }
 
 private struct EmptyMatcher: MapMatcher {
@@ -238,6 +548,33 @@ private struct EmptyMatcher: MapMatcher {
             rejectedPointCount: points.count,
             averageConfidence: 0
         )
+    }
+}
+
+private actor SuspendingMatcher: MapMatcher {
+    private var started = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func match(points: [RoutePoint], in pack: any CityCoveragePack) async throws -> MatchResult {
+        started = true
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+        try Task.checkCancellation()
+        return MatchResult(
+            intervals: [],
+            unmatchedPortions: [],
+            acceptedPointCount: 0,
+            rejectedPointCount: points.count,
+            averageConfidence: 0
+        )
+    }
+
+    func hasStarted() -> Bool { started }
+
+    func finish() {
+        continuation?.resume()
+        continuation = nil
     }
 }
 
@@ -269,6 +606,8 @@ private actor TestRouteSource: WorkoutRouteSource {
         authorizationContinuation?.resume()
         authorizationContinuation = nil
     }
+
+    func route(for workoutID: UUID) async throws -> WorkoutRoute? { nil }
 
     func routeBatches(
         since checkpoint: Data?,
@@ -335,15 +674,18 @@ private actor TestCoverageRepository: CoverageRepository {
         processedIDs.subtract(removed)
     }
 
-    func replaceSnapshot(_ snapshot: CoverageSnapshot) async throws {
-        self.snapshot = snapshot
-        lastSuccessfulImport = Date()
+    func removeCoverage(workoutIDs: [UUID]) async throws {
+        let removed = Set(workoutIDs)
+        records.removeAll { removed.contains($0.id) }
     }
 
-    func loadSnapshot() async throws -> CoverageSnapshot? { snapshot }
     func loadCheckpoint() async throws -> Data? { checkpoint }
     func loadLastSuccessfulImport() async throws -> Date? { lastSuccessfulImport }
     func saveCheckpoint(_ checkpoint: Data?) async throws { self.checkpoint = checkpoint }
+    func currentCheckpoint() -> Data? { checkpoint }
+    func saveLastSuccessfulImport(_ date: Date) async throws { lastSuccessfulImport = date }
+    func currentLastSuccessfulImport() -> Date? { lastSuccessfulImport }
+    func currentProcessedIDs() -> Set<UUID> { processedIDs }
 
     func resetDerivedCoverage() async throws {
         records = []

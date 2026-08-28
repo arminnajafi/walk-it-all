@@ -13,6 +13,7 @@
 		10557EC7241C285E39ACDF5D /* MapScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C2F149DE39FE7C02CB2A374 /* MapScreen.swift */; };
 		1F975065E6666299E024AC08 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DBEAAB8EF76A38A17ED42D8 /* OnboardingView.swift */; };
 		31BA0BF758C0888773350E78 /* WalkItAllCore in Frameworks */ = {isa = PBXBuildFile; productRef = C5AB7EC69599D1233B2ACC1C /* WalkItAllCore */; };
+		3495C791E456FA3E55196FFA /* manhattan-v2.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = C6C24976C4978A93A62546D2 /* manhattan-v2.sqlite */; };
 		369C19CC441EB5043A392ED8 /* WalkItAllCore in Frameworks */ = {isa = PBXBuildFile; productRef = 743CCBC2779103FD291BCFF5 /* WalkItAllCore */; };
 		39492E0DC66EBE95B56F840D /* WorkoutHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07510A3D027DD1B78300B46C /* WorkoutHistorySheet.swift */; };
 		39D973E0EA314470390C9BE9 /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB635380CE9E629086CE486 /* AppDependencies.swift */; };
@@ -40,7 +41,6 @@
 		E7B912EC74668C826D9E327C /* MethodologySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2179330C71F7193E3AF290 /* MethodologySheet.swift */; };
 		F1F3115EE0992110C4C31275 /* HealthKitWorkoutRouteSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = DABD328367D5C28075FE1BF9 /* HealthKitWorkoutRouteSource.swift */; };
 		F2522C4FABA0C69A9C7282EE /* ProgressCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E859A7C657582260DBF36425 /* ProgressCard.swift */; };
-		F98ECAC2FEC9633AB8ABC014 /* manhattan-v1.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = F96F85A232C52676971CA436 /* manhattan-v1.sqlite */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -84,6 +84,7 @@
 		B44B76EB7EFDEBF477553C8D /* WalkItAll.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = WalkItAll.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B499B81A9931CBF9FD2D136F /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		B8100120032C826D8CAFA518 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		C6C24976C4978A93A62546D2 /* manhattan-v2.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = "manhattan-v2.sqlite"; sourceTree = "<group>"; };
 		CDCBDD4837A510C93B7C65A3 /* MapKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MapKit.framework; path = System/Library/Frameworks/MapKit.framework; sourceTree = SDKROOT; };
 		CE3D4EA38075A5548B87AC68 /* WalkItAllApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkItAllApp.swift; sourceTree = "<group>"; };
 		D367A9FE158602470A886865 /* PersistedModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistedModels.swift; sourceTree = "<group>"; };
@@ -96,7 +97,6 @@
 		EF12E64E2A13DD96366FAD51 /* WalkItAllTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WalkItAllTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5696D74A58FC1BE5F4B683B /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		F745868D274433532D71FDA4 /* SQLiteCityPackLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteCityPackLoader.swift; sourceTree = "<group>"; };
-		F96F85A232C52676971CA436 /* manhattan-v1.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; path = "manhattan-v1.sqlite"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,7 +148,7 @@
 		265548B8EBF46BA0C604D69E /* OfflineMaps */ = {
 			isa = PBXGroup;
 			children = (
-				F96F85A232C52676971CA436 /* manhattan-v1.sqlite */,
+				C6C24976C4978A93A62546D2 /* manhattan-v2.sqlite */,
 			);
 			path = OfflineMaps;
 			sourceTree = "<group>";
@@ -356,6 +356,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					345A53A515D2ACC0872F6C4A = {
+						DevelopmentTeam = 47F6V2R9AA;
 						ProvisioningStyle = Automatic;
 					};
 					CD1E7C658700D7CFB9CD4918 = {
@@ -398,7 +399,7 @@
 			files = (
 				808D13FDF892A3C5FB9CBBF2 /* Assets.xcassets in Resources */,
 				9576DEA3C91B4A18EAA177CE /* PrivacyInfo.xcprivacy in Resources */,
-				F98ECAC2FEC9633AB8ABC014 /* manhattan-v1.sqlite in Resources */,
+				3495C791E456FA3E55196FFA /* manhattan-v2.sqlite in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -635,6 +636,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/WalkItAll.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 47F6V2R9AA;
 				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -689,6 +691,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Config/WalkItAll.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 47F6V2R9AA;
 				INFOPLIST_FILE = Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

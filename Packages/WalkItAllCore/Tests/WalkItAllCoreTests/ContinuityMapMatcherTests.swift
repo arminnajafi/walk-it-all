@@ -168,6 +168,45 @@ final class ContinuityMapMatcherTests: XCTestCase {
         XCTAssertTrue(result.unmatchedPortions.contains { $0.reason == .lowConfidence })
     }
 
+    func testMatchesAndNormalizesARealisticMultiThousandPointRoute() async throws {
+        let street = WalkableSegment(
+            id: "long-realistic-route",
+            startNode: NodeID(1),
+            endNode: NodeID(2),
+            coordinates: [
+                GeoCoordinate(latitude: 40.7400, longitude: -73.9900),
+                GeoCoordinate(latitude: 40.7600, longitude: -73.9900),
+            ],
+            kind: .street
+        )
+        let pack = InMemoryCityCoveragePack(metadata: .fixture, segments: [street])
+        let start = Date(timeIntervalSince1970: 6_000)
+        let pointCount = 2_500
+        let points = (0 ..< pointCount).map { index in
+            let fraction = Double(index) / Double(pointCount - 1)
+            return RoutePoint(
+                coordinate: GeoCoordinate(
+                    latitude: 40.7400 + fraction * 0.0200,
+                    longitude: -73.9900 + sin(Double(index) * 0.13) * 0.000005
+                ),
+                timestamp: start.addingTimeInterval(Double(index)),
+                horizontalAccuracy: 5
+            )
+        }
+
+        let result = try await ContinuityMapMatcher().match(points: points, in: pack)
+        let contribution = WorkoutCoverageContribution(
+            workoutID: UUID(),
+            intervals: result.intervals,
+            confidence: result.averageConfidence
+        )
+
+        XCTAssertEqual(result.acceptedPointCount, pointCount)
+        XCTAssertEqual(contribution.intervals.count, 1)
+        XCTAssertGreaterThan(contribution.uniqueCoveredDistanceMeters, street.lengthMeters * 0.98)
+        XCTAssertLessThanOrEqual(contribution.uniqueCoveredDistanceMeters, street.lengthMeters)
+    }
+
     private func routePoint(_ latitude: Double, _ longitude: Double, _ timestamp: Date) -> RoutePoint {
         RoutePoint(
             coordinate: GeoCoordinate(latitude: latitude, longitude: longitude),

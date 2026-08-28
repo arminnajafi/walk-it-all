@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     let model: AppModel
 
     var body: some View {
@@ -24,6 +25,14 @@ struct RootView: View {
             }
         }
         .task { await model.bootstrap() }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            model.refreshIfNeeded()
+        }
+        .onChange(of: model.launchState) { _, newState in
+            guard newState == .ready, scenePhase == .active else { return }
+            model.refreshIfNeeded()
+        }
         .fullScreenCover(
             isPresented: Binding(
                 get: { model.launchState == .ready && !model.hasCompletedOnboarding },

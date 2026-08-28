@@ -9,11 +9,12 @@ Walk It All is a private, local-first iPhone app that turns Apple Health walking
 - Native SwiftUI app for iOS 17 and later
 - Read-only Apple Health workout and route import
 - Continuity-aware local map matching with GPS accuracy, heading, and graph transitions
-- Distance-weighted coverage with a 70% per-segment completion threshold
+- Exact distance-weighted coverage with a 70% secondary completed-segment diagnostic
 - Apple Maps presentation with an OpenStreetMap-derived offline walking network
 - Protected, backup-excluded SwiftData cache that can be rebuilt from Apple Health
 - No account, backend, analytics, advertising, background location, or route upload
 - Debug-only route inspector and deterministic SwiftUI previews
+- Automatic foreground refresh after an explicit Health connection, with a five-minute throttle
 
 ## Open the app
 
@@ -42,8 +43,9 @@ The script verifies the pure-Swift matching core, Python map builder, generated 
 
 The script verifies a pinned official NYC borough boundary and the dated, checksummed August 25, 2026 Geofabrik New York OpenStreetMap extract, selects Manhattan Island’s largest polygon, and generates:
 
-- `WalkItAll/Resources/OfflineMaps/manhattan-v1.sqlite`
-- `Documentation/manhattan-v1-report.json`
+- `WalkItAll/Resources/OfflineMaps/manhattan-v2.sqlite`
+- `Documentation/manhattan-v2-report.json`
+- `Tools/CityPackBuilder/output/manhattan-v2-review.geojson` (ignored local review artifact)
 
 The downloaded statewide extract is intentionally ignored by Git. The generated city database contains public map geometry only—never workout data.
 
@@ -60,6 +62,7 @@ Real Health routes and coordinate-bearing debug exports must never be committed.
 
 - [Architecture](Documentation/ARCHITECTURE.md)
 - [Coverage methodology](Documentation/METHODOLOGY.md)
+- [Personal accuracy review](Documentation/ACCURACY_REVIEW.md)
 - [Manhattan map audit](Documentation/MAP_AUDIT.md)
 - [Privacy model](Documentation/PRIVACY.md)
 - [Product direction and release gates](Documentation/PRODUCT.md)

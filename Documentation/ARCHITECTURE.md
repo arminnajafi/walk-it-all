@@ -56,12 +56,18 @@ coverage snapshot ─────────► map renderer + progress card
 
 Health anchored-query checkpoints are saved only after the corresponding batch has been processed. Deleted workout UUIDs remove their per-workout contributions before aggregate coverage is recalculated.
 
-The cache also records route-less workouts that have already been checked, so an interrupted import does not repeatedly query a lifetime of indoor walks. Incremental refreshes recheck the last seven days because Health route samples can finish after their workout. A manual full rebuild remains the recovery path for older delayed data.
+The Health cursor is versioned inside the iOS adapter and contains independent workout and workout-route anchors plus route-sample-to-workout associations. Route additions and replacements reprocess their parent workout; route deletions remove only that route contribution unless the workout itself was also deleted. A legacy workout-only anchor is retained while a fresh route reconciliation is performed.
+
+The cache also records route-less workouts that have already been checked, so an interrupted import does not repeatedly query a lifetime of indoor walks. Incremental refreshes recheck the last seven days because Health route samples can finish after their workout. Once the user has explicitly connected Health, the app refreshes when it becomes active if the last successful refresh is more than five minutes old. Manual refresh bypasses that throttle, and a manual full rebuild remains the recovery path for older delayed data.
+
+Per-workout contributions are the only durable coverage projection. Intervals are normalized before persistence, unmatched diagnostics are coalesced, and the aggregate snapshot is always recalculated off the main actor—even for an empty record set. The legacy optional snapshot field remains temporarily in the SwiftData schema only for store compatibility and is cleared during preparation.
 
 ## Versioning
 
-The city package records an identifier, integer version, source timestamp, and checksum. Persisted workouts also record the package identifier and version. A package change atomically invalidates workout import status, checkpoints, matches, and the aggregate snapshot. The next refresh rebuilds from Health rather than attempting brittle geometry-ID migrations.
+The city package records an identifier, integer version, source timestamp, and checksum. Persisted workouts also record the package identifier and version. A package change atomically invalidates workout import status, checkpoints, and matches. The next refresh rebuilds from Health rather than attempting brittle geometry-ID migrations.
 
 ## Map rendering
 
-The main map uses Apple MapKit. Overlay construction runs off the main actor. An immutable custom overlay spatially indexes covered and remaining polylines, and its thread-safe renderer batches only geometry intersecting the current map rectangle. Remaining paths are faint at city scale and become clearer at neighborhood scale; solid versus dashed styling means state does not depend on color alone.
+The main map uses Apple MapKit. Overlay construction runs off the main actor. An immutable custom overlay spatially indexes covered and remaining polylines, and its thread-safe renderer clips and batches only geometry intersecting the requested map rectangle. The visible blue network always uses exact credited intervals; the 70% threshold affects only the secondary completed-segment count. Remaining paths are faint at city scale and become clearer at neighborhood scale; solid versus dashed styling means state does not depend on color alone.
+
+Map movement is expressed as an explicit viewport command (`fit Manhattan` or `fit selected workout`). SwiftUI never reaches into `MKMapView` directly. The selected workout draws its simplified Health route in orange and its exact credited network intervals in indigo.

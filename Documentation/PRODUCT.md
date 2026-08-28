@@ -8,7 +8,7 @@ Walk It All answers one question calmly and accurately: which eligible parts of 
 
 - Manhattan Island, using walking and hiking routes already present in Apple Health
 - Private and local-first, with no account, backend, analytics, advertising, subscription, or live location tracking
-- Foreground historical import and refresh, explainable conservative matching, workout inspection, and local rebuilds
+- Automatic-on-foreground and manual historical refresh, explainable conservative matching, workout inspection, and local rebuilds
 - Apple Maps for context and a reproducible OpenStreetMap-derived completion network
 
 This architecture has effectively no recurring service cost. Personal Team signing is suitable for direct use; TestFlight or App Store distribution requires the Apple Developer Program.
@@ -23,6 +23,12 @@ This architecture has effectively no recurring service cost. Personal Team signi
 
 The final two checks require the owner’s Health history and cannot be substituted with Simulator data.
 
+The DEBUG review workflow records meter-weighted precision and recall without committing route coordinates or identifiers. Aggregate acceptance remains at least 98% precision and 90% recall, with no unexplained parallel-street, gap-bridging, or grade-separated-crossing error.
+
+## Market reality
+
+[WalkNYC](https://walknyc.app/) already advertises Apple Health import, corrections, optional background tracking, and transmission of aggregate counts rather than individual GPS coordinates or specific blocks. A future public Walk It All release therefore must earn trust through conservative and explainable matching, meaningful park and pedestrian coverage, Health-based reconstruction without app cloud storage, no background battery drain, and a calm lifetime goal—not merely a “blocks walked” map.
+
 ## Public-release gate
 
 After personal accuracy validation, invite 5–10 testers before expanding city coverage. Before App Store submission:
@@ -36,4 +42,4 @@ After personal accuracy validation, invite 5–10 testers before expanding city 
 
 ## Deliberately deferred
 
-Additional cities, watchOS recording, manual corrections, suggested routes, sharing, badges, social features, and background processing remain outside the MVP. Each should be added only when it strengthens lifetime city completion without compromising privacy or making the core map harder to understand.
+Additional cities, watchOS recording, manual corrections, suggested routes, GPX or Strava import, sharing, badges, social features, and background processing remain outside the MVP. Each should be added only when it strengthens lifetime city completion without compromising privacy or making the core map harder to understand.

@@ -23,11 +23,18 @@ actor SwiftDataCoverageRepository: CoverageRepository {
 
         guard !hasDerivedState || isCompatible else {
             try await resetDerivedCoverage()
+            let resetState = try primaryState()
+            resetState.packIdentifier = identifier
+            resetState.packVersion = version
+            try modelContext.save()
             return
         }
 
         state.packIdentifier = identifier
         state.packVersion = version
+        // Kept in the schema only so existing personal stores migrate cleanly.
+        // Aggregate coverage is always derived from per-workout contributions.
+        state.snapshotData = nil
         try modelContext.save()
     }
 
@@ -103,12 +110,7 @@ actor SwiftDataCoverageRepository: CoverageRepository {
     func remove(workoutIDs: [UUID]) async throws {
         guard !workoutIDs.isEmpty else { return }
         for id in workoutIDs {
-            let coverageDescriptor = FetchDescriptor<PersistedWorkoutCoverage>(
-                predicate: #Predicate { $0.workoutID == id }
-            )
-            if let record = try modelContext.fetch(coverageDescriptor).first {
-                modelContext.delete(record)
-            }
+            try deleteCoverage(workoutID: id)
             let importDescriptor = FetchDescriptor<PersistedWorkoutImportState>(
                 predicate: #Predicate { $0.workoutID == id }
             )
@@ -119,18 +121,12 @@ actor SwiftDataCoverageRepository: CoverageRepository {
         try modelContext.save()
     }
 
-    func replaceSnapshot(_ snapshot: CoverageSnapshot) async throws {
-        let state = try primaryState()
-        state.snapshotData = try encoder.encode(snapshot)
-        state.lastSuccessfulImport = Date()
-        state.packIdentifier = snapshot.packIdentifier
-        state.packVersion = snapshot.packVersion
+    func removeCoverage(workoutIDs: [UUID]) async throws {
+        guard !workoutIDs.isEmpty else { return }
+        for id in workoutIDs {
+            try deleteCoverage(workoutID: id)
+        }
         try modelContext.save()
-    }
-
-    func loadSnapshot() async throws -> CoverageSnapshot? {
-        guard let data = try primaryState().snapshotData else { return nil }
-        return try? decoder.decode(CoverageSnapshot.self, from: data)
     }
 
     func loadCheckpoint() async throws -> Data? {
@@ -144,6 +140,12 @@ actor SwiftDataCoverageRepository: CoverageRepository {
     func saveCheckpoint(_ checkpoint: Data?) async throws {
         let state = try primaryState()
         state.checkpoint = checkpoint
+        try modelContext.save()
+    }
+
+    func saveLastSuccessfulImport(_ date: Date) async throws {
+        let state = try primaryState()
+        state.lastSuccessfulImport = date
         try modelContext.save()
     }
 
@@ -170,6 +172,15 @@ actor SwiftDataCoverageRepository: CoverageRepository {
         let state = PersistedAppState()
         modelContext.insert(state)
         return state
+    }
+
+    private func deleteCoverage(workoutID: UUID) throws {
+        let coverageDescriptor = FetchDescriptor<PersistedWorkoutCoverage>(
+            predicate: #Predicate { $0.workoutID == workoutID }
+        )
+        if let record = try modelContext.fetch(coverageDescriptor).first {
+            modelContext.delete(record)
+        }
     }
 
     private func decode(_ persisted: PersistedWorkoutCoverage) -> WorkoutCoverageRecord? {

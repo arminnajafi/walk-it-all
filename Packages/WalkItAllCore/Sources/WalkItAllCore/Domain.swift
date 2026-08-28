@@ -141,9 +141,35 @@ public struct UnmatchedPortion: Codable, Hashable, Sendable {
     public let reason: Reason
 
     public init(start: Date, end: Date, reason: Reason) {
-        self.start = start
-        self.end = end
+        self.start = min(start, end)
+        self.end = max(start, end)
         self.reason = reason
+    }
+
+    public static func coalesced(
+        _ portions: [UnmatchedPortion],
+        maximumGap: TimeInterval = 1
+    ) -> [UnmatchedPortion] {
+        let sorted = portions.sorted {
+            if $0.start == $1.start { return $0.end < $1.end }
+            return $0.start < $1.start
+        }
+        var result: [UnmatchedPortion] = []
+        for portion in sorted {
+            if let last = result.last,
+               last.reason == portion.reason,
+               portion.start.timeIntervalSince(last.end) <= maximumGap
+            {
+                result[result.count - 1] = UnmatchedPortion(
+                    start: last.start,
+                    end: max(last.end, portion.end),
+                    reason: last.reason
+                )
+            } else {
+                result.append(portion)
+            }
+        }
+        return result
     }
 }
 
@@ -197,6 +223,25 @@ public struct MapPackMetadata: Codable, Hashable, Sendable {
     }
 }
 
+public struct GeoBounds: Codable, Hashable, Sendable {
+    public let minimumLatitude: Double
+    public let minimumLongitude: Double
+    public let maximumLatitude: Double
+    public let maximumLongitude: Double
+
+    public init(
+        minimumLatitude: Double,
+        minimumLongitude: Double,
+        maximumLatitude: Double,
+        maximumLongitude: Double
+    ) {
+        self.minimumLatitude = minimumLatitude
+        self.minimumLongitude = minimumLongitude
+        self.maximumLatitude = maximumLatitude
+        self.maximumLongitude = maximumLongitude
+    }
+}
+
 public struct GraphPath: Sendable {
     public let distanceMeters: Double
     public let segmentIDs: [SegmentID]
@@ -211,6 +256,7 @@ public protocol CityCoveragePack: Sendable {
     var metadata: MapPackMetadata { get }
     var segments: [WalkableSegment] { get }
     var totalLengthMeters: Double { get }
+    var geographicBounds: GeoBounds? { get }
 
     func segment(id: SegmentID) -> WalkableSegment?
     func segments(near coordinate: GeoCoordinate, radiusMeters: Double) -> [WalkableSegment]
@@ -250,6 +296,7 @@ public struct WorkoutRouteBatch: Sendable {
 
     public let routes: [WorkoutRoute]
     public let deletedWorkoutIDs: [UUID]
+    public let routeInvalidatedWorkoutIDs: [UUID]
     public let processedWorkouts: [ProcessedWorkout]
     public let checkpoint: Data?
     public let completedCount: Int
@@ -258,6 +305,7 @@ public struct WorkoutRouteBatch: Sendable {
     public init(
         routes: [WorkoutRoute],
         deletedWorkoutIDs: [UUID] = [],
+        routeInvalidatedWorkoutIDs: [UUID] = [],
         processedWorkouts: [ProcessedWorkout] = [],
         checkpoint: Data? = nil,
         completedCount: Int = 0,
@@ -265,6 +313,7 @@ public struct WorkoutRouteBatch: Sendable {
     ) {
         self.routes = routes
         self.deletedWorkoutIDs = deletedWorkoutIDs
+        self.routeInvalidatedWorkoutIDs = routeInvalidatedWorkoutIDs
         self.processedWorkouts = processedWorkouts
         self.checkpoint = checkpoint
         self.completedCount = completedCount
@@ -274,6 +323,7 @@ public struct WorkoutRouteBatch: Sendable {
 
 public protocol WorkoutRouteSource: Sendable {
     func requestReadAuthorization() async throws
+    func route(for workoutID: UUID) async throws -> WorkoutRoute?
     func routeBatches(
         since checkpoint: Data?,
         excluding workoutIDs: Set<UUID>
@@ -287,8 +337,77 @@ public struct WorkoutCoverageContribution: Codable, Sendable {
 
     public init(workoutID: UUID, intervals: [SegmentInterval], confidence: Double) {
         self.workoutID = workoutID
-        self.intervals = intervals
-        self.confidence = confidence
+        self.intervals = Self.normalized(intervals)
+        self.confidence = min(1, max(0, confidence))
+    }
+
+    public var uniqueCoveredDistanceMeters: Double {
+        intervals.reduce(0) { $0 + $1.lengthMeters }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case workoutID
+        case intervals
+        case confidence
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            workoutID: try container.decode(UUID.self, forKey: .workoutID),
+            intervals: try container.decode([SegmentInterval].self, forKey: .intervals),
+            confidence: try container.decode(Double.self, forKey: .confidence)
+        )
+    }
+
+    private static func normalized(_ intervals: [SegmentInterval]) -> [SegmentInterval] {
+        Dictionary(grouping: intervals, by: \.segmentID)
+            .flatMap { segmentID, segmentIntervals -> [SegmentInterval] in
+                let sorted = segmentIntervals
+                    .map {
+                        SegmentInterval(
+                            segmentID: segmentID,
+                            lowerBoundMeters: max(0, $0.lowerBoundMeters),
+                            upperBoundMeters: max(0, $0.upperBoundMeters),
+                            confidence: $0.confidence
+                        )
+                    }
+                    .filter { $0.lengthMeters > 0 }
+                    .sorted {
+                        if $0.lowerBoundMeters == $1.lowerBoundMeters {
+                            return $0.upperBoundMeters < $1.upperBoundMeters
+                        }
+                        return $0.lowerBoundMeters < $1.lowerBoundMeters
+                    }
+
+                var merged: [SegmentInterval] = []
+                for interval in sorted {
+                    guard let last = merged.last,
+                          interval.lowerBoundMeters <= last.upperBoundMeters + 0.01
+                    else {
+                        merged.append(interval)
+                        continue
+                    }
+                    let combinedLength = last.lengthMeters + interval.lengthMeters
+                    let combinedConfidence = combinedLength > 0
+                        ? ((last.confidence * last.lengthMeters)
+                            + (interval.confidence * interval.lengthMeters)) / combinedLength
+                        : max(last.confidence, interval.confidence)
+                    merged[merged.count - 1] = SegmentInterval(
+                        segmentID: segmentID,
+                        lowerBoundMeters: last.lowerBoundMeters,
+                        upperBoundMeters: max(last.upperBoundMeters, interval.upperBoundMeters),
+                        confidence: combinedConfidence
+                    )
+                }
+                return merged
+            }
+            .sorted {
+                if $0.segmentID == $1.segmentID {
+                    return $0.lowerBoundMeters < $1.lowerBoundMeters
+                }
+                return $0.segmentID.rawValue < $1.segmentID.rawValue
+            }
     }
 }
 
@@ -316,7 +435,34 @@ public struct WorkoutCoverageRecord: Codable, Sendable, Identifiable {
         self.sourceName = sourceName
         self.simplifiedRouteParts = simplifiedRouteParts
         self.contribution = contribution
-        self.unmatchedPortions = unmatchedPortions
+        self.unmatchedPortions = UnmatchedPortion.coalesced(unmatchedPortions)
+    }
+
+    public var duration: TimeInterval {
+        max(0, end.timeIntervalSince(start))
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case start
+        case end
+        case sourceName
+        case simplifiedRouteParts
+        case contribution
+        case unmatchedPortions
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            start: try container.decode(Date.self, forKey: .start),
+            end: try container.decode(Date.self, forKey: .end),
+            sourceName: try container.decode(String.self, forKey: .sourceName),
+            simplifiedRouteParts: try container.decode([[GeoCoordinate]].self, forKey: .simplifiedRouteParts),
+            contribution: try container.decode(WorkoutCoverageContribution.self, forKey: .contribution),
+            unmatchedPortions: try container.decode([UnmatchedPortion].self, forKey: .unmatchedPortions)
+        )
     }
 }
 
@@ -379,11 +525,11 @@ public protocol CoverageRepository: Sendable {
     func loadProcessedWorkoutIDs() async throws -> Set<UUID>
     func markWorkoutProcessed(id: UUID, end: Date) async throws
     func save(record: WorkoutCoverageRecord, packIdentifier: String, packVersion: Int) async throws
+    func removeCoverage(workoutIDs: [UUID]) async throws
     func remove(workoutIDs: [UUID]) async throws
-    func replaceSnapshot(_ snapshot: CoverageSnapshot) async throws
-    func loadSnapshot() async throws -> CoverageSnapshot?
     func loadCheckpoint() async throws -> Data?
     func loadLastSuccessfulImport() async throws -> Date?
     func saveCheckpoint(_ checkpoint: Data?) async throws
+    func saveLastSuccessfulImport(_ date: Date) async throws
     func resetDerivedCoverage() async throws
 }

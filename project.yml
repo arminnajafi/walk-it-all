@@ -58,6 +58,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.arminnajafi.walkitall
         PRODUCT_NAME: WalkItAll
+        DEVELOPMENT_TEAM: 47F6V2R9AA
         TARGETED_DEVICE_FAMILY: 1
         SUPPORTS_MACCATALYST: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
