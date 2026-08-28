@@ -11,6 +11,7 @@ from city_pack_builder.build import (
     file_sha256,
     geodesic_polyline_length,
     named_goal_miles_by_kind,
+    source_tag_goal_miles,
     stable_segment_id,
     topology_audit,
     way_intersects_boundary,
@@ -108,6 +109,33 @@ def test_named_and_unnamed_goal_miles_are_reported_by_kind() -> None:
     assert report["connector"]["total_miles"] == 0
 
 
+def test_source_tag_goal_miles_explain_footway_denominator() -> None:
+    coordinates = ((0.2, 0.2), (0.8, 0.8))
+    segments = [
+        Segment(
+            "street", 1, 2, "street", 1_609.344, 1, "Broadway", coordinates, True,
+            source_highway="primary",
+        ),
+        Segment(
+            "path", 2, 3, "parkPath", 804.672, 2, None, coordinates, True,
+            source_highway="footway", source_footway=None,
+        ),
+        Segment(
+            "link", 3, 4, "parkPath", 402.336, 3, None, coordinates, True,
+            source_highway="footway", source_footway="link",
+        ),
+        Segment(
+            "crossing", 4, 5, "connector", 1_609.344, 4, None, coordinates, False,
+            source_highway="footway", source_footway="crossing",
+        ),
+    ]
+
+    report = source_tag_goal_miles(segments)
+
+    assert report["highway"] == {"footway": 0.75, "primary": 1.0}
+    assert report["footway"] == {"(unset)": 0.5, "link": 0.25}
+
+
 def test_geometry_and_topology_audits_expose_reviewable_failures() -> None:
     boundary = Polygon(((0, 0), (2, 0), (2, 2), (0, 2)))
     first = Segment(
@@ -182,3 +210,4 @@ def test_component_histogram_details_and_suspicious_geojson(tmp_path) -> None:
         "unnamed",
         "disconnected_component",
     ]
+    assert document["features"][0]["properties"]["source_highway"] is None

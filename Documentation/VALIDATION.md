@@ -6,7 +6,7 @@ This file records reproducible engineering evidence without workout coordinates,
 
 - Complete verification run: August 28, 2026
 - `WalkItAllCore`: 23 unit tests plus the executable core checks
-- `CityPackBuilder`: 13 tests
+- `CityPackBuilder`: 14 tests
 - iOS app: 25 unit tests
 - iOS UI: 5 end-to-end tests, including an accessibility XXXL onboarding journey
 - Synthetic coverage: 1,500 workout contributions and a 2,500-point route
@@ -23,6 +23,7 @@ Map version 2 is generated from the pinned 2026-08-25 Geofabrik New York extract
 - Outside-boundary, invalid, duplicate-ID, and duplicate-geometry counts: zero
 - Exact equivalent geometry removed deterministically: one 13.6-meter park path
 - Graph components: 3,230
+- Eligible source geometry tagged `highway=footway`: 208.910 miles, including 206.368 miles without a more specific `footway=*` value
 
 The complete evidence and review samples are in `manhattan-v2-report.json`; the manual denominator review remains a release gate.
 

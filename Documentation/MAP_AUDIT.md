@@ -18,4 +18,6 @@ The expanded connectivity report narrows the risk: only 0.168 street miles sit o
 
 The current 503.130 street miles are close to the expected scale for Manhattan, while the 206.172 park-path miles reflect the decision to include meaningful park and pedestrian paths. Unnamed or disconnected path clusters are the highest-priority denominator review before public distribution.
 
+The reproducible report now preserves the original OSM classification behind each completion kind. It shows 208.910 eligible miles sourced from `highway=footway`; 206.368 of those miles have no more specific `footway=*` value. This is not evidence that the ways are sidewalks—15,576 explicitly tagged sidewalk ways are already excluded—but it prevents the broad `parkPath` label from hiding the main denominator uncertainty. The review GeoJSON carries both source tags so the manual park, waterfront, plaza, and divided-street inspection can make evidence-based filtering decisions.
+
 The source is a dated Geofabrik extract rather than a moving “latest” URL. Both the PBF and the committed NYC boundary are checksum-verified, and their URLs and SHA-256 values are embedded in the database and report. The database also embeds direct OpenStreetMap attribution and ODbL license URLs; the app surfaces both links in its methodology screen in addition to keeping attribution adjacent to the map.

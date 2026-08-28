@@ -534,6 +534,28 @@
     "steps": 8.754374941764764,
     "street": 503.1300388486999
   },
+  "goal_length_miles_by_source_tag": {
+    "footway": {
+      "(unset)": 206.3682985028054,
+      "path": 2.1657402713669422,
+      "traffic_island": 0.37631763115613603
+    },
+    "highway": {
+      "cycleway": 19.366888260697618,
+      "footway": 208.91035640532837,
+      "living_street": 1.7119709173490187,
+      "path": 9.033569086421362,
+      "pedestrian": 11.419064433216652,
+      "primary": 89.87818302937369,
+      "residential": 253.06031685603676,
+      "secondary": 117.22095070650103,
+      "service": 0.20084689053350746,
+      "steps": 8.754374941764754,
+      "tertiary": 29.66824429179799,
+      "track": 0.062004592375689234,
+      "unclassified": 11.590373047641533
+    }
+  },
   "goal_miles_named_and_unnamed_by_kind": {
     "connector": {
       "named_miles": 17.05790495465016,

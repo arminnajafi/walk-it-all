@@ -56,6 +56,8 @@ class Segment:
     layer: int = 0
     bridge: bool = False
     tunnel: bool = False
+    source_highway: str | None = None
+    source_footway: str | None = None
 
 
 def classify_way(tags: dict[str, str]) -> Eligibility:
@@ -189,6 +191,8 @@ class SegmentCollector(osmium.SimpleHandler):
                     layer=parse_layer(tags.get("layer")),
                     bridge=tags.get("bridge") not in {None, "no"},
                     tunnel=tags.get("tunnel") not in {None, "no"},
+                    source_highway=tags.get("highway"),
+                    source_footway=tags.get("footway"),
                 ))
 
 
@@ -572,6 +576,31 @@ def named_goal_miles_by_kind(segments: list[Segment]) -> dict[str, dict[str, flo
     return result
 
 
+def source_tag_goal_miles(segments: list[Segment]) -> dict[str, dict[str, float]]:
+    goal = [segment for segment in segments if segment.counts_toward_coverage]
+
+    def miles_by(values: Iterable[tuple[str, float]]) -> dict[str, float]:
+        totals: Counter[str] = Counter()
+        for value, length_meters in values:
+            totals[value] += length_meters
+        return {
+            value: meters / 1_609.344
+            for value, meters in sorted(totals.items())
+        }
+
+    return {
+        "highway": miles_by(
+            ((segment.source_highway or "(missing)"), segment.length_meters)
+            for segment in goal
+        ),
+        "footway": miles_by(
+            ((segment.source_footway or "(unset)"), segment.length_meters)
+            for segment in goal
+            if segment.source_highway == "footway"
+        ),
+    }
+
+
 def geometry_audit(
     segments: list[Segment],
     boundary: Polygon,
@@ -704,6 +733,8 @@ def write_review_geojson(path: Path, segments: list[Segment], limit: int = 5_000
                 "source_way_id": segment.source_way_id,
                 "name": segment.name,
                 "kind": segment.kind,
+                "source_highway": segment.source_highway,
+                "source_footway": segment.source_footway,
                 "length_meters": segment.length_meters,
                 "component_rank": component_rank.get(segment.identifier),
                 "component_goal_miles": component_miles.get(segment.identifier),
@@ -776,6 +807,7 @@ def build(args: argparse.Namespace) -> None:
         "goal_miles_named_and_unnamed_by_kind": named_goal_miles_by_kind(
             segments
         ),
+        "goal_length_miles_by_source_tag": source_tag_goal_miles(segments),
         "graph_only_segment_count": sum(
             1 for segment in segments if not segment.counts_toward_coverage
         ),
