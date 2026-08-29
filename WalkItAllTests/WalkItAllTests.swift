@@ -97,6 +97,20 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(update.affectedWorkoutIDs, [workoutID])
     }
 
+    func testUnresolvedRouteChangeInvalidatesCachedWorkoutWithoutDeletingWorkout() {
+        let unresolved = UUID()
+        let resolved = UUID()
+        let deleted = UUID()
+
+        let invalidations = HealthRouteAssociationReconciler.unresolvedInvalidations(
+            affectedWorkoutIDs: [unresolved, resolved, deleted],
+            candidateWorkoutIDs: [resolved],
+            deletedWorkoutIDs: [deleted]
+        )
+
+        XCTAssertEqual(invalidations, [unresolved])
+    }
+
     @MainActor
     func testRepositoryRoundTripsReplacesAndDeletesRecordsAndState() async throws {
         let (repository, _) = try makeSwiftDataRepository()
@@ -541,6 +555,54 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
+    func testFinishKeepsTerminalRecoveryCheckpointIfCompactedSaveFails() async throws {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let paused = LiveTrailSession(
+            state: .paused,
+            start: start,
+            routeParts: [],
+            lastUpdate: start.addingTimeInterval(600)
+        )
+        let repository = FailingLiveTrailRepository(
+            session: paused,
+            failingSaveCalls: [2]
+        )
+        let controller = LiveTrailController(repository: repository)
+        await controller.bootstrap(now: paused.lastUpdate)
+
+        await controller.finish(at: start.addingTimeInterval(3_600))
+
+        let stored = try await repository.load()
+        XCTAssertEqual(stored?.state, .waitingForHealth)
+        XCTAssertEqual(stored?.end, paused.lastUpdate)
+        XCTAssertNil(controller.issueMessage)
+    }
+
+    @MainActor
+    func testFinishDeletesStaleActiveCheckpointWhenTerminalSavesFail() async throws {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let active = LiveTrailSession(
+            state: .active,
+            start: start,
+            routeParts: [],
+            lastUpdate: start.addingTimeInterval(600)
+        )
+        let repository = FailingLiveTrailRepository(
+            session: active,
+            failingSaveCalls: [1, 2]
+        )
+        let controller = LiveTrailController(repository: repository)
+        await controller.bootstrap(now: active.lastUpdate)
+
+        await controller.finish(at: start.addingTimeInterval(900))
+
+        XCTAssertEqual(controller.session?.state, .waitingForHealth)
+        let stored = try await repository.load()
+        XCTAssertNil(stored)
+        XCTAssertNotNil(controller.issueMessage)
+    }
+
+    @MainActor
     func testFullHealthRebuildIsUnavailableDuringRecoveredActiveTrail() async throws {
         let source = TestRouteSource(batches: [WorkoutRouteBatch(routes: [])])
         let active = LiveTrailSession(
@@ -613,6 +675,57 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertGreaterThan(MKCoordinateRegion(snapshot.boundingMapRect).span.longitudeDelta, 70)
         XCTAssertTrue(LifetimeRouteRenderer.usesNativeSpatialCulling)
         XCTAssertLessThan(LifetimeRouteRenderer.strokeAlpha, 1)
+    }
+
+    @MainActor
+    func testSelectingWorkoutPreservesImmutableHistoryOverlays() async throws {
+        let workout = record(id: UUID(), latitude: 40.75)
+        let mapView = MKMapView()
+        let coordinator = LifetimeMapView.Coordinator()
+        let viewport = MapViewportCommand(revision: 0, target: .manhattan)
+
+        coordinator.update(
+            mapView: mapView,
+            records: [workout],
+            selectedWorkout: nil,
+            routeRevision: 1,
+            liveTrailSession: nil,
+            liveTrailRevision: 0,
+            showsUserLocation: false,
+            viewportCommand: viewport,
+            bottomInset: 100,
+            initial: true
+        )
+
+        for _ in 0 ..< 50 where !mapView.overlays.contains(where: {
+            $0 is LifetimeWorkoutRouteOverlay
+        }) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let originalHistory = try XCTUnwrap(
+            mapView.overlays.first { $0 is LifetimeWorkoutRouteOverlay }
+                as? LifetimeWorkoutRouteOverlay
+        )
+
+        coordinator.update(
+            mapView: mapView,
+            records: [workout],
+            selectedWorkout: workout,
+            routeRevision: 1,
+            liveTrailSession: nil,
+            liveTrailRevision: 0,
+            showsUserLocation: false,
+            viewportCommand: MapViewportCommand(revision: 1, target: .workout(workout.id)),
+            bottomInset: 100,
+            initial: false
+        )
+
+        XCTAssertTrue(mapView.overlays.contains { $0 === originalHistory })
+        XCTAssertEqual(
+            mapView.overlays.filter { $0 is LifetimeWorkoutRouteOverlay }.count,
+            1
+        )
+        XCTAssertEqual(mapView.overlays.count, 3, "Selection adds only its casing and route")
     }
 
     func testLifetimeSnapshotKeepsWorkoutBoundsSeparateForNativeCulling() throws {
@@ -977,6 +1090,31 @@ private actor TestLiveTrailRepository: LiveTrailRepository {
 
     func load() -> LiveTrailSession? { session }
     func save(_ session: LiveTrailSession) { self.session = session }
+    func delete() { session = nil }
+}
+
+private actor FailingLiveTrailRepository: LiveTrailRepository {
+    private enum Failure: Error { case save }
+
+    private var session: LiveTrailSession?
+    private var saveCallCount = 0
+    private let failingSaveCalls: Set<Int>
+
+    init(session: LiveTrailSession?, failingSaveCalls: Set<Int>) {
+        self.session = session
+        self.failingSaveCalls = failingSaveCalls
+    }
+
+    func load() throws -> LiveTrailSession? { session }
+
+    func save(_ session: LiveTrailSession) throws {
+        saveCallCount += 1
+        if failingSaveCalls.contains(saveCallCount) {
+            throw Failure.save
+        }
+        self.session = session
+    }
+
     func delete() { session = nil }
 }
 

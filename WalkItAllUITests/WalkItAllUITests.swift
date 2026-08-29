@@ -179,9 +179,12 @@ final class WalkItAllUITests: XCTestCase {
 
     @MainActor
     func testPopulatedMapRendersInDarkAppearance() {
+        let previousAppearance = XCUIDevice.shared.appearance
+        XCUIDevice.shared.appearance = .dark
+        defer { XCUIDevice.shared.appearance = previousAppearance }
+
         let app = launch(arguments: [
             "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
-            "-AppleInterfaceStyle", "Dark",
         ])
         XCTAssertTrue(app.buttons["start-live-trail"].waitForExistence(timeout: 30))
         XCTAssertFalse(app.staticTexts["2 walks mapped"].exists)

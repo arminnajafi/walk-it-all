@@ -73,7 +73,9 @@ struct MapScreen: View {
             if model.liveTrail.accessState == .denied {
                 Button("Open Settings") {
                     model.liveTrail.clearIssue()
-                    UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(settingsURL)
+                    }
                 }
             }
             Button("OK", role: .cancel, action: model.liveTrail.clearIssue)

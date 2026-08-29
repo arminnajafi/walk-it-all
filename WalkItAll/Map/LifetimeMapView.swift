@@ -65,11 +65,13 @@ struct LifetimeMapView: UIViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, MKMapViewDelegate {
-        private var routeSignature: RouteSignature?
+        private var historyRevision: Int?
+        private var selectedWorkoutID: UUID?
         private var liveTrailSignature: LiveTrailSignature?
         private var viewportRevision: Int?
         private var pendingViewport = MapViewportCommand(revision: 0, target: .manhattan)
         private var pendingSelection: WorkoutRouteRecord?
+        private var pendingLiveTrailSession: LiveTrailSession?
         private var pendingBottomInset: CGFloat = 220
         private var appliedBottomInset: CGFloat?
         private var overlayTask: Task<Void, Never>?
@@ -101,6 +103,7 @@ struct LifetimeMapView: UIViewRepresentable {
             )
             pendingViewport = viewportCommand
             pendingSelection = selectedWorkout
+            pendingLiveTrailSession = liveTrailSession
             pendingBottomInset = bottomInset
 
             if viewportRevision != viewportCommand.revision
@@ -122,33 +125,34 @@ struct LifetimeMapView: UIViewRepresentable {
                 replaceLiveTrail(liveTrailSession, on: mapView)
             }
 
-            let nextSignature = RouteSignature(
-                routeRevision: routeRevision,
-                selectedWorkoutID: selectedWorkout?.id
-            )
-            guard nextSignature != routeSignature else { return }
-            routeSignature = nextSignature
+            if selectedWorkoutID != selectedWorkout?.id {
+                selectedWorkoutID = selectedWorkout?.id
+                replaceSelection(selectedWorkout, on: mapView)
+            }
+
+            guard historyRevision != routeRevision else { return }
+            historyRevision = routeRevision
             overlayTask?.cancel()
-            mapView.removeOverlays(mapView.overlays.filter {
-                $0 is LifetimeWorkoutRouteOverlay
-                    || $0 is SelectedRouteCasingPolyline
-                    || $0 is SelectedRoutePolyline
-            })
 
             overlayTask = Task.detached(priority: .userInitiated) { [weak self, weak mapView] in
                 let snapshot = LifetimeRouteSnapshot(records: records)
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
-                    guard let self, let mapView, self.routeSignature == nextSignature else { return }
+                    guard let self, let mapView, self.historyRevision == routeRevision else { return }
+                    mapView.removeOverlays(mapView.overlays.filter {
+                        $0 is LifetimeWorkoutRouteOverlay
+                    })
                     if !snapshot.overlays.isEmpty {
                         mapView.addOverlays(snapshot.overlays, level: .aboveRoads)
                     }
-                    if let selectedWorkout {
-                        self.addSelection(selectedWorkout, to: mapView)
-                    }
+                    // Re-add contextual overlays after the immutable history
+                    // swap so they retain their visual priority. Use the most
+                    // recent values because selection or Live Trail can change
+                    // while a large history snapshot is being constructed.
+                    self.replaceSelection(self.pendingSelection, on: mapView)
                     // Keep the immediate/provisional trail above the immutable
                     // history even when a Health refresh replaces that history.
-                    self.replaceLiveTrail(liveTrailSession, on: mapView)
+                    self.replaceLiveTrail(self.pendingLiveTrailSession, on: mapView)
                     if initial || self.viewportRevision != viewportCommand.revision {
                         self.scheduleViewport(on: mapView, animated: false)
                     }
@@ -228,6 +232,15 @@ struct LifetimeMapView: UIViewRepresentable {
                     SelectedRoutePolyline(coordinates: coordinates, count: coordinates.count),
                     level: .aboveRoads
                 )
+            }
+        }
+
+        private func replaceSelection(_ workout: WorkoutRouteRecord?, on mapView: MKMapView) {
+            mapView.removeOverlays(mapView.overlays.filter {
+                $0 is SelectedRouteCasingPolyline || $0 is SelectedRoutePolyline
+            })
+            if let workout {
+                addSelection(workout, to: mapView)
             }
         }
 
@@ -349,11 +362,6 @@ private final class LiveTrailCasingPolyline: MKPolyline {
 
 private final class LiveTrailPolyline: MKPolyline {
     var isPending = false
-}
-
-private struct RouteSignature: Equatable, Sendable {
-    let routeRevision: Int
-    let selectedWorkoutID: UUID?
 }
 
 private struct LiveTrailSignature: Equatable, Sendable {

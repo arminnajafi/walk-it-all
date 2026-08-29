@@ -14,7 +14,7 @@ There is no city database, street graph, map matching, SQLite, backend, or third
 
 `HealthKitWorkoutRouteSource` follows two independently mutable streams: workouts and workout-route samples. Its opaque versioned cursor contains both Health query anchors and route-sample-to-workout associations. It also reconciles recent workouts for seven days because a workout can arrive before its route is finalized.
 
-The source emits one workout at a time. Deleted workouts remove the route and processed-ledger row. An invalidated or replaced route removes only the cached route so the workout can be reconciled without losing its import history.
+The source emits one workout at a time. Deleted workouts remove the route and processed-ledger row. An invalidated or replaced route removes only the cached route so the workout can be reconciled without losing its import history. If Health reports a route change while its parent workout is temporarily unavailable, the app conservatively removes that workout's cached geometry rather than advancing the route anchor and leaving a stale path visible.
 
 After the user has connected Health, the app refreshes at launch, on foreground entry, and every five minutes while active, subject to the five-minute success/attempt throttle. Manual refresh bypasses the throttle. Health background delivery is not enabled.
 
@@ -28,7 +28,7 @@ Pause immediately invalidates location delivery and the background activity sess
 
 The app bootstraps the controller on every launch. Live Trail recovery runs before the permanent history cache is opened, and that cache is opened lazily only when protected data is available. This lets a locked background relaunch recover an explicit Live Trail without weakening the permanent cache's protection. A foreground retry after unlock opens the lifetime history without reloading an older trail checkpoint. Normal backgrounding and screen lock keep an active session alive, while recovery after process termination starts a new route part when the app is next launched. Force-quitting the app stops location delivery; When In Use authorization does not promise an automatic relaunch.
 
-Finish immediately stores a waiting-for-Health session. A Health record replaces it when the workout overlaps at least 80 percent of the temporary time interval; maximum overlap wins, followed by minimum excess workout duration. This associates sessions only and never compares or snaps geometry. Unmatched coordinates are deleted after seven days.
+Finish immediately stores a waiting-for-Health session before final compaction, so a crash cannot recover an explicitly finished checkpoint as active and restart location. A Health record replaces it when the workout overlaps at least 80 percent of the temporary time interval; maximum overlap wins, followed by minimum excess workout duration. This associates sessions only and never compares or snaps geometry. Unmatched coordinates are deleted after seven days.
 
 ## Route processing
 
@@ -65,4 +65,4 @@ The file and directory use complete-until-first-user-authentication protection a
 
 Every workout receives a translucent indigo stroke, so a single route remains legible while repeated walks deepen naturally through normal alpha compositing. Selected workout parts use an orange stroke with a contrasting casing. Active and paused Live Trail parts use solid green with a casing; waiting parts use dashed green with the same non-color distinction. The standard MapKit user-location annotation remains the blue position indicator.
 
-Historical overlay construction and Health route processing run away from the main actor; the app replaces a complete history overlay after import completion, cancellation, or failure rather than rebuilding per workout. The temporary overlay has an independent revision and is updated at a bounded cadence, preserving the history snapshot and map interaction performance.
+Historical overlay construction and Health route processing run away from the main actor; the app replaces a complete history overlay after import completion, cancellation, or failure rather than rebuilding per workout. Selecting or clearing one workout changes only the selected overlay and preserves the immutable history. The temporary overlay has an independent revision and is updated at a bounded cadence, preserving the history snapshot and map interaction performance.

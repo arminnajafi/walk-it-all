@@ -71,6 +71,21 @@ enum HealthRouteAssociationReconciler {
             affectedWorkoutIDs: affected
         )
     }
+
+    /// A route can disappear independently while its parent workout is
+    /// temporarily unavailable (for example while Health is still settling).
+    /// Conservatively invalidate that cached route instead of advancing the
+    /// route anchor and leaving stale geometry on the lifetime map.
+    static func unresolvedInvalidations(
+        affectedWorkoutIDs: Set<UUID>,
+        candidateWorkoutIDs: Set<UUID>,
+        deletedWorkoutIDs: Set<UUID>
+    ) -> [UUID] {
+        affectedWorkoutIDs
+            .subtracting(candidateWorkoutIDs)
+            .subtracting(deletedWorkoutIDs)
+            .sorted { $0.uuidString < $1.uuidString }
+    }
 }
 
 enum HealthImportCursorCodec {
@@ -209,6 +224,12 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                             candidates[workoutID] = affected
                         }
                     }
+                    let unresolvedRouteInvalidations = HealthRouteAssociationReconciler
+                        .unresolvedInvalidations(
+                            affectedWorkoutIDs: routeAffectedWorkoutIDs,
+                            candidateWorkoutIDs: Set(candidates.keys),
+                            deletedWorkoutIDs: deletedWorkoutIDs
+                        )
 
                     let changedWorkoutIDs = Set(workoutChanges.workouts.map(\.uuid))
                     let recentCutoff = Calendar.current.date(
@@ -235,7 +256,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                         continuation.yield(WorkoutRouteBatch(
                             routes: [],
                             deletedWorkoutIDs: workoutChanges.deletedIDs,
-                            routeInvalidatedWorkoutIDs: [],
+                            routeInvalidatedWorkoutIDs: unresolvedRouteInvalidations,
                             processedWorkouts: [],
                             checkpoint: try HealthImportCursorCodec.encode(cursor),
                             completedCount: 0,
@@ -259,11 +280,19 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                         let routeWasInvalidated = loaded.route == nil
                             && (routeAffectedWorkoutIDs.contains(workout.uuid)
                                 || requiresFullRouteReconciliation)
+                        var invalidatedWorkoutIDs = routeWasInvalidated
+                            ? Set([workout.uuid])
+                            : Set<UUID>()
+                        if index == 0 {
+                            invalidatedWorkoutIDs.formUnion(unresolvedRouteInvalidations)
+                        }
                         let isLast = index == workouts.count - 1
                         continuation.yield(WorkoutRouteBatch(
                             routes: loaded.route.map { [$0] } ?? [],
                             deletedWorkoutIDs: index == 0 ? workoutChanges.deletedIDs : [],
-                            routeInvalidatedWorkoutIDs: routeWasInvalidated ? [workout.uuid] : [],
+                            routeInvalidatedWorkoutIDs: invalidatedWorkoutIDs.sorted {
+                                $0.uuidString < $1.uuidString
+                            },
                             processedWorkouts: [.init(id: workout.uuid, end: workout.endDate)],
                             checkpoint: isLast ? try HealthImportCursorCodec.encode(cursor) : nil,
                             completedCount: index + 1,

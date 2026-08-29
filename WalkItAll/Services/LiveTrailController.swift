@@ -220,6 +220,25 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         renderRevision &+= 1
         await persistenceTask?.value
         persistenceTask = nil
+
+        // Commit the terminal state before compaction. If the app is killed
+        // during the heavier processing below, recovery must never resurrect
+        // an explicitly finished session and restart background location.
+        var terminalSnapshotPersisted = false
+        do {
+            try await repository.save(finishingSnapshot)
+            terminalSnapshotPersisted = true
+        } catch {
+            logger.error("Temporary trail terminal checkpoint failed: \(error.localizedDescription, privacy: .private)")
+            // Removing the stale active/paused checkpoint is safer than
+            // allowing a later launch to resume location after Finish.
+            do {
+                try await repository.delete()
+            } catch {
+                logger.error("Stale temporary trail cleanup failed: \(error.localizedDescription, privacy: .private)")
+            }
+        }
+
         let processor = processor
         let pending = await Task.detached(priority: .userInitiated) {
             processor.finishing(session, at: effectiveEnd)
@@ -230,7 +249,9 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             try await repository.save(pending)
         } catch {
             logger.error("Temporary trail finish save failed: \(error.localizedDescription, privacy: .private)")
-            issueMessage = "Live Trail stopped, but its temporary route could not be saved."
+            if !terminalSnapshotPersisted {
+                issueMessage = "Live Trail stopped, but its temporary route could not be saved. Your Apple Health workout is unaffected."
+            }
         }
         onDidFinish?()
     }
