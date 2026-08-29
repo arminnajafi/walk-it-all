@@ -506,7 +506,7 @@ final class WalkItAllTests: XCTestCase {
         let controller = LiveTrailController(repository: repository)
 
         await controller.bootstrap(now: now)
-        try await repository.save(LiveTrailSession(
+        await repository.save(LiveTrailSession(
             state: .waitingForHealth,
             start: now.addingTimeInterval(-300),
             end: now,
@@ -588,7 +588,7 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(authorizationCount, 0)
     }
 
-    func testLifetimeOverlayContainsEveryValidPartAndWorldwideBounds() {
+    func testLifetimeSnapshotContainsEveryValidPartAndWorldwideBounds() {
         let records = [
             WorkoutRouteRecord(
                 id: UUID(), start: .now, end: .now, sourceName: "NYC",
@@ -606,19 +606,19 @@ final class WalkItAllTests: XCTestCase {
             ),
         ]
 
-        let overlay = LifetimeRouteOverlay(records: records)
-        let world = MKMapRect.world
+        let snapshot = LifetimeRouteSnapshot(records: records)
 
-        XCTAssertEqual(overlay.polylineCount, 2)
-        XCTAssertEqual(overlay.polylines(intersecting: world).count, 2)
-        XCTAssertGreaterThan(MKCoordinateRegion(overlay.boundingMapRect).span.longitudeDelta, 70)
-        XCTAssertTrue(LifetimeRouteRenderer.usesDensityPass)
+        XCTAssertEqual(snapshot.overlays.count, 2)
+        XCTAssertEqual(snapshot.polylineCount, 2)
+        XCTAssertGreaterThan(MKCoordinateRegion(snapshot.boundingMapRect).span.longitudeDelta, 70)
+        XCTAssertTrue(LifetimeRouteRenderer.usesNativeSpatialCulling)
+        XCTAssertLessThan(LifetimeRouteRenderer.strokeAlpha, 1)
     }
 
-    func testLifetimeOverlaySpatialQueryClipsToVisibleRectangle() throws {
+    func testLifetimeSnapshotKeepsWorkoutBoundsSeparateForNativeCulling() throws {
         let nyc = record(id: UUID(), latitude: 40.75)
         let london = record(id: UUID(), latitude: 51.5, longitude: -0.15)
-        let overlay = LifetimeRouteOverlay(records: [nyc, london])
+        let snapshot = LifetimeRouteSnapshot(records: [nyc, london])
         let bounds = try XCTUnwrap(nyc.geographicBounds)
         let northWest = MKMapPoint(CLLocationCoordinate2D(
             latitude: bounds.maximumLatitude + 0.01,
@@ -633,11 +633,11 @@ final class WalkItAllTests: XCTestCase {
             width: abs(southEast.x - northWest.x), height: abs(southEast.y - northWest.y)
         )
 
-        XCTAssertEqual(overlay.polylines(intersecting: rect).count, 1)
+        XCTAssertEqual(snapshot.overlays.filter { $0.boundingMapRect.intersects(rect) }.count, 1)
         XCTAssertGreaterThan(LifetimeRouteStyle.selectedCasingWidth, LifetimeRouteStyle.selectedRouteWidth)
     }
 
-    func testLifetimeOverlayBoundsPathologicalLongPartWithoutExpandingEveryGridCell() {
+    func testLifetimeSnapshotAcceptsAPathologicalLongPartWithoutBuildingAGrid() {
         let record = WorkoutRouteRecord(
             id: UUID(),
             start: .now,
@@ -649,10 +649,27 @@ final class WalkItAllTests: XCTestCase {
             ]]
         )
 
-        let overlay = LifetimeRouteOverlay(records: [record])
+        let snapshot = LifetimeRouteSnapshot(records: [record])
 
-        XCTAssertEqual(overlay.polylineCount, 1)
-        XCTAssertEqual(overlay.polylines(intersecting: .world).count, 1)
+        XCTAssertEqual(snapshot.overlays.count, 1)
+        XCTAssertEqual(snapshot.polylineCount, 1)
+        XCTAssertTrue(snapshot.overlays[0].boundingMapRect.intersects(.world))
+    }
+
+    func testLifetimeSnapshotBuildsLargeHistoryAsIndependentlyBoundedOverlays() {
+        let records = (0 ..< 1_500).map { index in
+            record(
+                id: UUID(),
+                latitude: 40.60 + Double(index % 300) * 0.001,
+                longitude: -74.05 + Double(index % 200) * 0.001
+            )
+        }
+
+        let snapshot = LifetimeRouteSnapshot(records: records)
+
+        XCTAssertEqual(snapshot.overlays.count, 1_500)
+        XCTAssertEqual(snapshot.polylineCount, 1_500)
+        XCTAssertTrue(snapshot.overlays.allSatisfy { !$0.boundingMapRect.isNull })
     }
 
     @MainActor

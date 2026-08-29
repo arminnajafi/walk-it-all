@@ -130,18 +130,18 @@ struct LifetimeMapView: UIViewRepresentable {
             routeSignature = nextSignature
             overlayTask?.cancel()
             mapView.removeOverlays(mapView.overlays.filter {
-                $0 is LifetimeRouteOverlay
+                $0 is LifetimeWorkoutRouteOverlay
                     || $0 is SelectedRouteCasingPolyline
                     || $0 is SelectedRoutePolyline
             })
 
             overlayTask = Task.detached(priority: .userInitiated) { [weak self, weak mapView] in
-                let overlay = LifetimeRouteOverlay(records: records)
+                let snapshot = LifetimeRouteSnapshot(records: records)
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     guard let self, let mapView, self.routeSignature == nextSignature else { return }
-                    if overlay.polylineCount > 0 {
-                        mapView.addOverlay(overlay, level: .aboveRoads)
+                    if !snapshot.overlays.isEmpty {
+                        mapView.addOverlays(snapshot.overlays, level: .aboveRoads)
                     }
                     if let selectedWorkout {
                         self.addSelection(selectedWorkout, to: mapView)
@@ -164,8 +164,8 @@ struct LifetimeMapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            if overlay is LifetimeRouteOverlay {
-                return LifetimeRouteRenderer(overlay: overlay)
+            if let history = overlay as? LifetimeWorkoutRouteOverlay {
+                return LifetimeRouteRenderer.make(overlay: history)
             }
             if let casing = overlay as? SelectedRouteCasingPolyline {
                 let renderer = MKPolylineRenderer(polyline: casing)

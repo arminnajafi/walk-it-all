@@ -61,8 +61,8 @@ The file and directory use complete-until-first-user-authentication protection a
 
 ## Map rendering
 
-`LifetimeRouteOverlay` is an immutable snapshot with a fixed-grid spatial lookup. `LifetimeRouteRenderer` queries only polylines intersecting MapKit’s requested rectangle, clips drawing to that rectangle, and performs no mutation while concurrent tiles render.
+`LifetimeRouteSnapshot` is built immutably away from the main actor and contains one native `MKMultiPolyline` overlay per workout. Each overlay has tight local bounds, so MapKit performs its own viewport culling and does not treat worldwide history as one enormous drawing surface. This also avoids maintaining a parallel custom spatial index and renderer.
 
-All visible parts receive a baseline indigo stroke. A low-opacity per-route pass lets repeat walks deepen naturally. Selected workout parts use an orange stroke with a contrasting casing. Active and paused Live Trail parts use solid green with a casing; waiting parts use dashed green with the same non-color distinction. The standard MapKit user-location annotation remains the blue position indicator.
+Every workout receives a translucent indigo stroke, so a single route remains legible while repeated walks deepen naturally through normal alpha compositing. Selected workout parts use an orange stroke with a contrasting casing. Active and paused Live Trail parts use solid green with a casing; waiting parts use dashed green with the same non-color distinction. The standard MapKit user-location annotation remains the blue position indicator.
 
 Historical overlay construction and Health route processing run away from the main actor; the app replaces a complete history overlay after import completion, cancellation, or failure rather than rebuilding per workout. The temporary overlay has an independent revision and is updated at a bounded cadence, preserving the history snapshot and map interaction performance.

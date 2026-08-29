@@ -8,7 +8,7 @@ The verification script must pass:
 - Health cursor migration and route-association tests;
 - repository replacement, deletion, reset, corruption recovery, locked-data deferral, external-support-tree protection, cursor, ledger, and timestamp round trips;
 - synchronization addition, invalidation, deletion, cancellation, generation, and refresh-throttle tests;
-- overlay completeness, worldwide bounds, spatial clipping, repeat pass, and selection viewport tests;
+- overlay completeness, worldwide bounds, native spatial culling, repeat opacity, and selection viewport tests;
 - Live Trail filtering, pre-session/stale-location rejection, discontinuities, Pause/Resume separation, final Finish, Health association, exact-file persistence, structural corruption, idempotent locked relaunch ordering, replacement, and expiry tests;
 - onboarding, empty state, restrained populated map, Live Trail explanation, paused and finished states, details, Health help, history, privacy, and Dynamic Type UI tests.
 
