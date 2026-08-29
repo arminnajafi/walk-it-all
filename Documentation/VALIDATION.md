@@ -55,6 +55,6 @@ Verified on August 29, 2026:
 - a 15-second real-device Time Profiler recording reported no hangs or hang-risk events above its 250-millisecond threshold;
 - a symbolicated 25-second simulator map-pan trace spent 23.887 seconds idle and 1.086 seconds active on the main thread; MapKit and Metal dominated the active samples and no first-party hot path appeared;
 - Live Trail compaction runs away from the main actor, Pause/Resume cannot bridge a gap, temporary map revisions are rate-limited, and history overlays remain immutable;
-- the signed Release build containing the recovery, privacy, Live Trail, location-background-mode, and prompt-map-launch changes is installed and launches on the connected iPhone. The August 29 audit refinements passed simulator and Release gates; installing that exact revision requires the connected iPhone to be unlocked.
+- the signed Release build containing the August 29 recovery, privacy, Live Trail, location-background-mode, prompt-map-launch, and audit refinements is installed on the connected iPhone. Opening that exact build for its final device-launch check requires the iPhone to be unlocked.
 
 The remaining field checks require physical movement or elapsed time: a locked-phone Live Trail walk including Pause/Resume, Health replacement after ending the Watch workout, two-hour battery profiling, and destructive reinstall/recovery checks. They remain explicit personal-device acceptance work rather than claims made from simulator evidence.
