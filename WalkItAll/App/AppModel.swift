@@ -597,11 +597,13 @@ final class AppModel {
                 sourceName: "Apple Watch",
                 activityKind: .cycling,
                 routeParts: [[
-                    GeoCoordinate(latitude: 40.7040, longitude: -74.0180),
-                    GeoCoordinate(latitude: 40.7280, longitude: -74.0120),
-                    GeoCoordinate(latitude: 40.7600, longitude: -74.0100),
-                    GeoCoordinate(latitude: 40.8030, longitude: -73.9710),
-                    GeoCoordinate(latitude: 40.8500, longitude: -73.9360),
+                    GeoCoordinate(latitude: 40.7681, longitude: -73.9819),
+                    GeoCoordinate(latitude: 40.7798, longitude: -73.9740),
+                    GeoCoordinate(latitude: 40.8007, longitude: -73.9580),
+                    GeoCoordinate(latitude: 40.7968, longitude: -73.9494),
+                    GeoCoordinate(latitude: 40.7820, longitude: -73.9585),
+                    GeoCoordinate(latitude: 40.7644, longitude: -73.9738),
+                    GeoCoordinate(latitude: 40.7681, longitude: -73.9819),
                 ]]
             ),
             WorkoutRouteRecord(
@@ -611,11 +613,12 @@ final class AppModel {
                 sourceName: "Apple Watch",
                 activityKind: .running,
                 routeParts: [[
-                    GeoCoordinate(latitude: 40.7040, longitude: -74.0090),
-                    GeoCoordinate(latitude: 40.7180, longitude: -73.9970),
-                    GeoCoordinate(latitude: 40.7350, longitude: -73.9740),
-                    GeoCoordinate(latitude: 40.7560, longitude: -73.9580),
-                    GeoCoordinate(latitude: 40.7870, longitude: -73.9380),
+                    GeoCoordinate(latitude: 40.7307, longitude: -73.9825),
+                    GeoCoordinate(latitude: 40.7415, longitude: -73.9749),
+                    GeoCoordinate(latitude: 40.7539, longitude: -73.9661),
+                    GeoCoordinate(latitude: 40.7675, longitude: -73.9566),
+                    GeoCoordinate(latitude: 40.7804, longitude: -73.9474),
+                    GeoCoordinate(latitude: 40.7920, longitude: -73.9388),
                 ]]
             ),
             WorkoutRouteRecord(
@@ -624,12 +627,14 @@ final class AppModel {
                 end: start.addingTimeInterval(-255_600),
                 sourceName: "Apple Watch",
                 routeParts: [[
-                    GeoCoordinate(latitude: 40.7060, longitude: -74.0110),
-                    GeoCoordinate(latitude: 40.7210, longitude: -74.0040),
-                    GeoCoordinate(latitude: 40.7420, longitude: -73.9890),
-                    GeoCoordinate(latitude: 40.7580, longitude: -73.9850),
-                    GeoCoordinate(latitude: 40.7800, longitude: -73.9810),
-                    GeoCoordinate(latitude: 40.8090, longitude: -73.9540),
+                    GeoCoordinate(latitude: 40.7075, longitude: -74.0110),
+                    GeoCoordinate(latitude: 40.7198, longitude: -74.0065),
+                    GeoCoordinate(latitude: 40.7296, longitude: -73.9995),
+                    GeoCoordinate(latitude: 40.7405, longitude: -73.9907),
+                    GeoCoordinate(latitude: 40.7527, longitude: -73.9870),
+                    GeoCoordinate(latitude: 40.7681, longitude: -73.9819),
+                    GeoCoordinate(latitude: 40.7896, longitude: -73.9742),
+                    GeoCoordinate(latitude: 40.8092, longitude: -73.9534),
                 ]]
             ),
             WorkoutRouteRecord(
@@ -639,12 +644,13 @@ final class AppModel {
                 sourceName: "iPhone",
                 activityKind: .hiking,
                 routeParts: [[
-                    GeoCoordinate(latitude: 40.7680, longitude: -73.9819),
+                    GeoCoordinate(latitude: 40.7681, longitude: -73.9819),
                     GeoCoordinate(latitude: 40.7810, longitude: -73.9738),
-                    GeoCoordinate(latitude: 40.7980, longitude: -73.9495),
-                    GeoCoordinate(latitude: 40.7920, longitude: -73.9460),
-                    GeoCoordinate(latitude: 40.7740, longitude: -73.9720),
-                    GeoCoordinate(latitude: 40.7680, longitude: -73.9819),
+                    GeoCoordinate(latitude: 40.8007, longitude: -73.9580),
+                    GeoCoordinate(latitude: 40.7968, longitude: -73.9494),
+                    GeoCoordinate(latitude: 40.7820, longitude: -73.9585),
+                    GeoCoordinate(latitude: 40.7644, longitude: -73.9738),
+                    GeoCoordinate(latitude: 40.7681, longitude: -73.9819),
                 ]]
             ),
             WorkoutRouteRecord(
@@ -653,8 +659,8 @@ final class AppModel {
                 end: start.addingTimeInterval(-430_200),
                 sourceName: "Apple Watch",
                 routeParts: [[
-                    GeoCoordinate(latitude: 40.7390, longitude: -74.0090),
-                    GeoCoordinate(latitude: 40.7350, longitude: -73.9740),
+                    GeoCoordinate(latitude: 40.7410, longitude: -74.0065),
+                    GeoCoordinate(latitude: 40.7305, longitude: -73.9738),
                 ]]
             ),
             WorkoutRouteRecord(
@@ -663,8 +669,8 @@ final class AppModel {
                 end: start.addingTimeInterval(-516_600),
                 sourceName: "Apple Watch",
                 routeParts: [[
-                    GeoCoordinate(latitude: 40.7550, longitude: -74.0040),
-                    GeoCoordinate(latitude: 40.7440, longitude: -73.9720),
+                    GeoCoordinate(latitude: 40.7562, longitude: -74.0018),
+                    GeoCoordinate(latitude: 40.7430, longitude: -73.9716),
                 ]]
             ),
             WorkoutRouteRecord(
@@ -673,7 +679,7 @@ final class AppModel {
                 end: start.addingTimeInterval(-603_000),
                 sourceName: "Apple Watch",
                 routeParts: [[
-                    GeoCoordinate(latitude: 40.7710, longitude: -73.9940),
+                    GeoCoordinate(latitude: 40.7681, longitude: -73.9819),
                     GeoCoordinate(latitude: 40.7580, longitude: -73.9590),
                 ]]
             ),
@@ -683,8 +689,8 @@ final class AppModel {
                 end: start.addingTimeInterval(-689_400),
                 sourceName: "Apple Watch",
                 routeParts: [[
-                    GeoCoordinate(latitude: 40.7900, longitude: -73.9780),
-                    GeoCoordinate(latitude: 40.7760, longitude: -73.9470),
+                    GeoCoordinate(latitude: 40.7870, longitude: -73.9765),
+                    GeoCoordinate(latitude: 40.7772, longitude: -73.9470),
                 ]]
             ),
             WorkoutRouteRecord(
@@ -693,8 +699,8 @@ final class AppModel {
                 end: start.addingTimeInterval(-775_800),
                 sourceName: "Apple Watch",
                 routeParts: [[
-                    GeoCoordinate(latitude: 40.8040, longitude: -73.9650),
-                    GeoCoordinate(latitude: 40.7910, longitude: -73.9340),
+                    GeoCoordinate(latitude: 40.8008, longitude: -73.9580),
+                    GeoCoordinate(latitude: 40.7952, longitude: -73.9441),
                 ]]
             ),
         ]

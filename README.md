@@ -65,6 +65,37 @@ Recent workouts are safely rechecked because Apple Health may deliver or replace
 
 Walk It All is a personal MVP, not currently distributed through the App Store or TestFlight. The repository is public so the product, privacy model, and implementation can be reviewed and shared. Installing it currently requires building it with Xcode and signing it with your own Apple development team.
 
+## Install on your own iPhone with a coding agent
+
+Because Walk It All is unpublished, this GitHub repository is source code—not a one-tap installation link. Codex or Claude Code can automate most of a personal installation on a Mac, but Apple still requires the iPhone owner to sign in to Xcode with their own Apple Account, trust the Mac, enable Developer Mode, and approve permissions on the phone.
+
+With a free Xcode Personal Team, Apple currently allows up to 10 App IDs, 3 test devices per platform, and 3 apps per device. These registrations and the provisioning profile expire after 7 days, so the app must be rebuilt and reinstalled periodically. The three-device allowance belongs to each Apple Account: friends who sign their own clone with their own Personal Team do **not** use your three-device allowance. See Apple’s [Personal Team limits](https://developer.apple.com/help/account/basics/about-your-developer-account).
+
+<details>
+<summary><strong>Copy this prompt into Codex or Claude Code</strong></summary>
+
+```text
+Help me install Walk It All on my own iPhone for personal use.
+
+Repository: https://github.com/arminnajafi/walk-it-all
+
+Please:
+1. Clone the repository into a sensible local Projects folder and read its README before changing anything.
+2. Confirm that the current full Xcode and XcodeGen are installed. Install only XcodeGen if needed; do not install or download a different Xcode or iOS runtime without asking me.
+3. Explain the manual Apple steps when they become necessary: signing in to Xcode with my Apple Account, choosing my Personal Team, connecting and trusting my iPhone, and enabling Developer Mode.
+4. Do not use the repository owner’s signing team or bundle identifier. Ask me for a unique reverse-DNS bundle identifier, then update DEVELOPMENT_TEAM and PRODUCT_BUNDLE_IDENTIFIER only in my local clone. Keep the same values for later reinstalls so updates preserve the app’s local data.
+5. Regenerate the Xcode project, run ./Scripts/verify.sh, and resolve any build issue without weakening privacy or removing tests.
+6. Build, sign, install, and launch the app on my iPhone using supported Xcode device tooling and automatic signing. Do not erase or uninstall an existing Walk It All app unless I explicitly approve it.
+7. Guide me through read-only Apple Health access and optional When-In-Use location access. Never export, upload, print, or commit Health routes, coordinates, device identifiers, or signing credentials.
+8. Tell me clearly if a step must be completed by me on the Mac or iPhone. Do not claim success until the app launches on the phone.
+
+This app is not on the App Store or TestFlight. If I use a free Personal Team, remind me that its provisioning expires after 7 days and that I will need to rebuild and reinstall with the same team and bundle identifier.
+```
+
+</details>
+
+For genuinely easy sharing, the cleaner next step is the paid Apple Developer Program and TestFlight. Membership is currently [US$99 per year](https://developer.apple.com/programs/whats-included/); [TestFlight builds](https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview) remain available for up to 90 days and external testing may require beta review. That is not necessary for personal use or source review.
+
 ## Build and verify
 
 Requirements:
