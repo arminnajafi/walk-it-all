@@ -703,7 +703,10 @@ final class WalkItAllTests: XCTestCase {
         model.rebuildFromHealth()
         try await Task.sleep(for: .milliseconds(30))
 
-        XCTAssertTrue(model.liveTrail.isActive)
+        XCTAssertTrue(
+            model.liveTrail.hasInProgressSession,
+            "A recovered active trail may safely pause if simulator location delivery is unavailable"
+        )
         let authorizationCount = await source.authorizationRequestCount()
         XCTAssertEqual(authorizationCount, 0)
     }
