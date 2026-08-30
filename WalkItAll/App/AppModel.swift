@@ -26,12 +26,13 @@ enum AppLaunchState: Equatable {
 enum MapViewportTarget: Equatable, Sendable {
     case manhattan
     case workout(UUID)
-    case userLocation
+    case userLocation(MapUserTrackingMode)
 }
 
 enum MapUserTrackingMode: Equatable, Sendable {
     case free
     case follow
+    case followWithHeading
 }
 
 struct MapViewportCommand: Equatable, Sendable {
@@ -251,19 +252,27 @@ final class AppModel {
     }
 
     func showUserLocation() {
-        followUserLocation()
+        liveTrail.requestCurrentLocation()
+        let mode: MapUserTrackingMode = mapUserTrackingMode == .follow
+            ? .followWithHeading
+            : .follow
+        requestUserTracking(mode)
     }
 
     func mapUserTrackingDidChange(_ mode: MapUserTrackingMode) {
         mapUserTrackingMode = mode
     }
 
-    private func followUserLocation() {
+    private func followUserHeading() {
         liveTrail.requestCurrentLocation()
-        mapUserTrackingMode = .follow
+        requestUserTracking(.followWithHeading)
+    }
+
+    private func requestUserTracking(_ mode: MapUserTrackingMode) {
+        mapUserTrackingMode = mode
         mapViewportCommand = MapViewportCommand(
             revision: mapViewportCommand.revision &+ 1,
-            target: .userLocation
+            target: .userLocation(mode)
         )
     }
 
@@ -301,7 +310,7 @@ final class AppModel {
 
     func resumeLiveTrail() {
         liveTrail.resume()
-        followUserLocation()
+        followUserHeading()
     }
 
     func clearLiveTrail() {
@@ -315,14 +324,14 @@ final class AppModel {
         Task { [weak self] in
             guard let self else { return }
             await liveTrail.startNew()
-            followUserLocation()
+            followUserHeading()
         }
     }
 
     private func startLiveTrail() {
         selectedWorkoutID = nil
         liveTrail.start()
-        followUserLocation()
+        followUserHeading()
     }
 
     private func beginAuthorizedImport(resetFirst: Bool, isAutomatic: Bool) {

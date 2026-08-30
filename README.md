@@ -11,7 +11,7 @@ Walk It All is a private iPhone app that turns outdoor walking, hiking, running,
 - Conservative filtering of inaccurate locations, GPS gaps, large jumps, and implausible speeds
 - Smooth Apple Maps rendering with subtle deepening where routes repeat
 - One optional temporary Live Trail with Start, Pause, Resume, Finish, Start New, and Clear
-- Native position and compass plus a direction fan that does not rotate the map
+- Native MapKit north-up and heading-up position following
 - Incremental foreground refresh, including Health route replacements and deletions
 - Protected, backup-excluded SwiftData cache rebuilt from Apple Health
 - No passive tracking, account, backend, analytics, advertising, CloudKit, or route upload

@@ -21,7 +21,7 @@ The separate temporary Live Trail file contains only the current active, paused,
 
 Coordinates and Health identifiers must never appear in logs. Private device evidence belongs only under the ignored `LocalRouteFixtures/` directory.
 
-Compass heading used by the direction fan is ephemeral: it is neither persisted nor logged. Heading updates run only while the map is visible and the user-location indicator is enabled.
+MapKit handles the standard position and heading presentation under the same When In Use location authorization. Walk It All neither persists nor logs heading.
 
 ## Protection
 

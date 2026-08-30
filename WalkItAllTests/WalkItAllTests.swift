@@ -2,7 +2,6 @@ import XCTest
 import SwiftData
 @preconcurrency import HealthKit
 import MapKit
-import UIKit
 import WalkItAllCore
 @testable import WalkItAll
 
@@ -778,7 +777,6 @@ final class WalkItAllTests: XCTestCase {
             liveTrailSession: nil,
             liveTrailRevision: 0,
             showsUserLocation: false,
-            appIsActive: true,
             viewportCommand: viewport,
             bottomInset: 100,
             onUserTrackingModeChange: { _ in },
@@ -803,7 +801,6 @@ final class WalkItAllTests: XCTestCase {
             liveTrailSession: nil,
             liveTrailRevision: 0,
             showsUserLocation: false,
-            appIsActive: true,
             viewportCommand: MapViewportCommand(revision: 1, target: .workout(workout.id)),
             bottomInset: 100,
             onUserTrackingModeChange: { _ in },
@@ -1011,7 +1008,7 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
-    func testLocationButtonRecentersWithoutEnablingHeadingFollow() async {
+    func testLocationButtonCyclesNativeNorthUpAndHeadingFollow() async {
         let model = makeModel(
             source: TestRouteSource(batches: []),
             repository: TestHistoryRepository()
@@ -1020,76 +1017,21 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(model.mapUserTrackingMode, .free)
         model.showUserLocation()
         XCTAssertEqual(model.mapUserTrackingMode, .follow)
-        XCTAssertEqual(model.mapViewportCommand.target, .userLocation)
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.follow))
 
         let firstRevision = model.mapViewportCommand.revision
         model.mapUserTrackingDidChange(.follow)
         model.showUserLocation()
-        XCTAssertEqual(model.mapUserTrackingMode, .follow)
-        XCTAssertEqual(model.mapViewportCommand.target, .userLocation)
+        XCTAssertEqual(model.mapUserTrackingMode, .followWithHeading)
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.followWithHeading))
         XCTAssertGreaterThan(model.mapViewportCommand.revision, firstRevision)
+
+        model.showUserLocation()
+        XCTAssertEqual(model.mapUserTrackingMode, .follow)
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.follow))
 
         model.mapUserTrackingDidChange(.free)
         XCTAssertEqual(model.mapUserTrackingMode, .free)
-    }
-
-    func testHeadingConeRotatesIndependentlyFromMapCamera() {
-        XCTAssertEqual(
-            HeadingConeGeometry.rotationRadians(deviceHeading: 90, mapHeading: 0),
-            .pi / 2,
-            accuracy: 0.0001
-        )
-        XCTAssertEqual(
-            HeadingConeGeometry.rotationRadians(deviceHeading: 90, mapHeading: 30),
-            .pi / 3,
-            accuracy: 0.0001
-        )
-        XCTAssertEqual(
-            HeadingConeGeometry.rotationRadians(deviceHeading: 350, mapHeading: 0),
-            -.pi / 18,
-            accuracy: 0.0001
-        )
-    }
-
-    @MainActor
-    func testHeadingConeIsVisibleAndLeavesTheNativeDotUncovered() throws {
-        let annotation = HeadingConeAnnotation(
-            coordinate: CLLocationCoordinate2D(latitude: 40.783, longitude: -73.966)
-        )
-        let view = HeadingConeAnnotationView(
-            annotation: annotation,
-            reuseIdentifier: HeadingConeAnnotationView.reuseIdentifier
-        )
-        view.layoutIfNeeded()
-
-        XCTAssertEqual(view.bounds.size, HeadingConeAnnotationView.size)
-        XCTAssertEqual(view.zPriority, .max)
-        XCTAssertEqual(view.displayPriority, .required)
-
-        let width = Int(view.bounds.width)
-        let height = Int(view.bounds.height)
-        let bytesPerPixel = 4
-        var pixels = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        try pixels.withUnsafeMutableBytes { buffer in
-            let context = try XCTUnwrap(CGContext(
-                data: buffer.baseAddress,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: width * bytesPerPixel,
-                space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            ))
-            view.layer.render(in: context)
-        }
-
-        let alphaValues = stride(from: 3, to: pixels.count, by: bytesPerPixel).map { pixels[$0] }
-        XCTAssertGreaterThan(alphaValues.filter { $0 > 0 }.count, 250)
-        XCTAssertGreaterThan(alphaValues.max() ?? 0, 50)
-
-        let centerOffset = ((height / 2) * width + width / 2) * bytesPerPixel + 3
-        XCTAssertEqual(pixels[centerOffset], 0)
     }
 
     @MainActor

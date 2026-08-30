@@ -1,4 +1,3 @@
-import CoreLocation
 import MapKit
 import SwiftUI
 import WalkItAllCore
@@ -15,7 +14,6 @@ struct LifetimeMapView: UIViewRepresentable {
     let liveTrailSession: LiveTrailSession?
     let liveTrailRevision: Int
     let showsUserLocation: Bool
-    let appIsActive: Bool
     let viewportCommand: MapViewportCommand
     let mapOrnamentBottomInset: CGFloat
     let onUserTrackingModeChange: (MapUserTrackingMode) -> Void
@@ -44,7 +42,6 @@ struct LifetimeMapView: UIViewRepresentable {
             liveTrailSession: liveTrailSession,
             liveTrailRevision: liveTrailRevision,
             showsUserLocation: showsUserLocation,
-            appIsActive: appIsActive,
             viewportCommand: viewportCommand,
             bottomInset: mapOrnamentBottomInset,
             onUserTrackingModeChange: onUserTrackingModeChange,
@@ -62,7 +59,6 @@ struct LifetimeMapView: UIViewRepresentable {
             liveTrailSession: liveTrailSession,
             liveTrailRevision: liveTrailRevision,
             showsUserLocation: showsUserLocation,
-            appIsActive: appIsActive,
             viewportCommand: viewportCommand,
             bottomInset: mapOrnamentBottomInset,
             onUserTrackingModeChange: onUserTrackingModeChange,
@@ -71,7 +67,7 @@ struct LifetimeMapView: UIViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, MKMapViewDelegate, @preconcurrency CLLocationManagerDelegate {
+    final class Coordinator: NSObject, MKMapViewDelegate {
         private var historyRevision: Int?
         private var selectedWorkoutID: UUID?
         private var liveTrailSignature: LiveTrailSignature?
@@ -84,18 +80,6 @@ struct LifetimeMapView: UIViewRepresentable {
         private var onUserTrackingModeChange: ((MapUserTrackingMode) -> Void)?
         private var overlayTask: Task<Void, Never>?
         private var viewportTask: Task<Void, Never>?
-        private let headingManager = CLLocationManager()
-        private weak var headingMapView: MKMapView?
-        private var headingConeAnnotation: HeadingConeAnnotation?
-        private var currentDeviceHeading: CLLocationDirection?
-        private var shouldShowHeading = false
-        private var isUpdatingHeading = false
-
-        override init() {
-            super.init()
-            headingManager.delegate = self
-            headingManager.headingFilter = 2
-        }
 
         deinit {
             overlayTask?.cancel()
@@ -110,17 +94,13 @@ struct LifetimeMapView: UIViewRepresentable {
             liveTrailSession: LiveTrailSession?,
             liveTrailRevision: Int,
             showsUserLocation: Bool,
-            appIsActive: Bool,
             viewportCommand: MapViewportCommand,
             bottomInset: CGFloat,
             onUserTrackingModeChange: @escaping (MapUserTrackingMode) -> Void,
             initial: Bool
         ) {
             self.onUserTrackingModeChange = onUserTrackingModeChange
-            headingMapView = mapView
-            shouldShowHeading = showsUserLocation && appIsActive
             mapView.showsUserLocation = showsUserLocation
-            updateHeadingDelivery(for: mapView)
             mapView.layoutMargins = UIEdgeInsets(
                 top: 92,
                 left: 16,
@@ -187,7 +167,6 @@ struct LifetimeMapView: UIViewRepresentable {
         }
 
         func mapViewDidLayout(_ mapView: MKMapView) {
-            updateHeadingDelivery(for: mapView)
             guard viewportRevision != pendingViewport.revision
                 || appliedBottomInset.map({ abs($0 - pendingBottomInset) > 1 }) ?? true
             else { return }
@@ -237,26 +216,7 @@ struct LifetimeMapView: UIViewRepresentable {
             return MKOverlayRenderer(overlay: overlay)
         }
 
-        func mapView(_ mapView: MKMapView, viewFor annotation: any MKAnnotation) -> MKAnnotationView? {
-            guard annotation is HeadingConeAnnotation else { return nil }
-            let view = mapView.dequeueReusableAnnotationView(
-                withIdentifier: HeadingConeAnnotationView.reuseIdentifier
-            ) as? HeadingConeAnnotationView ?? HeadingConeAnnotationView(
-                annotation: annotation,
-                reuseIdentifier: HeadingConeAnnotationView.reuseIdentifier
-            )
-            view.annotation = annotation
-            if let currentDeviceHeading {
-                view.update(
-                    deviceHeading: currentDeviceHeading,
-                    mapHeading: mapView.camera.heading
-                )
-            }
-            return view
-        }
-
         func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
-            updateHeadingCone(on: mapView)
             guard case .userLocation = pendingViewport.target,
                   viewportRevision != pendingViewport.revision,
                   userLocation.location != nil
@@ -276,26 +236,10 @@ struct LifetimeMapView: UIViewRepresentable {
             switch mode {
             case .none: translatedMode = .free
             case .follow: translatedMode = .follow
-            case .followWithHeading: translatedMode = .follow
+            case .followWithHeading: translatedMode = .followWithHeading
             @unknown default: translatedMode = .free
             }
             onUserTrackingModeChange?(translatedMode)
-        }
-
-        func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
-            updateHeadingConeRotation(on: mapView)
-        }
-
-        func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
-            guard newHeading.headingAccuracy >= 0 else { return }
-            let heading = newHeading.trueHeading >= 0
-                ? newHeading.trueHeading
-                : newHeading.magneticHeading
-            guard heading.isFinite else { return }
-            currentDeviceHeading = heading
-            if let headingMapView {
-                updateHeadingCone(on: headingMapView)
-            }
         }
 
         private func addSelection(_ workout: WorkoutRouteRecord, to mapView: MKMapView) {
@@ -372,11 +316,14 @@ struct LifetimeMapView: UIViewRepresentable {
                       let bounds = pendingSelection?.geographicBounds
                 else { return }
                 mapRect = Self.mapRect(for: bounds)
-            case .userLocation:
+            case let .userLocation(mode):
                 guard mapView.showsUserLocation,
                       mapView.userLocation.location != nil
                 else { return }
-                mapView.setUserTrackingMode(.follow, animated: animated)
+                let trackingMode: MKUserTrackingMode = mode == .followWithHeading
+                    ? .followWithHeading
+                    : .follow
+                mapView.setUserTrackingMode(trackingMode, animated: animated)
                 viewportRevision = pendingViewport.revision
                 appliedBottomInset = pendingBottomInset
                 return
@@ -388,75 +335,6 @@ struct LifetimeMapView: UIViewRepresentable {
             )
             viewportRevision = pendingViewport.revision
             appliedBottomInset = pendingBottomInset
-        }
-
-        private func updateHeadingDelivery(for mapView: MKMapView) {
-            headingManager.headingOrientation = Self.headingOrientation(for: mapView)
-            let shouldUpdate = shouldShowHeading
-                && mapView.window != nil
-                && CLLocationManager.headingAvailable()
-            if shouldUpdate, !isUpdatingHeading {
-                headingManager.startUpdatingHeading()
-                isUpdatingHeading = true
-            } else if !shouldUpdate, isUpdatingHeading {
-                headingManager.stopUpdatingHeading()
-                isUpdatingHeading = false
-            }
-            if !shouldShowHeading {
-                removeHeadingCone(from: mapView)
-            }
-        }
-
-        private func updateHeadingCone(on mapView: MKMapView) {
-            guard shouldShowHeading,
-                  let currentDeviceHeading,
-                  let location = mapView.userLocation.location
-            else {
-                removeHeadingCone(from: mapView)
-                return
-            }
-
-            let annotation: HeadingConeAnnotation
-            if let headingConeAnnotation {
-                annotation = headingConeAnnotation
-                annotation.coordinate = location.coordinate
-            } else {
-                annotation = HeadingConeAnnotation(coordinate: location.coordinate)
-                headingConeAnnotation = annotation
-                mapView.addAnnotation(annotation)
-            }
-            if let view = mapView.view(for: annotation) as? HeadingConeAnnotationView {
-                view.update(
-                    deviceHeading: currentDeviceHeading,
-                    mapHeading: mapView.camera.heading
-                )
-            }
-        }
-
-        private func updateHeadingConeRotation(on mapView: MKMapView) {
-            guard let currentDeviceHeading,
-                  let headingConeAnnotation,
-                  let view = mapView.view(for: headingConeAnnotation) as? HeadingConeAnnotationView
-            else { return }
-            view.update(
-                deviceHeading: currentDeviceHeading,
-                mapHeading: mapView.camera.heading
-            )
-        }
-
-        private func removeHeadingCone(from mapView: MKMapView) {
-            guard let headingConeAnnotation else { return }
-            mapView.removeAnnotation(headingConeAnnotation)
-            self.headingConeAnnotation = nil
-        }
-
-        private static func headingOrientation(for mapView: MKMapView) -> CLDeviceOrientation {
-            switch mapView.window?.windowScene?.interfaceOrientation {
-            case .portraitUpsideDown: .portraitUpsideDown
-            case .landscapeLeft: .landscapeLeft
-            case .landscapeRight: .landscapeRight
-            default: .portrait
-            }
         }
 
         private static let manhattanMapRect = mapRect(for: GeoBounds(

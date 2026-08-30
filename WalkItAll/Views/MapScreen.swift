@@ -3,7 +3,6 @@ import UIKit
 
 struct MapScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.scenePhase) private var scenePhase
     let model: AppModel
     @State private var showHealthWaitHelp = false
     @State private var confirmFinishLiveTrail = false
@@ -21,7 +20,6 @@ struct MapScreen: View {
                     liveTrailSession: model.liveTrail.session,
                     liveTrailRevision: model.liveTrail.renderRevision,
                     showsUserLocation: model.liveTrail.accessState.canShowLocation,
-                    appIsActive: scenePhase == .active,
                     viewportCommand: model.mapViewportCommand,
                     mapOrnamentBottomInset: bottomOverlayHeight
                         + geometry.safeAreaInsets.bottom
@@ -156,7 +154,7 @@ struct MapScreen: View {
                 .frame(width: 44, height: 44)
         }
         .accessibilityLabel(locationLabel)
-        .accessibilityHint("Requests location access if needed")
+        .accessibilityHint(locationHint)
         .accessibilityIdentifier("current-location")
     }
 
@@ -164,13 +162,23 @@ struct MapScreen: View {
         switch model.mapUserTrackingMode {
         case .free: "location"
         case .follow: "location.fill"
+        case .followWithHeading: "location.north.line.fill"
         }
     }
 
     private var locationLabel: String {
         switch model.mapUserTrackingMode {
-        case .free: "Show current location and direction"
-        case .follow: "Recenter current location"
+        case .free: "Follow current location"
+        case .follow: "Follow current location with heading"
+        case .followWithHeading: "Follow current location north up"
+        }
+    }
+
+    private var locationHint: String {
+        switch model.mapUserTrackingMode {
+        case .free: "Recenters north up and requests location access if needed"
+        case .follow: "Rotates the map to face the direction you are heading"
+        case .followWithHeading: "Returns to north-up position following"
         }
     }
 
