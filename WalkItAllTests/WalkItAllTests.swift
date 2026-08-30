@@ -488,6 +488,25 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
+    func testStartNewDoesNotDiscardFinishedTrailWhenLocationIsDenied() async throws {
+        let session = liveTrailSession(state: .finished)
+        let repository = TestLiveTrailRepository(session: session)
+        let locationManager = TestLocationManager(authorizationStatus: .denied)
+        let controller = LiveTrailController(
+            repository: repository,
+            locationManager: locationManager
+        )
+        await controller.bootstrap(now: session.end ?? session.lastUpdate)
+
+        await controller.startNew(now: session.lastUpdate.addingTimeInterval(1))
+
+        XCTAssertEqual(controller.session, session)
+        let stored = await repository.load()
+        XCTAssertEqual(stored, session)
+        XCTAssertNotNil(controller.issueMessage)
+    }
+
+    @MainActor
     func testRecoveredActiveTrailAutomaticallyFinishesAtTwelveHours() async throws {
         let start = Date().addingTimeInterval(-(13 * 60 * 60))
         let active = LiveTrailSession(
@@ -1195,6 +1214,19 @@ private final class FactoryInvocationProbe: @unchecked Sendable {
 
     func recordInvocation() {
         lock.withLock { count += 1 }
+    }
+}
+
+private final class TestLocationManager: CLLocationManager {
+    private let testAuthorizationStatus: CLAuthorizationStatus
+
+    init(authorizationStatus: CLAuthorizationStatus) {
+        testAuthorizationStatus = authorizationStatus
+        super.init()
+    }
+
+    override var authorizationStatus: CLAuthorizationStatus {
+        testAuthorizationStatus
     }
 }
 

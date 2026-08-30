@@ -37,6 +37,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     @ObservationIgnored private var timeoutTask: Task<Void, Never>?
     @ObservationIgnored private var backgroundSession: CLBackgroundActivitySession?
     @ObservationIgnored private var pendingStart = false
+    @ObservationIgnored private var pendingStartNew = false
     @ObservationIgnored private var pendingResume = false
     @ObservationIgnored private var requiresNewPart = true
     @ObservationIgnored private var acceptedSincePersistence = 0
@@ -251,6 +252,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     func clear() async {
         stopLocationDelivery()
         pendingStart = false
+        pendingStartNew = false
         pendingResume = false
         await persistenceTask?.value
         persistenceTask = nil
@@ -266,9 +268,20 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     }
 
     func startNew(now: Date = Date()) async {
-        await clear()
-        guard session == nil else { return }
-        start(now: now)
+        guard isFinished else { return }
+        pendingStartNew = true
+        switch accessState {
+        case .authorized:
+            beginNewSession(at: now)
+        case .notDetermined:
+            locationManager.requestWhenInUseAuthorization()
+        case .denied:
+            pendingStartNew = false
+            issueMessage = "Location access is off. Allow it in Settings to start a new Live Trail."
+        case .restricted:
+            pendingStartNew = false
+            issueMessage = "Location access is restricted on this iPhone."
+        }
     }
 
     func clearIssue() {
@@ -314,6 +327,21 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             }
             return
         }
+        if pendingStartNew {
+            switch accessState {
+            case .authorized:
+                beginNewSession(at: Date())
+            case .denied:
+                pendingStartNew = false
+                issueMessage = "Location access is off. Allow it in Settings to start a new Live Trail."
+            case .restricted:
+                pendingStartNew = false
+                issueMessage = "Location access is restricted on this iPhone."
+            case .notDetermined:
+                break
+            }
+            return
+        }
         guard pendingStart else { return }
         switch accessState {
         case .authorized:
@@ -331,6 +359,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
 
     private func beginNewSession(at date: Date) {
         pendingStart = false
+        pendingStartNew = false
         requiresNewPart = true
         acceptedSincePersistence = 0
         lastPersistenceDate = date
