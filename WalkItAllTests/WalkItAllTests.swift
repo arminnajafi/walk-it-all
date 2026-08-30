@@ -2,6 +2,7 @@ import XCTest
 import SwiftData
 @preconcurrency import HealthKit
 import MapKit
+import UIKit
 import WalkItAllCore
 @testable import WalkItAll
 
@@ -1048,6 +1049,47 @@ final class WalkItAllTests: XCTestCase {
             -.pi / 18,
             accuracy: 0.0001
         )
+    }
+
+    @MainActor
+    func testHeadingConeIsVisibleAndLeavesTheNativeDotUncovered() throws {
+        let annotation = HeadingConeAnnotation(
+            coordinate: CLLocationCoordinate2D(latitude: 40.783, longitude: -73.966)
+        )
+        let view = HeadingConeAnnotationView(
+            annotation: annotation,
+            reuseIdentifier: HeadingConeAnnotationView.reuseIdentifier
+        )
+        view.layoutIfNeeded()
+
+        XCTAssertEqual(view.bounds.size, HeadingConeAnnotationView.size)
+        XCTAssertEqual(view.zPriority, .max)
+        XCTAssertEqual(view.displayPriority, .required)
+
+        let width = Int(view.bounds.width)
+        let height = Int(view.bounds.height)
+        let bytesPerPixel = 4
+        var pixels = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        try pixels.withUnsafeMutableBytes { buffer in
+            let context = try XCTUnwrap(CGContext(
+                data: buffer.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width * bytesPerPixel,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            view.layer.render(in: context)
+        }
+
+        let alphaValues = stride(from: 3, to: pixels.count, by: bytesPerPixel).map { pixels[$0] }
+        XCTAssertGreaterThan(alphaValues.filter { $0 > 0 }.count, 250)
+        XCTAssertGreaterThan(alphaValues.max() ?? 0, 50)
+
+        let centerOffset = ((height / 2) * width + width / 2) * bytesPerPixel + 3
+        XCTAssertEqual(pixels[centerOffset], 0)
     }
 
     @MainActor

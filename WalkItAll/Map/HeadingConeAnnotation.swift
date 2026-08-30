@@ -26,7 +26,7 @@ final class HeadingConeAnnotation: NSObject, MKAnnotation {
 @MainActor
 final class HeadingConeAnnotationView: MKAnnotationView {
     static let reuseIdentifier = "walk-it-all-heading-cone"
-    static let size = CGSize(width: 120, height: 120)
+    static let size = CGSize(width: 112, height: 112)
 
     private let directionView = UIView(frame: CGRect(origin: .zero, size: size))
     private let gradientLayer = CAGradientLayer()
@@ -41,7 +41,11 @@ final class HeadingConeAnnotationView: MKAnnotationView {
         canShowCallout = false
         collisionMode = .none
         displayPriority = .required
-        zPriority = .min
+        // The fan is a separate annotation from MapKit's user-location dot.
+        // Keep it above map labels and the accuracy halo; the hollow center
+        // leaves the native blue dot fully visible.
+        zPriority = .max
+        selectedZPriority = .max
         accessibilityElementsHidden = true
 
         directionView.isUserInteractionEnabled = false
@@ -83,16 +87,29 @@ final class HeadingConeAnnotationView: MKAnnotationView {
         outlineLayer.frame = directionView.bounds
 
         let center = CGPoint(x: directionView.bounds.midX, y: directionView.bounds.midY)
-        let radius = min(directionView.bounds.width, directionView.bounds.height) / 2 - 5
-        let halfAngle = CGFloat.pi / 5
+        let outerRadius = min(directionView.bounds.width, directionView.bounds.height) / 2 - 4
+        let innerRadius: CGFloat = 11
+        let halfAngle = CGFloat.pi / 5.5
+        let startAngle = -.pi / 2 - halfAngle
+        let endAngle = -.pi / 2 + halfAngle
         let path = UIBezierPath()
-        path.move(to: center)
         path.addArc(
             withCenter: center,
-            radius: radius,
-            startAngle: -.pi / 2 - halfAngle,
-            endAngle: -.pi / 2 + halfAngle,
+            radius: outerRadius,
+            startAngle: startAngle,
+            endAngle: endAngle,
             clockwise: true
+        )
+        path.addLine(to: CGPoint(
+            x: center.x + cos(endAngle) * innerRadius,
+            y: center.y + sin(endAngle) * innerRadius
+        ))
+        path.addArc(
+            withCenter: center,
+            radius: innerRadius,
+            startAngle: endAngle,
+            endAngle: startAngle,
+            clockwise: false
         )
         path.close()
         maskLayer.path = path.cgPath
@@ -102,12 +119,12 @@ final class HeadingConeAnnotationView: MKAnnotationView {
 
     private func updateColors() {
         gradientLayer.colors = [
-            UIColor.systemBlue.withAlphaComponent(0.24).cgColor,
-            UIColor.systemBlue.withAlphaComponent(0.12).cgColor,
-            UIColor.systemBlue.withAlphaComponent(0.015).cgColor,
+            UIColor.systemBlue.withAlphaComponent(0.34).cgColor,
+            UIColor.systemBlue.withAlphaComponent(0.2).cgColor,
+            UIColor.systemBlue.withAlphaComponent(0.045).cgColor,
         ]
         outlineLayer.fillColor = UIColor.clear.cgColor
-        outlineLayer.strokeColor = UIColor.systemBlue.withAlphaComponent(0.12).cgColor
-        outlineLayer.lineWidth = 0.75
+        outlineLayer.strokeColor = UIColor.systemBlue.withAlphaComponent(0.22).cgColor
+        outlineLayer.lineWidth = 1
     }
 }
