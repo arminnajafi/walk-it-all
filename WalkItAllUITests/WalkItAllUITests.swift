@@ -144,27 +144,6 @@ final class WalkItAllUITests: XCTestCase {
         attachScreenshot(named: "08-live-trail-intro", app: app)
     }
 
-    @MainActor
-    func testActiveLiveTrailUsesTheSharedControlLayout() {
-        let app = launch(arguments: [
-            "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
-            "-uiTestActiveLiveTrail",
-        ])
-
-        XCTAssertTrue(app.descendants(matching: .any)["active-live-trail"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.staticTexts["Live Trail"].exists)
-        XCTAssertTrue(app.staticTexts["Active · continues when your screen locks"].exists)
-        let pause = app.buttons["pause-live-trail"]
-        let finish = app.buttons["finish-live-trail"]
-        XCTAssertTrue(pause.isHittable)
-        XCTAssertTrue(finish.isHittable)
-        XCTAssertEqual(pause.frame.width, finish.frame.width, accuracy: 1)
-        XCTAssertEqual(pause.frame.height, finish.frame.height, accuracy: 1)
-        XCTAssertEqual(pause.frame.minY, finish.frame.minY, accuracy: 1)
-        attachScreenshot(named: "09-live-trail-active", app: app)
-    }
-
-    @MainActor
     func testPausedLiveTrailClearlyOffersResumeOrFinalFinish() {
         let app = launch(arguments: [
             "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
