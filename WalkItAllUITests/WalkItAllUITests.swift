@@ -144,6 +144,7 @@ final class WalkItAllUITests: XCTestCase {
         attachScreenshot(named: "08-live-trail-intro", app: app)
     }
 
+    @MainActor
     func testPausedLiveTrailClearlyOffersResumeOrFinalFinish() {
         let app = launch(arguments: [
             "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
