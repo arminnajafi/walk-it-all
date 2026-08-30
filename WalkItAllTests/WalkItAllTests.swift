@@ -777,6 +777,7 @@ final class WalkItAllTests: XCTestCase {
             liveTrailSession: nil,
             liveTrailRevision: 0,
             showsUserLocation: false,
+            appIsActive: true,
             viewportCommand: viewport,
             bottomInset: 100,
             onUserTrackingModeChange: { _ in },
@@ -801,6 +802,7 @@ final class WalkItAllTests: XCTestCase {
             liveTrailSession: nil,
             liveTrailRevision: 0,
             showsUserLocation: false,
+            appIsActive: true,
             viewportCommand: MapViewportCommand(revision: 1, target: .workout(workout.id)),
             bottomInset: 100,
             onUserTrackingModeChange: { _ in },
@@ -1008,7 +1010,7 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
-    func testLocationButtonShowsHeadingFirstAndOffersNorthUpOnSecondTap() async {
+    func testLocationButtonRecentersWithoutEnablingHeadingFollow() async {
         let model = makeModel(
             source: TestRouteSource(batches: []),
             repository: TestHistoryRepository()
@@ -1016,19 +1018,36 @@ final class WalkItAllTests: XCTestCase {
 
         XCTAssertEqual(model.mapUserTrackingMode, .free)
         model.showUserLocation()
-        XCTAssertEqual(model.mapUserTrackingMode, .followWithHeading)
-        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.followWithHeading))
-
-        model.mapUserTrackingDidChange(.followWithHeading)
-        model.showUserLocation()
         XCTAssertEqual(model.mapUserTrackingMode, .follow)
-        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.follow))
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation)
 
+        let firstRevision = model.mapViewportCommand.revision
         model.mapUserTrackingDidChange(.follow)
         model.showUserLocation()
-        XCTAssertEqual(model.mapUserTrackingMode, .followWithHeading)
+        XCTAssertEqual(model.mapUserTrackingMode, .follow)
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation)
+        XCTAssertGreaterThan(model.mapViewportCommand.revision, firstRevision)
+
         model.mapUserTrackingDidChange(.free)
         XCTAssertEqual(model.mapUserTrackingMode, .free)
+    }
+
+    func testHeadingConeRotatesIndependentlyFromMapCamera() {
+        XCTAssertEqual(
+            HeadingConeGeometry.rotationRadians(deviceHeading: 90, mapHeading: 0),
+            .pi / 2,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            HeadingConeGeometry.rotationRadians(deviceHeading: 90, mapHeading: 30),
+            .pi / 3,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            HeadingConeGeometry.rotationRadians(deviceHeading: 350, mapHeading: 0),
+            -.pi / 18,
+            accuracy: 0.0001
+        )
     }
 
     @MainActor

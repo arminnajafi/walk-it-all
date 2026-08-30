@@ -3,6 +3,7 @@ import UIKit
 
 struct MapScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
     let model: AppModel
     @State private var showHealthWaitHelp = false
     @State private var confirmFinishLiveTrail = false
@@ -20,6 +21,7 @@ struct MapScreen: View {
                     liveTrailSession: model.liveTrail.session,
                     liveTrailRevision: model.liveTrail.renderRevision,
                     showsUserLocation: model.liveTrail.accessState.canShowLocation,
+                    appIsActive: scenePhase == .active,
                     viewportCommand: model.mapViewportCommand,
                     mapOrnamentBottomInset: bottomOverlayHeight
                         + geometry.safeAreaInsets.bottom
@@ -162,15 +164,13 @@ struct MapScreen: View {
         switch model.mapUserTrackingMode {
         case .free: "location"
         case .follow: "location.fill"
-        case .followWithHeading: "location.north.line.fill"
         }
     }
 
     private var locationLabel: String {
         switch model.mapUserTrackingMode {
-        case .free: "Follow current location with heading"
-        case .follow: "Follow current location with heading"
-        case .followWithHeading: "Follow current location north up"
+        case .free: "Show current location and direction"
+        case .follow: "Recenter current location"
         }
     }
 

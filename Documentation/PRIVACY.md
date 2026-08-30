@@ -21,6 +21,8 @@ The separate temporary Live Trail file contains only the current active, paused,
 
 Coordinates and Health identifiers must never appear in logs. Private device evidence belongs only under the ignored `LocalRouteFixtures/` directory.
 
+Compass heading used by the direction fan is ephemeral: it is neither persisted nor logged. Heading updates run only while the map is visible and the user-location indicator is enabled.
+
 ## Protection
 
 The permanent Health-derived history directory, store, WAL/SHM sidecars, and SwiftData external-data files receive complete file protection. The temporary Live Trail file uses complete-until-first-user-authentication protection so an explicitly active trail can checkpoint while the screen is locked after the device's first unlock since boot. Both stores are explicitly excluded from backup, and the app reapplies those attributes after writes. Neither uses device backup or iCloud storage.

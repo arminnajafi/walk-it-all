@@ -10,7 +10,7 @@ The primary experience is a calm lifetime route map. Manhattan is the opening ca
 
 ## What the map means
 
-Indigo lines are simplified GPS paths from Apple Health walking, hiking, running, and cycling workouts. Repeated routes deepen subtly. An orange, outlined line is the selected workout. The first location-button tap asks MapKit to show the standard blue position indicator with heading; a second tap offers north-up follow.
+Indigo lines are simplified GPS paths from Apple Health walking, hiking, running, and cycling workouts. Repeated routes deepen subtly. An orange, outlined line is the selected workout. The location button recenters on the standard blue position dot. A translucent blue fan turns with the iPhone to show direction without rotating the map camera.
 
 For intentional gap-hunting, the user may explicitly start Live Trail. A solid, outlined green line appears immediately and continues through screen lock. Pause turns location delivery off; Resume starts a new route part so the break is never bridged. Finish permanently stops tracking and keeps the slightly muted solid trail until the user clears it or starts a new one. Live Trail is independent of Apple Health and never becomes permanent workout history.
 

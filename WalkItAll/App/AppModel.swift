@@ -26,13 +26,12 @@ enum AppLaunchState: Equatable {
 enum MapViewportTarget: Equatable, Sendable {
     case manhattan
     case workout(UUID)
-    case userLocation(MapUserTrackingMode)
+    case userLocation
 }
 
 enum MapUserTrackingMode: Equatable, Sendable {
     case free
     case follow
-    case followWithHeading
 }
 
 struct MapViewportCommand: Equatable, Sendable {
@@ -252,29 +251,19 @@ final class AppModel {
     }
 
     func showUserLocation() {
-        liveTrail.requestCurrentLocation()
-        // Direction is the useful default while choosing the next gap to
-        // cover. A second tap offers the calmer north-up alternative.
-        let mode: MapUserTrackingMode = mapUserTrackingMode == .followWithHeading
-            ? .follow
-            : .followWithHeading
-        requestUserTracking(mode)
+        followUserLocation()
     }
 
     func mapUserTrackingDidChange(_ mode: MapUserTrackingMode) {
         mapUserTrackingMode = mode
     }
 
-    private func followUserHeading() {
+    private func followUserLocation() {
         liveTrail.requestCurrentLocation()
-        requestUserTracking(.followWithHeading)
-    }
-
-    private func requestUserTracking(_ mode: MapUserTrackingMode) {
-        mapUserTrackingMode = mode
+        mapUserTrackingMode = .follow
         mapViewportCommand = MapViewportCommand(
             revision: mapViewportCommand.revision &+ 1,
-            target: .userLocation(mode)
+            target: .userLocation
         )
     }
 
@@ -312,7 +301,7 @@ final class AppModel {
 
     func resumeLiveTrail() {
         liveTrail.resume()
-        followUserHeading()
+        followUserLocation()
     }
 
     func clearLiveTrail() {
@@ -326,14 +315,14 @@ final class AppModel {
         Task { [weak self] in
             guard let self else { return }
             await liveTrail.startNew()
-            followUserHeading()
+            followUserLocation()
         }
     }
 
     private func startLiveTrail() {
         selectedWorkoutID = nil
         liveTrail.start()
-        followUserHeading()
+        followUserLocation()
     }
 
     private func beginAuthorizedImport(resetFirst: Bool, isAutomatic: Bool) {

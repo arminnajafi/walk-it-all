@@ -8,7 +8,7 @@ The verification script must pass:
 - Health cursor v3 migration, route association, authoritative reconciliation, and conservative zero-readable-cache preservation tests;
 - repository activity payload compatibility, replacement, deletion, reset, corruption recovery, locked-data deferral, external-support-tree protection, cursor, ledger, and timestamp round trips;
 - synchronization addition, invalidation, deletion, cancellation, generation, and refresh-throttle tests;
-- overlay completeness, worldwide bounds, native spatial culling, repeat opacity, selection viewport, heading-mode state, and selection-without-history-rebuild tests;
+- overlay completeness, worldwide bounds, native spatial culling, repeat opacity, selection viewport, direction-fan geometry, position-follow state, and selection-without-history-rebuild tests;
 - Live Trail filtering, pre-session rejection, discontinuities, Pause/Resume separation, crash-safe final Finish, Clear, exact-file persistence, structural corruption, retained finished state, and locked relaunch ordering tests;
 - onboarding, empty state, restrained populated map, Live Trail explanation, paused and finished states, details, Health help, history, privacy, and Dynamic Type UI tests.
 
@@ -20,7 +20,7 @@ Before signoff:
 2. Compare representative walk, hike, run, and ride routes with Apple Fitness. Confirm that inaccurate points, transit, outages, and implausible jumps are not bridged.
 3. Start Live Trail, lock the phone, walk several blocks, and confirm the solid green trail is continuous after reopening. Pause and confirm background trail tracking and its system indicator stop; Resume and confirm a new trail part begins without bridging the break. Finish and confirm the state is final across relaunch.
 4. Confirm Start New replaces a finished trail only after confirmation when it has geometry, and Clear removes it. Record a supported Watch workout separately and verify its indigo Health route imports without altering the green trail.
-5. Verify north-up follow, heading follow outdoors, the standard compass, and that panning or rotating releases the camera.
+5. Verify outdoors that the blue direction fan turns with the iPhone while the camera does not, the standard compass behaves normally after manual rotation, and panning or rotating releases position follow.
 6. Exercise denied permission, interruption/relaunch, stationary time, implausible movement, 12-hour timeout, and Health route replacement/deletion.
 7. Reinstall after Health synchronization and rebuild the same permanent history; confirm the backup-excluded temporary Live Trail is not restored.
 

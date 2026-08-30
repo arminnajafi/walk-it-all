@@ -40,6 +40,7 @@
 		C85A45D452EC32070BFA289F /* ProtectedWalkHistoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BB96553502A3CBDFCBDED8F /* ProtectedWalkHistoryRepository.swift */; };
 		DDE80A0219F548016BF64321 /* LiveTrailIntroSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7F3DB0BA4769580F1882440 /* LiveTrailIntroSheet.swift */; };
 		E1396F76D748166FC83178F9 /* PersistedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D367A9FE158602470A886865 /* PersistedModels.swift */; };
+		EAD49CE8473FF705BC3B8C88 /* HeadingConeAnnotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C13EB7E958F64993BD20B3A /* HeadingConeAnnotation.swift */; };
 		F1F3115EE0992110C4C31275 /* HealthKitWorkoutRouteSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = DABD328367D5C28075FE1BF9 /* HealthKitWorkoutRouteSource.swift */; };
 /* End PBXBuildFile section */
 
@@ -73,6 +74,7 @@
 		3DC1C40A9FE2099E49F82BCD /* LifetimeMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifetimeMapView.swift; sourceTree = "<group>"; };
 		492C52D4F9EF866E16526CCF /* WalkItAllUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkItAllUITests.swift; sourceTree = "<group>"; };
 		55339BDC0BA2CC9800B82EA4 /* WalkItAllCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WalkItAllCore; path = Packages/WalkItAllCore; sourceTree = SOURCE_ROOT; };
+		5C13EB7E958F64993BD20B3A /* HeadingConeAnnotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadingConeAnnotation.swift; sourceTree = "<group>"; };
 		6BDAB903C28152806483F500 /* WalkItAllTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkItAllTests.swift; sourceTree = "<group>"; };
 		6C2F149DE39FE7C02CB2A374 /* MapScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapScreen.swift; sourceTree = "<group>"; };
 		6C32BF60E9317FB6AD472BFD /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 		4AA56FD0C286D33C56F44829 /* Map */ = {
 			isa = PBXGroup;
 			children = (
+				5C13EB7E958F64993BD20B3A /* HeadingConeAnnotation.swift */,
 				3DC1C40A9FE2099E49F82BCD /* LifetimeMapView.swift */,
 				C9E5E6FE2A88CB2CB95ED60A /* LifetimeRouteOverlay.swift */,
 			);
@@ -415,6 +418,7 @@
 				9F775BE05BA74554735045A0 /* AppModel.swift in Sources */,
 				C691B3B6540554A1EEF7A2FC /* AppSheetHost.swift in Sources */,
 				4FBA7F88E1113AA285EFAD0B /* FloatingSurface.swift in Sources */,
+				EAD49CE8473FF705BC3B8C88 /* HeadingConeAnnotation.swift in Sources */,
 				B5AC9CC528D1C64AB767B87A /* HealthAccessHelpSheet.swift in Sources */,
 				F1F3115EE0992110C4C31275 /* HealthKitWorkoutRouteSource.swift in Sources */,
 				3051DEB5DA7A79624439F509 /* LifetimeMapCard.swift in Sources */,
