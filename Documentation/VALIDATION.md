@@ -45,14 +45,15 @@ On a real device, confirm complete protection for permanent history, complete-un
 
 ## Current status
 
-Verified on 2026-08-29:
+Verified on 2026-08-30:
 
-- A [fresh GitHub-hosted run](https://github.com/arminnajafi/walk-it-all/actions/runs/33289411525) from commit `6b71370` passed 22 core tests, 49 app/storage/map tests, and 10 UI tests. Project regeneration also produced no committed-project diff.
+- The complete local verification gate passed 22 core tests, 54 app/storage/map tests, and 10 UI tests. Project regeneration also produced no committed-project diff.
 - Generic iOS Simulator test builds, Debug static analysis, and a Release simulator build completed without errors.
-- A signed Release build was installed and launched wirelessly on the personal iPhone with bundle identifier `com.arminnajafi.walkitall` and team `47F6V2R9AA`.
+- A signed Release build was installed and launched wirelessly on the personal iPhone with bundle identifier `com.arminnajafi.walkitall` and team `47F6V2R9AA` after the final automated gate.
 - The activity-scope reconciliation completed on that iPhone with 220 drawable route records and a 240-workout processed ledger while preserving the existing map.
 - The personal device no longer contained the exact legacy `coverage.store`, WAL, or shared-memory files before the obsolete migration path was removed.
 - Source inspection confirmed no app networking client, coordinate or Health-identifier logging, CloudKit container, Always-location request, street-matching runtime, or third-party runtime SDK.
+- A current-run visual audit covered onboarding, the empty and populated map, Live Trail introduction, paused and finished trails, workout selection, Details, About, Privacy, dark appearance, and accessibility Dynamic Type. Normal-size controls remained compact, all tested actions remained reachable, and Apple map attribution stayed unobscured.
 - The public repository uses `main` as its sole product branch. Private route fixtures and device exports remain ignored.
 
 Physical movement, outdoor heading accuracy, the two-hour battery pass, and destructive reinstall/recovery remain field checks rather than simulator claims.

@@ -57,6 +57,9 @@ struct MapScreen: View {
             guard model.importPhase == .requestingHealthAccess else { return }
             showHealthWaitHelp = true
         }
+        .onChange(of: model.liveTrail.accessState) { _, accessState in
+            model.locationAccessDidChange(accessState)
+        }
         .alert("Still waiting for Apple Health?", isPresented: $showHealthWaitHelp) {
             Button("Review Access") {
                 model.cancelImport()

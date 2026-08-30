@@ -1013,6 +1013,7 @@ final class WalkItAllTests: XCTestCase {
             source: TestRouteSource(batches: []),
             repository: TestHistoryRepository()
         )
+        model.liveTrail.accessState = .authorized
 
         XCTAssertEqual(model.mapUserTrackingMode, .free)
         model.showUserLocation()
@@ -1031,6 +1032,57 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.followNorthUp))
 
         model.mapUserTrackingDidChange(.free)
+        XCTAssertEqual(model.mapUserTrackingMode, .free)
+    }
+
+    @MainActor
+    func testLocationButtonWaitsForAccessBeforeShowingFollowState() {
+        let model = makeModel(
+            source: TestRouteSource(batches: []),
+            repository: TestHistoryRepository()
+        )
+        model.liveTrail.accessState = .notDetermined
+
+        model.showUserLocation()
+
+        XCTAssertEqual(model.mapUserTrackingMode, .free)
+        XCTAssertEqual(model.mapViewportCommand.target, .manhattan)
+
+        model.liveTrail.accessState = .authorized
+        model.locationAccessDidChange(.authorized)
+
+        XCTAssertEqual(model.mapUserTrackingMode, .followNorthUp)
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.followNorthUp))
+    }
+
+    @MainActor
+    func testDeniedLocationAccessDoesNotQueueFutureFollowing() {
+        let model = makeModel(
+            source: TestRouteSource(batches: []),
+            repository: TestHistoryRepository()
+        )
+        model.liveTrail.accessState = .denied
+
+        model.showUserLocation()
+        model.liveTrail.accessState = .authorized
+        model.locationAccessDidChange(.authorized)
+
+        XCTAssertEqual(model.mapUserTrackingMode, .free)
+        XCTAssertEqual(model.mapViewportCommand.target, .manhattan)
+    }
+
+    @MainActor
+    func testLosingLocationAccessClearsTheVisibleFollowState() {
+        let model = makeModel(
+            source: TestRouteSource(batches: []),
+            repository: TestHistoryRepository()
+        )
+        model.liveTrail.accessState = .authorized
+        model.showUserLocation()
+        XCTAssertEqual(model.mapUserTrackingMode, .followNorthUp)
+
+        model.locationAccessDidChange(.denied)
+
         XCTAssertEqual(model.mapUserTrackingMode, .free)
     }
 

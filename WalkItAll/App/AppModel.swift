@@ -115,6 +115,7 @@ final class AppModel {
     @ObservationIgnored private var importGeneration = 0
     @ObservationIgnored private var shouldImportAfterOnboardingDismisses = false
     @ObservationIgnored private var shouldStartLiveTrailAfterSheetDismisses = false
+    @ObservationIgnored private var shouldFollowAfterLocationAuthorization = false
     @ObservationIgnored private var lastAutomaticRefreshAttempt: Date?
     @ObservationIgnored private var bootstrapInProgress = false
 
@@ -231,6 +232,7 @@ final class AppModel {
 
     func selectWorkout(_ id: UUID) {
         guard !liveTrail.hasInProgressSession else { return }
+        shouldFollowAfterLocationAuthorization = false
         selectedWorkoutID = id
         mapUserTrackingMode = .free
         mapViewportCommand = MapViewportCommand(
@@ -246,6 +248,7 @@ final class AppModel {
     }
 
     func showAllManhattan() {
+        shouldFollowAfterLocationAuthorization = false
         mapUserTrackingMode = .free
         mapViewportCommand = MapViewportCommand(
             revision: mapViewportCommand.revision &+ 1,
@@ -255,13 +258,32 @@ final class AppModel {
 
     func showUserLocation() {
         liveTrail.requestCurrentLocation()
+        guard liveTrail.accessState.canShowLocation else {
+            shouldFollowAfterLocationAuthorization = liveTrail.accessState == .notDetermined
+            mapUserTrackingMode = .free
+            return
+        }
+        shouldFollowAfterLocationAuthorization = false
         let mode: MapUserTrackingMode = mapUserTrackingMode == .followNorthUp
             ? .followWithHeading
             : .followNorthUp
         requestUserTracking(mode)
     }
 
+    func locationAccessDidChange(_ accessState: LocationAccessState) {
+        guard accessState.canShowLocation else {
+            mapUserTrackingMode = .free
+            return
+        }
+        guard shouldFollowAfterLocationAuthorization else { return }
+        shouldFollowAfterLocationAuthorization = false
+        requestUserTracking(.followNorthUp)
+    }
+
     func mapUserTrackingDidChange(_ mode: MapUserTrackingMode) {
+        if mode == .free {
+            shouldFollowAfterLocationAuthorization = false
+        }
         mapUserTrackingMode = mode
     }
 
