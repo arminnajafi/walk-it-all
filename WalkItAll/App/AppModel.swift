@@ -593,12 +593,108 @@ final class AppModel {
             WorkoutRouteRecord(
                 id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
                 start: start.addingTimeInterval(-86_400),
-                end: start.addingTimeInterval(-84_600),
-                sourceName: "iPhone",
+                end: start.addingTimeInterval(-81_900),
+                sourceName: "Apple Watch",
                 activityKind: .cycling,
                 routeParts: [[
-                    GeoCoordinate(latitude: 40.7420, longitude: -74.0060),
-                    GeoCoordinate(latitude: 40.7480, longitude: -74.0030),
+                    GeoCoordinate(latitude: 40.7040, longitude: -74.0180),
+                    GeoCoordinate(latitude: 40.7280, longitude: -74.0120),
+                    GeoCoordinate(latitude: 40.7600, longitude: -74.0100),
+                    GeoCoordinate(latitude: 40.8030, longitude: -73.9710),
+                    GeoCoordinate(latitude: 40.8500, longitude: -73.9360),
+                ]]
+            ),
+            WorkoutRouteRecord(
+                id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+                start: start.addingTimeInterval(-172_800),
+                end: start.addingTimeInterval(-168_600),
+                sourceName: "Apple Watch",
+                activityKind: .running,
+                routeParts: [[
+                    GeoCoordinate(latitude: 40.7040, longitude: -74.0090),
+                    GeoCoordinate(latitude: 40.7180, longitude: -73.9970),
+                    GeoCoordinate(latitude: 40.7350, longitude: -73.9740),
+                    GeoCoordinate(latitude: 40.7560, longitude: -73.9580),
+                    GeoCoordinate(latitude: 40.7870, longitude: -73.9380),
+                ]]
+            ),
+            WorkoutRouteRecord(
+                id: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
+                start: start.addingTimeInterval(-259_200),
+                end: start.addingTimeInterval(-255_600),
+                sourceName: "Apple Watch",
+                routeParts: [[
+                    GeoCoordinate(latitude: 40.7060, longitude: -74.0110),
+                    GeoCoordinate(latitude: 40.7210, longitude: -74.0040),
+                    GeoCoordinate(latitude: 40.7420, longitude: -73.9890),
+                    GeoCoordinate(latitude: 40.7580, longitude: -73.9850),
+                    GeoCoordinate(latitude: 40.7800, longitude: -73.9810),
+                    GeoCoordinate(latitude: 40.8090, longitude: -73.9540),
+                ]]
+            ),
+            WorkoutRouteRecord(
+                id: UUID(uuidString: "55555555-5555-5555-5555-555555555555")!,
+                start: start.addingTimeInterval(-345_600),
+                end: start.addingTimeInterval(-342_000),
+                sourceName: "iPhone",
+                activityKind: .hiking,
+                routeParts: [[
+                    GeoCoordinate(latitude: 40.7680, longitude: -73.9819),
+                    GeoCoordinate(latitude: 40.7810, longitude: -73.9738),
+                    GeoCoordinate(latitude: 40.7980, longitude: -73.9495),
+                    GeoCoordinate(latitude: 40.7920, longitude: -73.9460),
+                    GeoCoordinate(latitude: 40.7740, longitude: -73.9720),
+                    GeoCoordinate(latitude: 40.7680, longitude: -73.9819),
+                ]]
+            ),
+            WorkoutRouteRecord(
+                id: UUID(uuidString: "66666666-6666-6666-6666-666666666666")!,
+                start: start.addingTimeInterval(-432_000),
+                end: start.addingTimeInterval(-430_200),
+                sourceName: "Apple Watch",
+                routeParts: [[
+                    GeoCoordinate(latitude: 40.7390, longitude: -74.0090),
+                    GeoCoordinate(latitude: 40.7350, longitude: -73.9740),
+                ]]
+            ),
+            WorkoutRouteRecord(
+                id: UUID(uuidString: "77777777-7777-7777-7777-777777777777")!,
+                start: start.addingTimeInterval(-518_400),
+                end: start.addingTimeInterval(-516_600),
+                sourceName: "Apple Watch",
+                routeParts: [[
+                    GeoCoordinate(latitude: 40.7550, longitude: -74.0040),
+                    GeoCoordinate(latitude: 40.7440, longitude: -73.9720),
+                ]]
+            ),
+            WorkoutRouteRecord(
+                id: UUID(uuidString: "88888888-8888-8888-8888-888888888888")!,
+                start: start.addingTimeInterval(-604_800),
+                end: start.addingTimeInterval(-603_000),
+                sourceName: "Apple Watch",
+                routeParts: [[
+                    GeoCoordinate(latitude: 40.7710, longitude: -73.9940),
+                    GeoCoordinate(latitude: 40.7580, longitude: -73.9590),
+                ]]
+            ),
+            WorkoutRouteRecord(
+                id: UUID(uuidString: "99999999-9999-9999-9999-999999999999")!,
+                start: start.addingTimeInterval(-691_200),
+                end: start.addingTimeInterval(-689_400),
+                sourceName: "Apple Watch",
+                routeParts: [[
+                    GeoCoordinate(latitude: 40.7900, longitude: -73.9780),
+                    GeoCoordinate(latitude: 40.7760, longitude: -73.9470),
+                ]]
+            ),
+            WorkoutRouteRecord(
+                id: UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!,
+                start: start.addingTimeInterval(-777_600),
+                end: start.addingTimeInterval(-775_800),
+                sourceName: "Apple Watch",
+                routeParts: [[
+                    GeoCoordinate(latitude: 40.8040, longitude: -73.9650),
+                    GeoCoordinate(latitude: 40.7910, longitude: -73.9340),
                 ]]
             ),
         ]

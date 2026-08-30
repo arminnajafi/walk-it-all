@@ -108,6 +108,7 @@ final class WalkItAllUITests: XCTestCase {
         XCTAssertTrue(app.buttons["start-live-trail"].waitForExistence(timeout: 30))
         XCTAssertFalse(app.staticTexts["2 walks mapped"].exists)
         XCTAssertTrue(app.buttons["current-location"].exists)
+        attachScreenshot(named: "07-lifetime-map", app: app)
         app.buttons["About Walk It All"].tap()
         let history = app.buttons["Workout history"]
         scrollUntilHittable(history, in: app)
@@ -121,7 +122,7 @@ final class WalkItAllUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["selected-workout-card"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Walking"].exists)
         XCTAssertTrue(app.staticTexts["Orange with a contrasting outline shows this workout"].exists)
-        attachScreenshot(named: "07-selected-workout", app: app)
+        attachScreenshot(named: "08-selected-workout", app: app)
         app.buttons["Clear"].tap()
         XCTAssertTrue(app.buttons["start-live-trail"].waitForExistence(timeout: 5))
     }
