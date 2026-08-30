@@ -10,7 +10,7 @@ public struct RouteChunkingResult: Sendable {
     }
 }
 
-/// Filters unreliable samples and separates continuous walking portions. A
+/// Filters unreliable samples and separates continuous route portions. A
 /// break always ends the current part; the processor never draws across it.
 public struct RouteChunker: Sendable {
     public let maximumHorizontalAccuracyMeters: Double

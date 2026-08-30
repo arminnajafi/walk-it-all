@@ -6,6 +6,8 @@ struct MapScreen: View {
     let model: AppModel
     @State private var showHealthWaitHelp = false
     @State private var confirmFinishLiveTrail = false
+    @State private var confirmClearLiveTrail = false
+    @State private var confirmStartNewLiveTrail = false
     @State private var bottomOverlayHeight: CGFloat = 76
 
     var body: some View {
@@ -21,7 +23,8 @@ struct MapScreen: View {
                     viewportCommand: model.mapViewportCommand,
                     mapOrnamentBottomInset: bottomOverlayHeight
                         + geometry.safeAreaInsets.bottom
-                        + 8
+                        + 8,
+                    onUserTrackingModeChange: model.mapUserTrackingDidChange
                 )
                 .ignoresSafeArea()
 
@@ -89,7 +92,19 @@ struct MapScreen: View {
             Button("Finish Live Trail", role: .destructive, action: model.finishLiveTrail)
             Button("Keep Trail", role: .cancel) {}
         } message: {
-            Text("Finish is final. Use Pause instead if you only need a short break.")
+            Text("Finish stops tracking. This trail will remain on the map until you clear it or start a new one.")
+        }
+        .alert("Clear Live Trail?", isPresented: $confirmClearLiveTrail) {
+            Button("Clear Trail", role: .destructive, action: model.clearLiveTrail)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently removes the temporary trail from this iPhone.")
+        }
+        .alert("Start a new Live Trail?", isPresented: $confirmStartNewLiveTrail) {
+            Button("Start New", role: .destructive, action: model.startNewLiveTrail)
+            Button("Keep Current Trail", role: .cancel) {}
+        } message: {
+            Text("Starting a new trail permanently replaces the finished trail currently on the map.")
         }
     }
 
@@ -134,13 +149,29 @@ struct MapScreen: View {
 
     private var locationButton: some View {
         Button(action: model.showUserLocation) {
-            Image(systemName: "location.fill")
+            Image(systemName: locationSymbol)
                 .font(.title3.weight(.semibold))
                 .frame(width: 44, height: 44)
         }
-        .accessibilityLabel("Show current location")
-        .accessibilityHint("Requests location access if needed and recenters the map")
+        .accessibilityLabel(locationLabel)
+        .accessibilityHint("Requests location access if needed")
         .accessibilityIdentifier("current-location")
+    }
+
+    private var locationSymbol: String {
+        switch model.mapUserTrackingMode {
+        case .free: "location"
+        case .follow: "location.fill"
+        case .followWithHeading: "location.north.line.fill"
+        }
+    }
+
+    private var locationLabel: String {
+        switch model.mapUserTrackingMode {
+        case .free: "Follow current location"
+        case .follow: "Follow current location with heading"
+        case .followWithHeading: "Follow current location north up"
+        }
     }
 
     private var infoButton: some View {
@@ -161,27 +192,32 @@ struct MapScreen: View {
                 SelectedWorkoutCard(workout: workout, clear: model.clearSelectedWorkout)
             } else if let session = model.liveTrail.session, session.state == .active {
                 ActiveLiveTrailCard(
-                    session: session,
                     pause: model.pauseLiveTrail,
                     finish: { confirmFinishLiveTrail = true }
                 )
             } else if model.liveTrail.isPaused {
                 PausedLiveTrailCard(
                     resume: model.resumeLiveTrail,
-                    finish: { confirmFinishLiveTrail = true }
+                    finish: { confirmFinishLiveTrail = true },
+                    clear: { confirmClearLiveTrail = true }
+                )
+            } else if model.liveTrail.isFinished {
+                FinishedLiveTrailCard(
+                    startNew: {
+                        if model.liveTrail.hasDrawableGeometry {
+                            confirmStartNewLiveTrail = true
+                        } else {
+                            model.startNewLiveTrail()
+                        }
+                    },
+                    clear: { confirmClearLiveTrail = true }
                 )
             } else if model.importPhase.isWorking {
                 CompactImportCard(phase: model.importPhase, cancel: model.cancelImport)
             } else if case let .failed(message) = model.importPhase {
                 CompactErrorCard(message: message) { model.presentedSheet = .details }
-            } else if model.liveTrail.isWaitingForHealth {
-                WaitingForHealthCard(
-                    refresh: model.refresh,
-                    showDetails: { model.presentedSheet = .details }
-                )
             } else if !model.hasMappedWorkouts {
-                LifetimeMapCard(
-                    mappedWorkoutCount: 0,
+                EmptyRouteMapCard(
                     phase: model.importPhase,
                     lastSuccessfulImport: model.lastSuccessfulImport,
                     hasConnectedHealth: model.hasConnectedHealth,

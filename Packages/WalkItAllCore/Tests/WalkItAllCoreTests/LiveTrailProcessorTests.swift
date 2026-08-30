@@ -86,7 +86,7 @@ final class LiveTrailProcessorTests: XCTestCase {
         XCTAssertEqual(compacted.routeParts[0].last, points.last)
     }
 
-    func testFinishMakesSessionPendingWithoutLosingGeometry() {
+    func testFinishMakesSessionFinishedWithoutLosingGeometry() {
         let processor = LiveTrailProcessor()
         let session = LiveTrailSession(
             state: .active,
@@ -98,7 +98,7 @@ final class LiveTrailProcessorTests: XCTestCase {
             lastUpdate: start.addingTimeInterval(10)
         )
         let finished = processor.finishing(session, at: start.addingTimeInterval(20))
-        XCTAssertEqual(finished.state, .waitingForHealth)
+        XCTAssertEqual(finished.state, .finished)
         XCTAssertEqual(finished.end, start.addingTimeInterval(20))
         XCTAssertEqual(finished.coordinateParts.count, 1)
     }
@@ -140,25 +140,25 @@ final class LiveTrailProcessorTests: XCTestCase {
         XCTAssertEqual(appended.session.routeParts[1].count, 1)
     }
 
-    func testHealthAssociationUsesCoverageThenOverlapThenSmallestExcess() {
-        let trail = LiveTrailSession(
-            state: .waitingForHealth,
-            start: start,
-            end: start.addingTimeInterval(1_000),
-            routeParts: [[point(40.75, -73.99, seconds: 0)]],
-            lastUpdate: start.addingTimeInterval(1_000)
-        )
-        let poorCoverage = record(start: start.addingTimeInterval(250), end: start.addingTimeInterval(1_000))
-        let excess = record(start: start.addingTimeInterval(-100), end: start.addingTimeInterval(1_100))
-        let best = record(start: start, end: start.addingTimeInterval(1_000))
+    func testLegacyWaitingStateDecodesAsFinished() throws {
+        let data = try JSONEncoder().encode("waitingForHealth")
+        XCTAssertEqual(try JSONDecoder().decode(LiveTrailState.self, from: data), .finished)
+    }
 
-        XCTAssertEqual(
-            LiveTrailHealthAssociator.matchingWorkoutID(
-                for: trail,
-                among: [poorCoverage, excess, best]
-            ),
-            best.id
+    func testDefaultLiveTrailPolicyAcceptsPlausibleCyclingMovement() {
+        let processor = LiveTrailProcessor()
+        var session = activeSession()
+        session = processor.appending(
+            point(40.7500, -73.9900, seconds: 0),
+            to: session
+        ).session
+        let result = processor.appending(
+            point(40.7540, -73.9900, seconds: 30),
+            to: session
         )
+
+        XCTAssertTrue(result.accepted)
+        XCTAssertEqual(result.session.routeParts.count, 1)
     }
 
     private func activeSession() -> LiveTrailSession {
@@ -178,16 +178,4 @@ final class LiveTrailProcessorTests: XCTestCase {
         )
     }
 
-    private func record(start: Date, end: Date) -> WorkoutRouteRecord {
-        WorkoutRouteRecord(
-            id: UUID(),
-            start: start,
-            end: end,
-            sourceName: "Apple Watch",
-            routeParts: [[
-                GeoCoordinate(latitude: 40.75, longitude: -73.99),
-                GeoCoordinate(latitude: 40.751, longitude: -73.99),
-            ]]
-        )
-    }
 }

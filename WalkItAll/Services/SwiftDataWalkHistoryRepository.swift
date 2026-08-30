@@ -4,6 +4,14 @@ import WalkItAllCore
 
 @ModelActor
 actor SwiftDataWalkHistoryRepository: WalkHistoryRepository {
+    private struct RoutePayload: Codable {
+        static let currentVersion = 2
+
+        let version: Int
+        let activityKind: RouteActivityKind
+        let routeParts: [[GeoCoordinate]]
+    }
+
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -23,7 +31,11 @@ actor SwiftDataWalkHistoryRepository: WalkHistoryRepository {
     }
 
     func save(record: WorkoutRouteRecord) async throws {
-        let data = try encoder.encode(record.routeParts)
+        let data = try encoder.encode(RoutePayload(
+            version: RoutePayload.currentVersion,
+            activityKind: record.activityKind,
+            routeParts: record.routeParts
+        ))
         let workoutID = record.id
         let descriptor = FetchDescriptor<PersistedWorkoutRouteRecord>(
             predicate: #Predicate { $0.workoutID == workoutID }
@@ -135,15 +147,27 @@ actor SwiftDataWalkHistoryRepository: WalkHistoryRepository {
     }
 
     private func decode(_ persisted: PersistedWorkoutRouteRecord) -> WorkoutRouteRecord? {
-        guard let routeParts = try? decoder.decode(
+        let activityKind: RouteActivityKind
+        let routeParts: [[GeoCoordinate]]
+        if let payload = try? decoder.decode(RoutePayload.self, from: persisted.routePartsData) {
+            guard payload.version <= RoutePayload.currentVersion else { return nil }
+            activityKind = payload.activityKind
+            routeParts = payload.routeParts
+        } else if let legacyParts = try? decoder.decode(
             [[GeoCoordinate]].self,
             from: persisted.routePartsData
-        ) else { return nil }
+        ) {
+            activityKind = .walking
+            routeParts = legacyParts
+        } else {
+            return nil
+        }
         let record = WorkoutRouteRecord(
             id: persisted.workoutID,
             start: persisted.start,
             end: persisted.end,
             sourceName: persisted.sourceName,
+            activityKind: activityKind,
             routeParts: routeParts
         )
         return record.routeParts.isEmpty ? nil : record

@@ -2,7 +2,7 @@
 
 ## Data use
 
-Walk It All requests read-only access to walking and hiking workouts and workout routes. It never writes to Apple Health. Location access is requested only when the user asks to see their position or explicitly starts Live Trail.
+Walk It All requests read-only access to walking, hiking, running, and cycling workouts and workout routes. It never writes to Apple Health. Location access is requested only when the user asks to see their position or explicitly starts Live Trail.
 
 There is no passive background tracking. While Live Trail is explicitly active, a When In Use Core Location session continues through screen lock with Apple’s visible location indicator. Pause or Finish invalidates background trail tracking immediately; Resume starts it again only after an explicit tap. The app never requests Always location access.
 
@@ -12,12 +12,12 @@ The app has no account, server, analytics, advertising, or CloudKit container. H
 
 Full-resolution Health locations exist only while one workout is being processed. The durable cache contains:
 
-- workout UUID, dates, and source name;
+- workout UUID, dates, source name, and activity kind;
 - simplified route parts;
 - Health import cursor and processed-workout ledger; and
 - the exact last successful refresh date.
 
-The separate temporary Live Trail file contains only the current active, paused, or waiting session: session dates, filtered route parts, and last update. It never contains unfiltered location updates. It is deleted when the associated Health route imports or seven days after Finish. A non-coordinate expiry date may remain so Details can explain that a Health route was not found.
+The separate temporary Live Trail file contains only the current active, paused, or finished session: session dates, filtered route parts, and last update. It never contains unfiltered location updates. Apple Health never changes it. A finished trail remains until Clear Trail or Start New, survives ordinary relaunches, and is lost after reinstall because the file is excluded from backup.
 
 Coordinates and Health identifiers must never appear in logs. Private device evidence belongs only under the ignored `LocalRouteFixtures/` directory.
 

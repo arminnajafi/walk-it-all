@@ -10,9 +10,7 @@ final class WalkItAllTests: XCTestCase {
         super.setUp()
         UserDefaults.standard.removeObject(forKey: "didCompleteOnboarding")
         UserDefaults.standard.removeObject(forKey: "didConnectAppleHealth")
-        UserDefaults.standard.removeObject(forKey: "didBeginLifetimeMapMigration")
         UserDefaults.standard.removeObject(forKey: "didExplainLiveTrail")
-        UserDefaults.standard.removeObject(forKey: "lastExpiredLiveTrailDate")
     }
 
     func testHealthCursorRoundTripsBothAnchorsAndAssociations() throws {
@@ -33,7 +31,7 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(decoded.routeToWorkout[routeID], workoutID)
     }
 
-    func testLegacyWorkoutAnchorMigratesWithoutDiscardingIt() throws {
+    func testLegacyWorkoutAnchorResetsForExpandedActivityScope() throws {
         let anchor = HKQueryAnchor(fromValue: 42)
         let legacy = try NSKeyedArchiver.archivedData(
             withRootObject: anchor,
@@ -42,9 +40,37 @@ final class WalkItAllTests: XCTestCase {
 
         let migration = HealthImportCursorCodec.decodeForImport(legacy)
 
-        XCTAssertEqual(migration.cursor.workoutAnchorData, legacy)
+        XCTAssertNil(migration.cursor.workoutAnchorData)
         XCTAssertNil(migration.cursor.routeAnchorData)
         XCTAssertTrue(migration.requiresFullRouteReconciliation)
+    }
+
+    func testVersionTwoCursorResetsWorkoutScopeButPreservesRouteAnchor() throws {
+        let routeID = UUID()
+        let workoutID = UUID()
+        let oldCursor = HealthImportCursor(
+            version: 2,
+            workoutAnchorData: Data([1]),
+            routeAnchorData: Data([2]),
+            routeToWorkout: [routeID: workoutID]
+        )
+
+        let migration = HealthImportCursorCodec.decodeForImport(
+            try HealthImportCursorCodec.encode(oldCursor)
+        )
+
+        XCTAssertNil(migration.cursor.workoutAnchorData)
+        XCTAssertEqual(migration.cursor.routeAnchorData, Data([2]))
+        XCTAssertTrue(migration.cursor.routeToWorkout.isEmpty)
+        XCTAssertTrue(migration.requiresFullRouteReconciliation)
+    }
+
+    func testHealthActivityMapperSupportsEveryMVPActivity() {
+        XCTAssertEqual(HealthWorkoutActivityMapper.kind(for: .walking), .walking)
+        XCTAssertEqual(HealthWorkoutActivityMapper.kind(for: .hiking), .hiking)
+        XCTAssertEqual(HealthWorkoutActivityMapper.kind(for: .running), .running)
+        XCTAssertEqual(HealthWorkoutActivityMapper.kind(for: .cycling), .cycling)
+        XCTAssertNil(HealthWorkoutActivityMapper.kind(for: .swimming))
     }
 
     func testCorruptHealthCursorRequestsRouteReconciliation() {
@@ -116,7 +142,12 @@ final class WalkItAllTests: XCTestCase {
         let (repository, _) = try makeSwiftDataRepository()
         let id = UUID()
         let first = record(id: id, latitude: 40.75, source: "First")
-        let replacement = record(id: id, latitude: 51.5, source: "Replacement")
+        let replacement = record(
+            id: id,
+            latitude: 51.5,
+            source: "Replacement",
+            activityKind: .cycling
+        )
         let date = Date(timeIntervalSince1970: 500)
 
         try await repository.save(record: first)
@@ -130,6 +161,7 @@ final class WalkItAllTests: XCTestCase {
         let storedCheckpoint = try await repository.loadCheckpoint()
         let storedDate = try await repository.loadLastSuccessfulImport()
         XCTAssertEqual(loaded, [replacement])
+        XCTAssertEqual(loaded.first?.activityKind, .cycling)
         XCTAssertEqual(processed, [id])
         XCTAssertEqual(storedCheckpoint, Data([9]))
         XCTAssertEqual(storedDate, date)
@@ -201,6 +233,32 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
+    func testRepositoryDecodesLegacyGeometryPayloadAsWalking() async throws {
+        let (repository, container) = try makeSwiftDataRepository()
+        let context = ModelContext(container)
+        let id = UUID()
+        let legacyParts = [[
+            GeoCoordinate(latitude: 40.75, longitude: -73.99),
+            GeoCoordinate(latitude: 40.751, longitude: -73.989),
+        ]]
+        context.insert(PersistedWorkoutRouteRecord(
+            workoutID: id,
+            start: .distantPast,
+            end: .distantFuture,
+            sourceName: "Legacy",
+            routePartsData: try JSONEncoder().encode(legacyParts)
+        ))
+        try context.save()
+
+        let loaded = try await repository.loadRecords()
+
+        XCTAssertEqual(loaded.count, 1)
+        XCTAssertEqual(loaded.first?.id, id)
+        XCTAssertEqual(loaded.first?.activityKind, .walking)
+        XCTAssertEqual(loaded.first?.routeParts, legacyParts)
+    }
+
+    @MainActor
     func testRepositoryFullResetClearsEveryRebuildableValue() async throws {
         let (repository, _) = try makeSwiftDataRepository()
         let item = record(id: UUID(), latitude: 40.75)
@@ -219,31 +277,6 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertTrue(processed.isEmpty)
         XCTAssertNil(checkpoint)
         XCTAssertNil(date)
-    }
-
-    func testLegacyCleanupDeletesOnlyExactStoreFilesAndExternalData() throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let exact = ["coverage.store", "coverage.store-wal", "coverage.store-shm"].map {
-            directory.appendingPathComponent($0)
-        }
-        let unrelated = directory.appendingPathComponent("keep-me")
-        let support = directory.appendingPathComponent(".coverage_SUPPORT", isDirectory: true)
-        let externalData = support.appendingPathComponent("_EXTERNAL_DATA", isDirectory: true)
-        let externalRoute = externalData.appendingPathComponent("route")
-        try FileManager.default.createDirectory(at: externalData, withIntermediateDirectories: true)
-        for file in exact + [unrelated] {
-            FileManager.default.createFile(atPath: file.path, contents: Data([1]))
-        }
-        FileManager.default.createFile(atPath: externalRoute.path, contents: Data([2]))
-
-        try LegacyCoverageStore(files: exact, directories: [support]).removeAfterSuccessfulRebuild()
-
-        XCTAssertTrue(exact.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) })
-        XCTAssertFalse(FileManager.default.fileExists(atPath: support.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelated.path))
     }
 
     func testProtectedCacheUsesCompleteProtectionAndBackupExclusion() throws {
@@ -397,10 +430,10 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
-    func testPendingLiveTrailIsRemovedWhenMatchingHealthRouteAlreadyExists() async throws {
+    func testFinishedLiveTrailRemainsIndependentWhenHealthHistoryAlreadyExists() async throws {
         let routeRecord = record(id: UUID(), latitude: 40.75)
         let liveRepository = TestLiveTrailRepository(
-            session: liveTrailSession(state: .waitingForHealth)
+            session: liveTrailSession(state: .finished)
         )
         let model = makeModel(
             source: TestRouteSource(batches: []),
@@ -410,9 +443,9 @@ final class WalkItAllTests: XCTestCase {
 
         await model.bootstrap()
 
-        XCTAssertNil(model.liveTrail.session)
+        XCTAssertEqual(model.liveTrail.session?.state, .finished)
         let stored = await liveRepository.load()
-        XCTAssertNil(stored)
+        XCTAssertEqual(stored?.state, .finished)
     }
 
     @MainActor
@@ -440,22 +473,16 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
-    func testPendingLiveTrailExpiresAfterSevenDaysAndLeavesOnlyNotice() async throws {
-        let end = Date().addingTimeInterval(-(8 * 24 * 60 * 60))
-        let session = LiveTrailSession(
-            state: .waitingForHealth,
-            start: end.addingTimeInterval(-100),
-            end: end,
-            routeParts: [],
-            lastUpdate: end
-        )
+    func testFinishedLiveTrailDoesNotExpireAndClearDeletesIt() async throws {
+        let session = liveTrailSession(state: .finished)
         let repository = TestLiveTrailRepository(session: session)
         let controller = LiveTrailController(repository: repository)
 
-        await controller.bootstrap(now: Date())
+        await controller.bootstrap(now: session.start.addingTimeInterval(30 * 24 * 60 * 60))
 
+        XCTAssertEqual(controller.session, session)
+        await controller.clear()
         XCTAssertNil(controller.session)
-        XCTAssertNotNil(controller.lastExpiredTrailDate)
         let stored = await repository.load()
         XCTAssertNil(stored)
     }
@@ -474,13 +501,13 @@ final class WalkItAllTests: XCTestCase {
 
         await controller.bootstrap(now: Date())
 
-        XCTAssertEqual(controller.session?.state, .waitingForHealth)
+        XCTAssertEqual(controller.session?.state, .finished)
         XCTAssertEqual(
             controller.session?.end,
             start.addingTimeInterval(LiveTrailController.maximumSessionDuration)
         )
         let stored = await repository.load()
-        XCTAssertEqual(stored?.state, .waitingForHealth)
+        XCTAssertEqual(stored?.state, .finished)
     }
 
     @MainActor
@@ -497,14 +524,14 @@ final class WalkItAllTests: XCTestCase {
 
         await controller.bootstrap(now: Date())
 
-        XCTAssertEqual(controller.session?.state, .waitingForHealth)
+        XCTAssertEqual(controller.session?.state, .finished)
         XCTAssertEqual(
             controller.session?.end,
             start.addingTimeInterval(100),
             "Finishing a paused trail must not include unattended paused time"
         )
         let stored = await repository.load()
-        XCTAssertEqual(stored?.state, .waitingForHealth)
+        XCTAssertEqual(stored?.state, .finished)
     }
 
     @MainActor
@@ -521,7 +548,7 @@ final class WalkItAllTests: XCTestCase {
 
         await controller.bootstrap(now: now)
         await repository.save(LiveTrailSession(
-            state: .waitingForHealth,
+            state: .finished,
             start: now.addingTimeInterval(-300),
             end: now,
             lastUpdate: now
@@ -548,7 +575,7 @@ final class WalkItAllTests: XCTestCase {
 
         await controller.finish(at: start.addingTimeInterval(3_600))
 
-        XCTAssertEqual(controller.session?.state, .waitingForHealth)
+        XCTAssertEqual(controller.session?.state, .finished)
         XCTAssertEqual(controller.session?.end, pauseDate)
         let stored = await repository.load()
         XCTAssertEqual(stored?.end, pauseDate)
@@ -573,7 +600,7 @@ final class WalkItAllTests: XCTestCase {
         await controller.finish(at: start.addingTimeInterval(3_600))
 
         let stored = try await repository.load()
-        XCTAssertEqual(stored?.state, .waitingForHealth)
+        XCTAssertEqual(stored?.state, .finished)
         XCTAssertEqual(stored?.end, paused.lastUpdate)
         XCTAssertNil(controller.issueMessage)
     }
@@ -596,10 +623,46 @@ final class WalkItAllTests: XCTestCase {
 
         await controller.finish(at: start.addingTimeInterval(900))
 
-        XCTAssertEqual(controller.session?.state, .waitingForHealth)
+        XCTAssertEqual(controller.session?.state, .finished)
         let stored = try await repository.load()
         XCTAssertNil(stored)
         XCTAssertNotNil(controller.issueMessage)
+    }
+
+    @MainActor
+    func testFinishedTrailRejectsResumeAndRepeatedFinish() async throws {
+        let finished = liveTrailSession(state: .finished)
+        let repository = TestLiveTrailRepository(session: finished)
+        let controller = LiveTrailController(repository: repository)
+        await controller.bootstrap(now: finished.lastUpdate)
+
+        controller.resume(now: finished.lastUpdate.addingTimeInterval(10))
+        await controller.finish(at: finished.lastUpdate.addingTimeInterval(20))
+
+        let stored = await repository.load()
+        XCTAssertEqual(controller.session, finished)
+        XCTAssertEqual(stored, finished)
+    }
+
+    @MainActor
+    func testFinishingLiveTrailDoesNotTriggerHealthRefresh() async throws {
+        let source = TestRouteSource(batches: [])
+        let paused = liveTrailSession(state: .paused)
+        let model = makeModel(
+            source: source,
+            repository: TestHistoryRepository(),
+            liveTrailRepository: TestLiveTrailRepository(session: paused)
+        )
+        await model.bootstrap()
+
+        model.finishLiveTrail()
+        for _ in 0 ..< 100 where !model.liveTrail.isFinished {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let authorizationCount = await source.authorizationRequestCount()
+        XCTAssertTrue(model.liveTrail.isFinished)
+        XCTAssertEqual(authorizationCount, 0)
     }
 
     @MainActor
@@ -694,6 +757,7 @@ final class WalkItAllTests: XCTestCase {
             showsUserLocation: false,
             viewportCommand: viewport,
             bottomInset: 100,
+            onUserTrackingModeChange: { _ in },
             initial: true
         )
 
@@ -717,6 +781,7 @@ final class WalkItAllTests: XCTestCase {
             showsUserLocation: false,
             viewportCommand: MapViewportCommand(revision: 1, target: .workout(workout.id)),
             bottomInset: 100,
+            onUserTrackingModeChange: { _ in },
             initial: false
         )
 
@@ -862,6 +927,89 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
+    func testAuthoritativeReconciliationRemovesOnlyStaleSupportedWorkouts() async throws {
+        let retainedID = UUID()
+        let staleID = UUID()
+        let repository = TestHistoryRepository(
+            records: [
+                record(id: retainedID, latitude: 40.75),
+                record(id: staleID, latitude: 40.76),
+            ],
+            processedIDs: [retainedID, staleID]
+        )
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(
+            routes: [],
+            authoritativeWorkoutIDs: [retainedID],
+            checkpoint: Data([4])
+        )])
+        let model = makeModel(source: source, repository: repository)
+        await model.bootstrap()
+
+        model.refresh()
+        try await waitForImportToFinish(model)
+
+        let processed = try await repository.loadProcessedWorkoutIDs()
+        let checkpoint = try await repository.loadCheckpoint()
+        XCTAssertEqual(model.routeRecords.map(\.id), [retainedID])
+        XCTAssertEqual(processed, [retainedID])
+        XCTAssertEqual(checkpoint, Data([4]))
+    }
+
+    @MainActor
+    func testZeroReadableScopeKeepsExistingCacheAndOldCheckpoint() async throws {
+        let id = UUID()
+        let oldCheckpoint = Data([3])
+        let repository = TestHistoryRepository(
+            records: [record(id: id, latitude: 40.75)],
+            processedIDs: [id],
+            checkpoint: oldCheckpoint
+        )
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(
+            routes: [],
+            authoritativeWorkoutIDs: [],
+            checkpoint: Data([9])
+        )])
+        let model = makeModel(source: source, repository: repository)
+        await model.bootstrap()
+
+        model.refresh()
+        try await waitForImportToFinish(model)
+
+        let processed = try await repository.loadProcessedWorkoutIDs()
+        let checkpoint = try await repository.loadCheckpoint()
+        XCTAssertEqual(model.routeRecords.map(\.id), [id])
+        XCTAssertEqual(processed, [id])
+        XCTAssertEqual(checkpoint, oldCheckpoint)
+        guard case .failed = model.importPhase else {
+            return XCTFail("An unreadable Health scope should ask for attention")
+        }
+    }
+
+    @MainActor
+    func testLocationButtonCyclesNorthUpHeadingAndReturnsToNorthUpAfterHeading() async {
+        let model = makeModel(
+            source: TestRouteSource(batches: []),
+            repository: TestHistoryRepository()
+        )
+
+        XCTAssertEqual(model.mapUserTrackingMode, .free)
+        model.showUserLocation()
+        XCTAssertEqual(model.mapUserTrackingMode, .follow)
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.follow))
+
+        model.mapUserTrackingDidChange(.follow)
+        model.showUserLocation()
+        XCTAssertEqual(model.mapUserTrackingMode, .followWithHeading)
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.followWithHeading))
+
+        model.mapUserTrackingDidChange(.followWithHeading)
+        model.showUserLocation()
+        XCTAssertEqual(model.mapUserTrackingMode, .follow)
+        model.mapUserTrackingDidChange(.free)
+        XCTAssertEqual(model.mapUserTrackingMode, .free)
+    }
+
+    @MainActor
     func testForegroundRefreshThrottlesFiveMinutesAndManualRefreshBypassesIt() async throws {
         let lastSuccess = Date(timeIntervalSince1970: 10_000)
         UserDefaults.standard.set(true, forKey: "didConnectAppleHealth")
@@ -909,43 +1057,28 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
-    func testLegacyStoreIsRetainedOnFailureAndDeletedAfterSuccessfulNonemptyImport() async throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let legacyFile = directory.appendingPathComponent("coverage.store")
-        FileManager.default.createFile(atPath: legacyFile.path, contents: Data([1]))
-        let legacy = LegacyCoverageStore(files: [legacyFile])
-
-        UserDefaults.standard.set(true, forKey: "didConnectAppleHealth")
-        let failing = TestRouteSource(batches: [], failure: TestError.failed)
-        let failedModel = makeModel(
-            source: failing,
-            repository: TestHistoryRepository(),
-            legacyStore: legacy
-        )
-        await failedModel.bootstrap()
-        failedModel.refresh()
-        try await waitForImportToFinish(failedModel)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: legacyFile.path))
-
-        UserDefaults.standard.removeObject(forKey: "didBeginLifetimeMapMigration")
+    func testCancellationBeforeStreamCompletionDoesNotPublishCheckpoint() async throws {
         let route = workoutRoute()
-        let successful = TestRouteSource(batches: [WorkoutRouteBatch(
+        let oldCheckpoint = Data([1])
+        let source = SuspendedAfterBatchRouteSource(batch: WorkoutRouteBatch(
             routes: [route],
             processedWorkouts: [.init(id: route.id, end: route.end)],
-            checkpoint: Data([1])
-        )])
-        let successfulModel = makeModel(
-            source: successful,
-            repository: TestHistoryRepository(),
-            legacyStore: legacy
-        )
-        await successfulModel.bootstrap()
-        successfulModel.refresh()
-        try await waitForImportToFinish(successfulModel)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFile.path))
+            checkpoint: Data([9])
+        ))
+        let repository = TestHistoryRepository(checkpoint: oldCheckpoint)
+        let model = makeModel(source: source, repository: repository)
+        await model.bootstrap()
+
+        model.refresh()
+        for _ in 0 ..< 100 where !(await source.didYieldBatch()) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        model.cancelImport()
+        try await Task.sleep(for: .milliseconds(50))
+
+        let checkpoint = try await repository.loadCheckpoint()
+        XCTAssertEqual(checkpoint, oldCheckpoint)
+        XCTAssertEqual(model.importPhase, .idle)
     }
 
     @MainActor
@@ -966,8 +1099,7 @@ final class WalkItAllTests: XCTestCase {
     private func makeModel(
         source: any WorkoutRouteSource,
         repository: any WalkHistoryRepository,
-        liveTrailRepository: any LiveTrailRepository = TestLiveTrailRepository(),
-        legacyStore: LegacyCoverageStore = LegacyCoverageStore(files: [])
+        liveTrailRepository: any LiveTrailRepository = TestLiveTrailRepository()
     ) -> AppModel {
         AppModel(dependencies: AppDependencies(
             routeSource: source,
@@ -975,7 +1107,6 @@ final class WalkItAllTests: XCTestCase {
             routeProcessor: RouteProcessor(),
             liveTrailRepository: liveTrailRepository,
             liveTrailProcessor: LiveTrailProcessor(),
-            legacyStore: legacyStore,
             protectStorage: {}
         ))
     }
@@ -1015,13 +1146,15 @@ final class WalkItAllTests: XCTestCase {
         id: UUID,
         latitude: Double,
         longitude: Double = -73.99,
-        source: String = "Test"
+        source: String = "Test",
+        activityKind: RouteActivityKind = .walking
     ) -> WorkoutRouteRecord {
         WorkoutRouteRecord(
             id: id,
             start: Date(timeIntervalSince1970: 100),
             end: Date(timeIntervalSince1970: 200),
             sourceName: source,
+            activityKind: activityKind,
             routeParts: [[
                 GeoCoordinate(latitude: latitude, longitude: longitude),
                 GeoCoordinate(latitude: latitude + 0.001, longitude: longitude + 0.001),
@@ -1034,7 +1167,7 @@ final class WalkItAllTests: XCTestCase {
         return LiveTrailSession(
             state: state,
             start: start,
-            end: state == .waitingForHealth ? start.addingTimeInterval(100) : nil,
+            end: state == .finished ? start.addingTimeInterval(100) : nil,
             routeParts: [[
                 RoutePoint(
                     coordinate: GeoCoordinate(latitude: 40.75, longitude: -73.99),
@@ -1051,8 +1184,6 @@ final class WalkItAllTests: XCTestCase {
         )
     }
 }
-
-private enum TestError: Error { case failed }
 
 private final class FactoryInvocationProbe: @unchecked Sendable {
     private let lock = NSLock()
@@ -1171,6 +1302,32 @@ private actor SuspendingRouteSource: WorkoutRouteSource {
     ) async -> AsyncThrowingStream<WorkoutRouteBatch, Error> {
         AsyncThrowingStream { $0.finish() }
     }
+}
+
+private actor SuspendedAfterBatchRouteSource: WorkoutRouteSource {
+    private let batch: WorkoutRouteBatch
+    private var yielded = false
+
+    init(batch: WorkoutRouteBatch) {
+        self.batch = batch
+    }
+
+    func requestReadAuthorization() async throws {}
+
+    func routeBatches(
+        since checkpoint: Data?,
+        excluding workoutIDs: Set<UUID>
+    ) async -> AsyncThrowingStream<WorkoutRouteBatch, Error> {
+        let batch = batch
+        yielded = true
+        return AsyncThrowingStream { continuation in
+            continuation.yield(batch)
+            // Deliberately remain open. Cancelling the consumer must end the
+            // import without publishing this batch's deferred checkpoint.
+        }
+    }
+
+    func didYieldBatch() -> Bool { yielded }
 }
 
 private actor TestHistoryRepository: WalkHistoryRepository {

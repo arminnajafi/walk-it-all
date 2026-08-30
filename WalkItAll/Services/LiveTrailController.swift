@@ -17,8 +17,6 @@ enum LocationAccessState: Equatable {
 @Observable
 final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDelegate {
     static let maximumSessionDuration: TimeInterval = 12 * 60 * 60
-    static let pendingRetentionDuration: TimeInterval = 7 * 24 * 60 * 60
-    private static let expiredNoticeKey = "lastExpiredLiveTrailDate"
     private static let persistenceInterval: TimeInterval = 15
     private static let persistencePointInterval = 25
     private static let renderInterval: TimeInterval = 2
@@ -27,13 +25,10 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     var accessState: LocationAccessState
     var issueMessage: String?
     var renderRevision = 0
-    var lastExpiredTrailDate: Date?
 
-    @ObservationIgnored var onDidFinish: (() -> Void)?
     @ObservationIgnored private let repository: any LiveTrailRepository
     @ObservationIgnored private let processor: LiveTrailProcessor
     @ObservationIgnored private let locationManager: CLLocationManager
-    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let logger = Logger(
         subsystem: "com.arminnajafi.walkitall",
         category: "LiveTrail"
@@ -57,23 +52,21 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     init(
         repository: any LiveTrailRepository,
         processor: LiveTrailProcessor = LiveTrailProcessor(),
-        locationManager: CLLocationManager = CLLocationManager(),
-        defaults: UserDefaults = .standard
+        locationManager: CLLocationManager = CLLocationManager()
     ) {
         self.repository = repository
         self.processor = processor
         self.locationManager = locationManager
-        self.defaults = defaults
         accessState = Self.accessState(for: locationManager.authorizationStatus)
-        lastExpiredTrailDate = defaults.object(forKey: Self.expiredNoticeKey) as? Date
         super.init()
         locationManager.delegate = self
     }
 
     var isActive: Bool { session?.state == .active }
     var isPaused: Bool { session?.state == .paused }
+    var isFinished: Bool { session?.state == .finished }
     var hasInProgressSession: Bool { isActive || isPaused }
-    var isWaitingForHealth: Bool { session?.state == .waitingForHealth }
+    var hasDrawableGeometry: Bool { !(session?.coordinateParts.isEmpty ?? true) }
 
     func bootstrap(now: Date = Date()) async {
         guard !hasBootstrapped, !bootstrapInProgress else { return }
@@ -86,8 +79,8 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             }
             if ProcessInfo.processInfo.arguments.contains("-uiTestPausedLiveTrail") {
                 try await repository.save(Self.uiTestSession(state: .paused, now: now))
-            } else if ProcessInfo.processInfo.arguments.contains("-uiTestWaitingLiveTrail") {
-                try await repository.save(Self.uiTestSession(state: .waitingForHealth, now: now))
+            } else if ProcessInfo.processInfo.arguments.contains("-uiTestFinishedLiveTrail") {
+                try await repository.save(Self.uiTestSession(state: .finished, now: now))
             }
             #endif
             guard let stored = try await repository.load() else {
@@ -113,8 +106,8 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
                 } else {
                     scheduleTimeout()
                 }
-            case .waitingForHealth:
-                await expirePendingTrailIfNeeded(now: now)
+            case .finished:
+                break
             }
             hasBootstrapped = true
         } catch {
@@ -209,7 +202,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         // prevents a late update or a second tap from reopening the session.
         let finishingSnapshot = LiveTrailSession(
             id: session.id,
-            state: .waitingForHealth,
+            state: .finished,
             start: session.start,
             end: max(effectiveEnd, session.start),
             routeParts: session.routeParts,
@@ -240,38 +233,42 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         }
 
         let processor = processor
-        let pending = await Task.detached(priority: .userInitiated) {
+        let finished = await Task.detached(priority: .userInitiated) {
             processor.finishing(session, at: effectiveEnd)
         }.value
-        workingSession = pending
-        self.session = pending
+        workingSession = finished
+        self.session = finished
         do {
-            try await repository.save(pending)
+            try await repository.save(finished)
         } catch {
             logger.error("Temporary trail finish save failed: \(error.localizedDescription, privacy: .private)")
             if !terminalSnapshotPersisted {
-                issueMessage = "Live Trail stopped, but its temporary route could not be saved. Your Apple Health workout is unaffected."
+                issueMessage = "Live Trail stopped, but its temporary route could not be saved."
             }
         }
-        onDidFinish?()
     }
 
-    func reconcile(with records: [WorkoutRouteRecord], now: Date = Date()) async {
-        guard let session, session.state == .waitingForHealth else { return }
-        if LiveTrailHealthAssociator.matchingWorkoutID(for: session, among: records) != nil {
-            do {
-                await persistenceTask?.value
-                persistenceTask = nil
-                try await repository.delete()
-                workingSession = nil
-                self.session = nil
-                renderRevision &+= 1
-            } catch {
-                logger.error("Matched temporary trail cleanup failed: \(error.localizedDescription, privacy: .private)")
-            }
-            return
+    func clear() async {
+        stopLocationDelivery()
+        pendingStart = false
+        pendingResume = false
+        await persistenceTask?.value
+        persistenceTask = nil
+        do {
+            try await repository.delete()
+            workingSession = nil
+            session = nil
+            renderRevision &+= 1
+        } catch {
+            logger.error("Temporary trail cleanup failed: \(error.localizedDescription, privacy: .private)")
+            issueMessage = "The temporary trail could not be cleared."
         }
-        await expirePendingTrailIfNeeded(now: now)
+    }
+
+    func startNew(now: Date = Date()) async {
+        await clear()
+        guard session == nil else { return }
+        start(now: now)
     }
 
     func clearIssue() {
@@ -472,26 +469,6 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         }
     }
 
-    private func expirePendingTrailIfNeeded(now: Date) async {
-        guard let session,
-              session.state == .waitingForHealth,
-              let end = session.end,
-              now.timeIntervalSince(end) >= Self.pendingRetentionDuration
-        else { return }
-        do {
-            await persistenceTask?.value
-            persistenceTask = nil
-            try await repository.delete()
-            workingSession = nil
-            self.session = nil
-            renderRevision &+= 1
-            lastExpiredTrailDate = now
-            defaults.set(now, forKey: Self.expiredNoticeKey)
-        } catch {
-            logger.error("Expired temporary trail cleanup failed: \(error.localizedDescription, privacy: .private)")
-        }
-    }
-
     private static func accessState(for status: CLAuthorizationStatus) -> LocationAccessState {
         switch status {
         case .authorizedAlways, .authorizedWhenInUse: .authorized
@@ -525,7 +502,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         return LiveTrailSession(
             state: state,
             start: start,
-            end: state == .waitingForHealth ? now.addingTimeInterval(-60) : nil,
+            end: state == .finished ? now.addingTimeInterval(-60) : nil,
             routeParts: [[
                 RoutePoint(
                     coordinate: GeoCoordinate(latitude: 40.7530, longitude: -73.9900),

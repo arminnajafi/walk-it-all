@@ -1,8 +1,7 @@
 import SwiftUI
 import WalkItAllCore
 
-struct LifetimeMapCard: View {
-    let mappedWorkoutCount: Int
+struct EmptyRouteMapCard: View {
     let phase: ImportPhase
     let lastSuccessfulImport: Date?
     let hasConnectedHealth: Bool
@@ -14,9 +13,8 @@ struct LifetimeMapCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
+                    Text("No outdoor routes mapped yet")
                         .font(.title2.weight(.semibold))
-                        .contentTransition(.numericText())
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -31,8 +29,8 @@ struct LifetimeMapCard: View {
                 .accessibilityLabel("Show map details")
             }
 
-            if mappedWorkoutCount == 0, !phase.isWorking {
-                Text("Ordinary steps and indoor workouts do not include a route. Record an Outdoor Walk, or review Apple Health access.")
+            if !phase.isWorking {
+                Text("Ordinary steps and indoor workouts do not include a route. Record a supported outdoor workout, or review Apple Health access.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -75,12 +73,6 @@ struct LifetimeMapCard: View {
         .accessibilityIdentifier("lifetime-map-card")
     }
 
-    private var title: String {
-        mappedWorkoutCount == 0
-            ? "No walking routes mapped yet"
-            : "\(mappedWorkoutCount.formatted()) walk\(mappedWorkoutCount == 1 ? "" : "s") mapped"
-    }
-
     private var subtitle: String {
         if phase.isWorking { return phase.title }
         if let lastSuccessfulImport {
@@ -113,6 +105,8 @@ struct SelectedWorkoutCard: View {
 
             Label(duration(workout.duration), systemImage: "clock")
                 .font(.subheadline.weight(.medium))
+            Label(workout.activityKind.displayName, systemImage: workout.activityKind.systemImage)
+                .font(.subheadline.weight(.medium))
             Label("Orange with a contrasting outline shows this workout", systemImage: "line.diagonal")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -132,9 +126,8 @@ struct SelectedWorkoutCard: View {
 }
 
 #if DEBUG
-#Preview("Mapped") {
-    LifetimeMapCard(
-        mappedWorkoutCount: 211,
+#Preview("Empty") {
+    EmptyRouteMapCard(
         phase: .idle,
         lastSuccessfulImport: .now,
         hasConnectedHealth: true,

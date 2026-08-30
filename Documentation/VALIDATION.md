@@ -4,24 +4,25 @@
 
 The verification script must pass:
 
-- pure-Swift route filtering, gap separation, simplification, bounds, and stress tests;
-- Health cursor migration, route association, and conservative unresolved-route invalidation tests;
-- repository replacement, deletion, reset, corruption recovery, locked-data deferral, external-support-tree protection, cursor, ledger, and timestamp round trips;
+- pure-Swift activity-aware route filtering, gap separation, simplification, bounds, and mixed-activity stress tests;
+- Health cursor v3 migration, route association, authoritative reconciliation, and conservative zero-readable-cache preservation tests;
+- repository activity payload compatibility, replacement, deletion, reset, corruption recovery, locked-data deferral, external-support-tree protection, cursor, ledger, and timestamp round trips;
 - synchronization addition, invalidation, deletion, cancellation, generation, and refresh-throttle tests;
-- overlay completeness, worldwide bounds, native spatial culling, repeat opacity, selection viewport, and selection-without-history-rebuild tests;
-- Live Trail filtering, pre-session/stale-location rejection, discontinuities, Pause/Resume separation, crash-safe final Finish, Health association, exact-file persistence, structural corruption, idempotent locked relaunch ordering, replacement, and expiry tests;
+- overlay completeness, worldwide bounds, native spatial culling, repeat opacity, selection viewport, heading-mode state, and selection-without-history-rebuild tests;
+- Live Trail filtering, pre-session rejection, discontinuities, Pause/Resume separation, crash-safe final Finish, Clear, exact-file persistence, structural corruption, retained finished state, and locked relaunch ordering tests;
 - onboarding, empty state, restrained populated map, Live Trail explanation, paused and finished states, details, Health help, history, privacy, and Dynamic Type UI tests.
 
 ## Personal-device gate
 
 Before signoff:
 
-1. Record the current drawable-route and processed-workout counts, rebuild from Apple Health, and confirm the same baseline returns. Counts are intentionally not fixed here because they grow as new workouts sync.
-2. Compare at least ten representative routes with Apple Fitness. Confirm that inaccurate points, subway travel, outages, and implausible jumps are not bridged.
-3. Start an Apple Watch Outdoor Walk and Live Trail, lock the phone, walk several blocks, and confirm the solid green trail is continuous after reopening. Pause and confirm background trail tracking and its system indicator stop; Resume and confirm a new trail part begins without bridging the break. Finish and confirm the stopped state is final.
-4. Wait for Apple Health and confirm its indigo route replaces rather than duplicates the dashed provisional trail. Verify automatic five-minute refresh and manual bypass.
-5. Exercise denied permission, interruption/relaunch, stationary time, implausible movement, 12-hour timeout, route replacement/deletion, and seven-day cleanup.
-6. Reinstall after Health synchronization and rebuild the same permanent history; confirm no temporary Live Trail is restored from backup.
+1. Record the current drawable-route and processed-workout counts, run the activity-scope reconciliation, and confirm existing walks/hikes remain while supported runs and rides appear. Counts are intentionally not fixed because they grow as new workouts sync.
+2. Compare representative walk, hike, run, and ride routes with Apple Fitness. Confirm that inaccurate points, transit, outages, and implausible jumps are not bridged.
+3. Start Live Trail, lock the phone, walk several blocks, and confirm the solid green trail is continuous after reopening. Pause and confirm background trail tracking and its system indicator stop; Resume and confirm a new trail part begins without bridging the break. Finish and confirm the state is final across relaunch.
+4. Confirm Start New replaces a finished trail only after confirmation when it has geometry, and Clear removes it. Record a supported Watch workout separately and verify its indigo Health route imports without altering the green trail.
+5. Verify north-up follow, heading follow outdoors, the standard compass, and that panning or rotating releases the camera.
+6. Exercise denied permission, interruption/relaunch, stationary time, implausible movement, 12-hour timeout, and Health route replacement/deletion.
+7. Reinstall after Health synchronization and rebuild the same permanent history; confirm the backup-excluded temporary Live Trail is not restored.
 
 ## Performance gate
 
@@ -44,17 +45,6 @@ On a real device, confirm complete protection for permanent history, complete-un
 
 ## Current status
 
-The previous street-completion implementation is preserved on `codex/street-completion-archive`.
+The repository records the route-history decision directly on `main`; it does not retain a parallel street-completion product branch.
 
-Verified on August 29, 2026:
-
-- 20 core tests, 41 app/storage/map tests, and 10 rendered UI tests pass;
-- Xcode static analysis and clean Debug and Release simulator builds pass without compiler diagnostics;
-- the latest connected-iPhone history inspection found 213 drawable routes and 232 processed workouts; future rebuild checks compare against a fresh pre-rebuild baseline instead of these naturally changing counts;
-- the active store, WAL, sidecar, SwiftData external-data support tree, temporary trail, and their directories are excluded from backup; code/test invariants request complete protection for permanent history and locked-screen-compatible protection for the temporary trail;
-- a 15-second real-device Time Profiler recording reported no hangs or hang-risk events above its 250-millisecond threshold;
-- a symbolicated 25-second simulator map-pan trace spent 23.887 seconds idle and 1.086 seconds active on the main thread; MapKit and Metal dominated the active samples and no first-party hot path appeared;
-- Live Trail compaction runs away from the main actor, Pause/Resume cannot bridge a gap, temporary map revisions are rate-limited, and history overlays remain immutable;
-- the signed Release build containing the August 29 recovery, privacy, Live Trail, location-background-mode, prompt-map-launch, and audit refinements is installed on the connected iPhone. Opening that exact build for its final device-launch check requires the iPhone to be unlocked.
-
-The remaining field checks require physical movement or elapsed time: a locked-phone Live Trail walk including Pause/Resume, Health replacement after ending the Watch workout, two-hour battery profiling, and destructive reinstall/recovery checks. They remain explicit personal-device acceptance work rather than claims made from simulator evidence.
+Update this section only with evidence from the final verification and personal-device pass. Physical movement, heading accuracy, two-hour battery use, and destructive reinstall/recovery remain field checks rather than simulator claims.

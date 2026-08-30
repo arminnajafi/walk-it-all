@@ -11,40 +11,31 @@ struct MapDetailsSheet: View {
                 case .active:
                     Label("Active", systemImage: "location.fill")
                         .foregroundStyle(.green)
-                    Text("Location continues while the screen is locked until you tap Finish. Start an Outdoor Walk on Apple Watch for permanent history.")
+                    Text("Location continues while the screen is locked until you Pause or Finish.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 case .paused:
                     Label("Paused — trail tracking is off", systemImage: "pause.circle.fill")
                         .foregroundStyle(.orange)
-                    Text("Resume from the map after a short break. Finish instead if the walk is over or you are switching to transit.")
+                    Text("Resume from the map after a short break. Finish instead if the outing is over or you are switching to transit.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                case .waitingForHealth:
-                    Label("Finished — syncing from Apple Health", systemImage: "checkmark.circle.fill")
+                case .finished:
+                    Label("Finished — tracking is off", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("Background trail tracking is no longer running. The dashed green trail is temporary and will disappear when the finished workout route imports, or after seven days.")
+                    Text("The temporary green trail remains until you clear it or start a new one. Apple Health does not change it.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 case nil:
-                    Text("Start Live Trail from the map when you want an immediate, temporary guide during a walk.")
+                    Text("Start Live Trail from the map when you want an immediate, temporary guide while moving outdoors.")
                         .foregroundStyle(.secondary)
                 }
 
-                if let date = model.liveTrail.lastExpiredTrailDate {
-                    Label {
-                        Text("A Live Trail from \(date.formatted(date: .abbreviated, time: .omitted)) expired because its Health route was not found. No coordinates were retained.")
-                    } icon: {
-                        Image(systemName: "exclamationmark.circle")
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                }
             }
 
             Section("Apple Health") {
                 LabeledContent("Status", value: model.importPhase.title)
-                LabeledContent("Walks mapped", value: model.mappedWorkoutCount.formatted())
+                LabeledContent("Workouts mapped", value: model.mappedWorkoutCount.formatted())
                 if let date = model.lastSuccessfulImport {
                     LabeledContent(
                         "Last refreshed",
@@ -92,7 +83,7 @@ struct MapDetailsSheet: View {
                     Label {
                         Text("There may be no recorded outdoor routes, access may be limited, or Health history may still be syncing.")
                     } icon: {
-                        Image(systemName: "figure.walk")
+                        Image(systemName: "map")
                     }
                     .foregroundStyle(.secondary)
                 }
@@ -109,7 +100,7 @@ struct MapDetailsSheet: View {
             Button("Rebuild history", role: .destructive, action: model.rebuildFromHealth)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the rebuildable local map and imports your authorized walking routes again.")
+            Text("This removes the rebuildable local map and imports your authorized outdoor workout routes again.")
         }
     }
 }

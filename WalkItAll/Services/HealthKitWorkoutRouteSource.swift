@@ -20,7 +20,7 @@ enum HealthRouteSourceError: LocalizedError {
 /// HealthKit anchors are deliberately opaque to WalkItAllCore. This cursor owns
 /// the two independently mutable Health streams and their parent association.
 struct HealthImportCursor: Codable, Sendable {
-    static let currentVersion = 2
+    static let currentVersion = 3
 
     var version: Int
     var workoutAnchorData: Data?
@@ -105,16 +105,25 @@ enum HealthImportCursorCodec {
                 requiresFullRouteReconciliation: false
             )
         }
-        if let cursor = try? JSONDecoder().decode(HealthImportCursor.self, from: data) {
+        if var cursor = try? JSONDecoder().decode(HealthImportCursor.self, from: data) {
+            let scopeChanged = cursor.version != HealthImportCursor.currentVersion
+            let routeStateMissing = cursor.routeAnchorData == nil
+            if scopeChanged {
+                // The workout predicate changed in v3. An anchor created for
+                // the old scope must not hide older runs or rides.
+                cursor.workoutAnchorData = nil
+            }
+            if scopeChanged || routeStateMissing {
+                cursor.routeToWorkout = [:]
+            }
             return DecodingResult(
                 cursor: cursor,
-                requiresFullRouteReconciliation: cursor.version != HealthImportCursor.currentVersion
-                    || cursor.routeAnchorData == nil
+                requiresFullRouteReconciliation: scopeChanged || routeStateMissing
             )
         }
         if (try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: data)) != nil {
             return DecodingResult(
-                cursor: HealthImportCursor(workoutAnchorData: data),
+                cursor: HealthImportCursor(),
                 requiresFullRouteReconciliation: true
             )
         }
@@ -126,6 +135,25 @@ enum HealthImportCursorCodec {
 
     static func encode(_ cursor: HealthImportCursor) throws -> Data {
         try JSONEncoder().encode(cursor)
+    }
+}
+
+enum HealthWorkoutActivityMapper {
+    static let supportedTypes: [HKWorkoutActivityType] = [
+        .walking,
+        .hiking,
+        .running,
+        .cycling,
+    ]
+
+    static func kind(for activityType: HKWorkoutActivityType) -> RouteActivityKind? {
+        switch activityType {
+        case .walking: .walking
+        case .hiking: .hiking
+        case .running: .running
+        case .cycling: .cycling
+        default: nil
+        }
     }
 }
 
@@ -191,11 +219,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                     var addedAssociations: [UUID: UUID] = [:]
                     for routeSample in routeChanges.routes {
                         try Task.checkCancellation()
-                        guard let parent = try await parentWorkout(for: routeSample) else {
-                            // Routes for activities other than walking and hiking are
-                            // intentionally outside this app's walking history.
-                            continue
-                        }
+                        guard let parent = try await parentWorkout(for: routeSample) else { continue }
                         addedAssociations[routeSample.uuid] = parent.uuid
                     }
                     let associationUpdate = HealthRouteAssociationReconciler.applying(
@@ -247,6 +271,9 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                                     || requiresFullRouteReconciliation)
                         }
                         .sorted { $0.startDate < $1.startDate }
+                    let authoritativeWorkoutIDs = requiresFullRouteReconciliation
+                        ? Set(candidates.keys).subtracting(deletedWorkoutIDs)
+                        : nil
 
                     cursor.version = HealthImportCursor.currentVersion
                     cursor.workoutAnchorData = try encodeAnchor(workoutChanges.anchor)
@@ -258,6 +285,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                             deletedWorkoutIDs: workoutChanges.deletedIDs,
                             routeInvalidatedWorkoutIDs: unresolvedRouteInvalidations,
                             processedWorkouts: [],
+                            authoritativeWorkoutIDs: authoritativeWorkoutIDs,
                             checkpoint: try HealthImportCursorCodec.encode(cursor),
                             completedCount: 0,
                             totalCount: 0
@@ -294,6 +322,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                                 $0.uuidString < $1.uuidString
                             },
                             processedWorkouts: [.init(id: workout.uuid, end: workout.endDate)],
+                            authoritativeWorkoutIDs: isLast ? authoritativeWorkoutIDs : nil,
                             checkpoint: isLast ? try HealthImportCursorCodec.encode(cursor) : nil,
                             completedCount: index + 1,
                             totalCount: workouts.count
@@ -312,7 +341,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
 
     private func queryWorkoutChanges(anchor: HKQueryAnchor?) async throws -> WorkoutChanges {
         let descriptor = HKAnchoredObjectQueryDescriptor<HKWorkout>(
-            predicates: [.workout(walkingOrHikingPredicate())],
+            predicates: [.workout(supportedActivityPredicate())],
             anchor: anchor,
             limit: nil
         )
@@ -342,14 +371,14 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
         let dates = HKQuery.predicateForSamples(withStart: cutoff, end: nil)
         return try await queryWorkouts(
-            predicate: NSCompoundPredicate(andPredicateWithSubpredicates: [walkingOrHikingPredicate(), dates]),
+            predicate: NSCompoundPredicate(andPredicateWithSubpredicates: [supportedActivityPredicate(), dates]),
             sortDescriptors: [SortDescriptor(\.startDate)]
         )
     }
 
     private func queryAllWorkouts() async throws -> [HKWorkout] {
         try await queryWorkouts(
-            predicate: walkingOrHikingPredicate(),
+            predicate: supportedActivityPredicate(),
             sortDescriptors: [SortDescriptor(\.startDate)]
         )
     }
@@ -357,7 +386,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
     private func workout(id: UUID) async throws -> HKWorkout? {
         let identifier = HKQuery.predicateForObject(with: id)
         return try await queryWorkouts(
-            predicate: NSCompoundPredicate(andPredicateWithSubpredicates: [walkingOrHikingPredicate(), identifier]),
+            predicate: NSCompoundPredicate(andPredicateWithSubpredicates: [supportedActivityPredicate(), identifier]),
             sortDescriptors: [],
             limit: 1
         ).first
@@ -371,7 +400,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
             options: []
         )
         let candidates = try await queryWorkouts(
-            predicate: NSCompoundPredicate(andPredicateWithSubpredicates: [walkingOrHikingPredicate(), dates]),
+            predicate: NSCompoundPredicate(andPredicateWithSubpredicates: [supportedActivityPredicate(), dates]),
             sortDescriptors: [SortDescriptor(\.startDate)]
         )
         for candidate in candidates {
@@ -396,14 +425,15 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
         return try await descriptor.result(for: healthStore)
     }
 
-    private func walkingOrHikingPredicate() -> NSPredicate {
-        NSCompoundPredicate(orPredicateWithSubpredicates: [
-            HKQuery.predicateForWorkouts(with: .walking),
-            HKQuery.predicateForWorkouts(with: .hiking),
-        ])
+    private func supportedActivityPredicate() -> NSPredicate {
+        NSCompoundPredicate(orPredicateWithSubpredicates:
+            HealthWorkoutActivityMapper.supportedTypes.map(HKQuery.predicateForWorkouts(with:))
+        )
     }
 
     private func loadWorkoutRoute(_ workout: HKWorkout) async throws -> LoadedRoute {
+        guard let activityKind = HealthWorkoutActivityMapper.kind(for: workout.workoutActivityType)
+        else { throw HealthRouteSourceError.unexpectedSample }
         let routes = try await routeSamples(for: workout)
         guard !routes.isEmpty else { return LoadedRoute(route: nil, sampleIDs: []) }
         var allLocations: [CLLocation] = []
@@ -433,6 +463,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                 start: workout.startDate,
                 end: workout.endDate,
                 sourceName: workout.sourceRevision.source.name,
+                activityKind: activityKind,
                 points: deduplicated.map {
                     RoutePoint(
                         coordinate: GeoCoordinate(

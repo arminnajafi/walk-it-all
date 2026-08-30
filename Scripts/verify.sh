@@ -8,6 +8,7 @@ swift test
 
 cd "$project_root"
 xcodegen generate
+git diff --exit-code -- WalkItAll.xcodeproj
 
 if [[ -d /Applications/Xcode.app ]]; then
   simulator_id="$(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \

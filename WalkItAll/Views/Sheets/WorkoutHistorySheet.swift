@@ -10,8 +10,8 @@ struct WorkoutHistorySheet: View {
             if model.routeRecords.isEmpty {
                 ContentUnavailableView(
                     "No workout routes",
-                    systemImage: "figure.walk",
-                    description: Text("Outdoor walking and hiking routes imported from Apple Health will appear here.")
+                    systemImage: "map",
+                    description: Text("Supported outdoor workout routes imported from Apple Health will appear here.")
                 )
             } else {
                 List(model.routeRecords) { record in
@@ -41,7 +41,7 @@ private struct WorkoutRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "figure.walk.circle")
+            Image(systemName: isSelected ? "checkmark.circle.fill" : record.activityKind.systemImage)
                 .font(.title2)
                 .foregroundStyle(isSelected ? .indigo : .secondary)
             VStack(alignment: .leading, spacing: 4) {
@@ -51,6 +51,9 @@ private struct WorkoutRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                Text(record.activityKind.displayName)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             Text(duration(record.duration))
@@ -65,5 +68,25 @@ private struct WorkoutRow: View {
         Duration.seconds(interval).formatted(
             .time(pattern: interval >= 3_600 ? .hourMinute : .minuteSecond)
         )
+    }
+}
+
+extension RouteActivityKind {
+    var displayName: String {
+        switch self {
+        case .walking: "Walking"
+        case .hiking: "Hiking"
+        case .running: "Running"
+        case .cycling: "Cycling"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .walking: "figure.walk"
+        case .hiking: "figure.hiking"
+        case .running: "figure.run"
+        case .cycling: "bicycle"
+        }
     }
 }

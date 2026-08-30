@@ -46,7 +46,7 @@ targets:
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
-        NSHealthShareUsageDescription: Walk It All reads walking and hiking workout routes to create your private lifetime map. Route processing stays on this device.
+        NSHealthShareUsageDescription: Walk It All reads walking, hiking, running, and cycling workout routes to create your private lifetime map. Route processing stays on this device.
         NSLocationWhenInUseUsageDescription: Walk It All shows your position and, only while you explicitly run Live Trail, continues drawing that temporary trail when the screen locks. Location stays on this iPhone.
         UIBackgroundModes:
           - location

@@ -7,7 +7,6 @@ struct AppDependencies {
     let routeProcessor: RouteProcessor
     let liveTrailRepository: any LiveTrailRepository
     let liveTrailProcessor: LiveTrailProcessor
-    let legacyStore: LegacyCoverageStore
     let protectStorage: @Sendable () throws -> Void
 
     static func live() throws -> AppDependencies {
@@ -17,7 +16,6 @@ struct AppDependencies {
             routeProcessor: RouteProcessor(),
             liveTrailRepository: try ProtectedLiveTrailRepository.live(),
             liveTrailProcessor: LiveTrailProcessor(),
-            legacyStore: try LegacyCoverageStore.live(),
             protectStorage: ProtectedModelContainer.protectHistoryStoreFiles
         )
     }

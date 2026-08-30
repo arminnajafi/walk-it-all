@@ -50,10 +50,10 @@ struct OnboardingView: View {
         VStack(spacing: pageSpacing) {
             pageIcon("map.fill", color: .indigo)
             VStack(spacing: 12) {
-                Text("See everywhere you’ve walked.")
+                Text("See everywhere you’ve covered.")
                     .font(pageTitleFont)
                     .multilineTextAlignment(.center)
-                Text("Recorded outdoor walks and hikes become one lifetime map—wherever they took you.")
+                Text("Walking, hiking, running, and cycling workouts from Apple Health become one private lifetime map.")
                     .font(pageBodyFont)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -75,7 +75,7 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
             }
             Label(
-                "For future walks, record an Outdoor Walk with Apple Watch or another app that saves a GPS route to Health.",
+                "Record an outdoor walk, hike, run, or ride with Apple Watch or another app that saves a GPS route to Health.",
                 systemImage: "applewatch"
             )
             .font(.subheadline)

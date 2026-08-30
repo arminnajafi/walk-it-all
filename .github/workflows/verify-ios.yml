@@ -1,7 +1,17 @@
 name: Verify iOS
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-ios-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
@@ -23,7 +33,9 @@ jobs:
         run: swift test
 
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: |
+          xcodegen generate
+          git diff --exit-code -- WalkItAll.xcodeproj
 
       - name: Run app and tests
         run: |

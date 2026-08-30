@@ -23,7 +23,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Walk It All reads walking and hiking workout routes to create your private lifetime map. Route processing stays on this device.</string>
+	<string>Walk It All reads walking, hiking, running, and cycling workout routes to create your private lifetime map. Route processing stays on this device.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Walk It All shows your position and, only while you explicitly run Live Trail, continues drawing that temporary trail when the screen locks. Location stays on this iPhone.</string>
 	<key>UIApplicationSceneManifest</key>

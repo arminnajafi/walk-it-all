@@ -11,6 +11,7 @@ final class RouteProcessorTests: XCTestCase {
             start: start,
             end: start.addingTimeInterval(600),
             sourceName: "Apple Watch",
+            activityKind: .hiking,
             points: [
                 point(40.7500, -73.9900, at: start),
                 point(40.7501, -73.9900, at: start.addingTimeInterval(10)),
@@ -23,6 +24,7 @@ final class RouteProcessorTests: XCTestCase {
 
         XCTAssertEqual(record.id, id)
         XCTAssertEqual(record.sourceName, "Apple Watch")
+        XCTAssertEqual(record.activityKind, .hiking)
         XCTAssertEqual(record.duration, 600)
         XCTAssertEqual(record.routeParts.count, 2)
         XCTAssertTrue(record.routeParts.allSatisfy { $0.count == 2 })
@@ -100,6 +102,24 @@ final class RouteProcessorTests: XCTestCase {
         XCTAssertEqual(bounds.maximumLongitude, -0.1)
     }
 
+    func testActivitySpecificMovementThresholds() {
+        let start = Date(timeIntervalSince1970: 4_000)
+        let moderateMovement = [
+            point(40.7500, -73.9900, at: start),
+            point(40.75225, -73.9900, at: start.addingTimeInterval(30)),
+        ]
+        let fastMovement = [
+            point(40.7500, -73.9900, at: start),
+            point(40.7540, -73.9900, at: start.addingTimeInterval(30)),
+        ]
+        let processor = RouteProcessor()
+
+        XCTAssertNil(processor.process(route(kind: .walking, points: moderateMovement, start: start)))
+        XCTAssertNotNil(processor.process(route(kind: .running, points: moderateMovement, start: start)))
+        XCTAssertNil(processor.process(route(kind: .running, points: fastMovement, start: start)))
+        XCTAssertNotNil(processor.process(route(kind: .cycling, points: fastMovement, start: start)))
+    }
+
     func testProcessesFifteenHundredMultiThousandPointRoutes() {
         let processor = RouteProcessor()
         let base = Date(timeIntervalSince1970: 5_000)
@@ -120,10 +140,27 @@ final class RouteProcessorTests: XCTestCase {
                 start: base,
                 end: base.addingTimeInterval(4_000),
                 sourceName: "Synthetic \(index)",
+                activityKind: RouteActivityKind.allCases[index % RouteActivityKind.allCases.count],
                 points: points
             )
             XCTAssertNotNil(processor.process(route))
         }
+    }
+
+
+    private func route(
+        kind: RouteActivityKind,
+        points: [RoutePoint],
+        start: Date
+    ) -> WorkoutRoute {
+        WorkoutRoute(
+            id: UUID(),
+            start: start,
+            end: points.last?.timestamp ?? start,
+            sourceName: "Test",
+            activityKind: kind,
+            points: points
+        )
     }
 
     private func point(_ latitude: Double, _ longitude: Double, at date: Date) -> RoutePoint {

@@ -26,7 +26,13 @@ enum AppLaunchState: Equatable {
 enum MapViewportTarget: Equatable, Sendable {
     case manhattan
     case workout(UUID)
-    case userLocation
+    case userLocation(MapUserTrackingMode)
+}
+
+enum MapUserTrackingMode: Equatable, Sendable {
+    case free
+    case follow
+    case followWithHeading
 }
 
 struct MapViewportCommand: Equatable, Sendable {
@@ -59,10 +65,21 @@ enum ImportPhase: Equatable {
         case .requestingHealthAccess: "Connecting to Apple Health…"
         case .findingWorkouts: "Finding workouts…"
         case let .readingRoutes(completed, total): "Reading routes \(completed) of \(total)…"
-        case let .processingRoutes(completed, total): "Preparing walks \(completed) of \(total)…"
+        case let .processingRoutes(completed, total): "Preparing routes \(completed) of \(total)…"
         case .preparingMap: "Updating your map…"
-        case let .complete(imported): "Updated \(imported) walk\(imported == 1 ? "" : "s")"
+        case let .complete(imported): "Updated \(imported) workout\(imported == 1 ? "" : "s")"
         case .failed: "Refresh needs attention"
+        }
+    }
+}
+
+enum HealthImportApplicationError: LocalizedError {
+    case noReadableWorkouts
+
+    var errorDescription: String? {
+        switch self {
+        case .noReadableWorkouts:
+            "Apple Health returned no readable workouts. Your existing map was kept. Review Health access or try again."
         }
     }
 }
@@ -72,7 +89,6 @@ enum ImportPhase: Equatable {
 final class AppModel {
     private static let onboardingKey = "didCompleteOnboarding"
     private static let connectedHealthKey = "didConnectAppleHealth"
-    private static let migrationStartedKey = "didBeginLifetimeMapMigration"
     private static let liveTrailExplainedKey = "didExplainLiveTrail"
     private static let automaticRefreshInterval: TimeInterval = 5 * 60
     private let logger = Logger(subsystem: "com.arminnajafi.walkitall", category: "AppModel")
@@ -85,6 +101,7 @@ final class AppModel {
     var lastSuccessfulImport: Date?
     var routeRenderRevision = 0
     var mapViewportCommand = MapViewportCommand(revision: 0, target: .manhattan)
+    var mapUserTrackingMode: MapUserTrackingMode = .free
     @ObservationIgnored let liveTrail: LiveTrailController
     var hasCompletedOnboarding: Bool {
         didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: Self.onboardingKey) }
@@ -93,7 +110,6 @@ final class AppModel {
     @ObservationIgnored private let routeSource: any WorkoutRouteSource
     @ObservationIgnored private let repository: any WalkHistoryRepository
     @ObservationIgnored private let routeProcessor: RouteProcessor
-    @ObservationIgnored private let legacyStore: LegacyCoverageStore
     @ObservationIgnored private let protectStorage: @Sendable () throws -> Void
     @ObservationIgnored private var importTask: Task<Void, Never>?
     @ObservationIgnored private var importGeneration = 0
@@ -110,7 +126,6 @@ final class AppModel {
             repository: dependencies.liveTrailRepository,
             processor: dependencies.liveTrailProcessor
         )
-        legacyStore = dependencies.legacyStore
         protectStorage = dependencies.protectStorage
 
         let arguments = ProcessInfo.processInfo.arguments
@@ -121,13 +136,6 @@ final class AppModel {
         }
         hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Self.onboardingKey)
             || arguments.contains("-skipOnboarding")
-        liveTrail.onDidFinish = { [weak self] in
-            guard let self,
-                  self.launchState == .ready,
-                  self.hasConnectedHealth
-            else { return }
-            self.refresh()
-        }
     }
 
     var selectedWorkout: WorkoutRouteRecord? {
@@ -162,21 +170,10 @@ final class AppModel {
             }
             #endif
             lastSuccessfulImport = try await repository.loadLastSuccessfulImport()
-            await liveTrail.reconcile(with: routeRecords)
             try protectStorage()
             routeRenderRevision &+= 1
             launchState = .ready
 
-            // A completed new-store import can outlive a failed legacy-file
-            // cleanup. Retry the exact cleanup on a later unlocked launch.
-            if legacyStore.exists,
-               lastSuccessfulImport != nil,
-               !routeRecords.isEmpty
-            {
-                try? finishLegacyMigration()
-            } else if !legacyStore.exists {
-                UserDefaults.standard.removeObject(forKey: Self.migrationStartedKey)
-            }
         } catch {
             logger.error("Bootstrap failed: \(error.localizedDescription, privacy: .private)")
             launchState = .failed(error.localizedDescription)
@@ -196,7 +193,7 @@ final class AppModel {
 
     func refresh() {
         guard !importPhase.isWorking else { return }
-        beginAuthorizedImport(resetFirst: shouldStartLegacyRebuild, isAutomatic: false)
+        beginAuthorizedImport(resetFirst: false, isAutomatic: false)
     }
 
     func rebuildFromHealth() {
@@ -219,7 +216,7 @@ final class AppModel {
         else { return }
 
         lastAutomaticRefreshAttempt = now
-        beginAuthorizedImport(resetFirst: shouldStartLegacyRebuild, isAutomatic: true)
+        beginAuthorizedImport(resetFirst: false, isAutomatic: true)
     }
 
     func cancelImport() {
@@ -231,8 +228,9 @@ final class AppModel {
     }
 
     func selectWorkout(_ id: UUID) {
-        guard liveTrail.session == nil else { return }
+        guard !liveTrail.hasInProgressSession else { return }
         selectedWorkoutID = id
+        mapUserTrackingMode = .free
         mapViewportCommand = MapViewportCommand(
             revision: mapViewportCommand.revision &+ 1,
             target: .workout(id)
@@ -246,6 +244,7 @@ final class AppModel {
     }
 
     func showAllManhattan() {
+        mapUserTrackingMode = .free
         mapViewportCommand = MapViewportCommand(
             revision: mapViewportCommand.revision &+ 1,
             target: .manhattan
@@ -254,9 +253,26 @@ final class AppModel {
 
     func showUserLocation() {
         liveTrail.requestCurrentLocation()
+        let mode: MapUserTrackingMode = mapUserTrackingMode == .follow
+            ? .followWithHeading
+            : .follow
+        requestUserTracking(mode)
+    }
+
+    func mapUserTrackingDidChange(_ mode: MapUserTrackingMode) {
+        mapUserTrackingMode = mode
+    }
+
+    private func followUserHeading() {
+        liveTrail.requestCurrentLocation()
+        requestUserTracking(.followWithHeading)
+    }
+
+    private func requestUserTracking(_ mode: MapUserTrackingMode) {
+        mapUserTrackingMode = mode
         mapViewportCommand = MapViewportCommand(
             revision: mapViewportCommand.revision &+ 1,
-            target: .userLocation
+            target: .userLocation(mode)
         )
     }
 
@@ -294,24 +310,28 @@ final class AppModel {
 
     func resumeLiveTrail() {
         liveTrail.resume()
-        mapViewportCommand = MapViewportCommand(
-            revision: mapViewportCommand.revision &+ 1,
-            target: .userLocation
-        )
+        followUserHeading()
+    }
+
+    func clearLiveTrail() {
+        Task { [weak self] in
+            await self?.liveTrail.clear()
+        }
+    }
+
+    func startNewLiveTrail() {
+        selectedWorkoutID = nil
+        Task { [weak self] in
+            guard let self else { return }
+            await liveTrail.startNew()
+            followUserHeading()
+        }
     }
 
     private func startLiveTrail() {
         selectedWorkoutID = nil
         liveTrail.start()
-        mapViewportCommand = MapViewportCommand(
-            revision: mapViewportCommand.revision &+ 1,
-            target: .userLocation
-        )
-    }
-
-    private var shouldStartLegacyRebuild: Bool {
-        legacyStore.exists
-            && !UserDefaults.standard.bool(forKey: Self.migrationStartedKey)
+        followUserHeading()
     }
 
     private func beginAuthorizedImport(resetFirst: Bool, isAutomatic: Bool) {
@@ -328,9 +348,6 @@ final class AppModel {
                 UserDefaults.standard.set(true, forKey: Self.connectedHealthKey)
                 if resetFirst {
                     try await repository.reset()
-                    if legacyStore.exists {
-                        UserDefaults.standard.set(true, forKey: Self.migrationStartedKey)
-                    }
                     routeRecords = []
                     lastSuccessfulImport = nil
                     clearSelectedWorkout()
@@ -360,6 +377,8 @@ final class AppModel {
                 excluding: processedWorkoutIDs
             )
             var imported = 0
+            var pendingCheckpoint: Data?
+            var authoritativeWorkoutIDs: Set<UUID>?
 
             for try await batch in batches {
                 try Task.checkCancellation()
@@ -392,9 +411,29 @@ final class AppModel {
                 for processed in batch.processedWorkouts {
                     try await repository.markWorkoutProcessed(id: processed.id, end: processed.end)
                 }
-                if let checkpoint = batch.checkpoint {
-                    try await repository.saveCheckpoint(checkpoint)
+                if let checkpoint = batch.checkpoint { pendingCheckpoint = checkpoint }
+                if let authoritative = batch.authoritativeWorkoutIDs {
+                    authoritativeWorkoutIDs = authoritative
                 }
+            }
+
+            try Task.checkCancellation()
+            guard generation == importGeneration else { return }
+
+            if let authoritativeWorkoutIDs {
+                let existingWorkoutIDs = try await repository.loadProcessedWorkoutIDs()
+                if authoritativeWorkoutIDs.isEmpty, !existingWorkoutIDs.isEmpty {
+                    throw HealthImportApplicationError.noReadableWorkouts
+                }
+                let staleWorkoutIDs = existingWorkoutIDs.subtracting(authoritativeWorkoutIDs)
+                if !staleWorkoutIDs.isEmpty {
+                    try await repository.removeWorkouts(
+                        workoutIDs: staleWorkoutIDs.sorted { $0.uuidString < $1.uuidString }
+                    )
+                }
+            }
+            if let pendingCheckpoint {
+                try await repository.saveCheckpoint(pendingCheckpoint)
             }
 
             importPhase = .preparingMap
@@ -404,20 +443,12 @@ final class AppModel {
             let successfulRefreshDate = Date()
             try await repository.saveLastSuccessfulImport(successfulRefreshDate)
             try protectStorage()
-            await liveTrail.reconcile(with: records, now: successfulRefreshDate)
             routeRecords = records
             lastSuccessfulImport = successfulRefreshDate
             clearSelectionIfMissing()
             routeRenderRevision &+= 1
             importPhase = .complete(imported: imported)
 
-            if legacyStore.exists, !records.isEmpty {
-                do {
-                    try finishLegacyMigration()
-                } catch {
-                    logger.error("Legacy cache cleanup deferred: \(error.localizedDescription, privacy: .private)")
-                }
-            }
         } catch is CancellationError {
             guard generation == importGeneration else { return }
             await publishStoredHistory()
@@ -453,11 +484,6 @@ final class AppModel {
               !routeRecords.contains(where: { $0.id == selectedWorkoutID })
         else { return }
         clearSelectedWorkout()
-    }
-
-    private func finishLegacyMigration() throws {
-        try legacyStore.removeAfterSuccessfulRebuild()
-        UserDefaults.standard.removeObject(forKey: Self.migrationStartedKey)
     }
 
     private func isFailure(_ state: AppLaunchState) -> Bool {
@@ -496,6 +522,7 @@ final class AppModel {
                 start: start.addingTimeInterval(-86_400),
                 end: start.addingTimeInterval(-84_600),
                 sourceName: "iPhone",
+                activityKind: .cycling,
                 routeParts: [[
                     GeoCoordinate(latitude: 40.7420, longitude: -74.0060),
                     GeoCoordinate(latitude: 40.7480, longitude: -74.0030),

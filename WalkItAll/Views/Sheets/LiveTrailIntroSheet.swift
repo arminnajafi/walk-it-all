@@ -12,31 +12,31 @@ struct LiveTrailIntroSheet: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("See this walk as you go")
+                    Text("See where you go now")
                         .font(.title2.bold())
-                    Text("Live Trail draws your current path immediately while Apple Health records the permanent workout.")
+                    Text("Live Trail draws one temporary path that you control independently from Apple Health.")
                         .foregroundStyle(.secondary)
                 }
 
                 VStack(alignment: .leading, spacing: 16) {
                     instruction(
-                        "Start an Outdoor Walk on Apple Watch",
-                        detail: "That workout remains your permanent history.",
-                        symbol: "applewatch"
-                    )
-                    instruction(
-                        "Then start Live Trail here",
-                        detail: "It is a temporary, on-device guide—not another workout.",
+                        "Start Live Trail here",
+                        detail: "The green line appears immediately and stays only on this iPhone.",
                         symbol: "location.fill"
                     )
                     instruction(
-                        "Pause briefly, or Finish when done",
-                        detail: "Pause turns location off and can be resumed. Finish is final and waits for the Apple Health route.",
+                        "Pause and resume when needed",
+                        detail: "Pausing turns location off. Resuming starts a new trail part without bridging the break.",
                         symbol: "pause.circle"
+                    )
+                    instruction(
+                        "Finish when you are done",
+                        detail: "Tracking stops, and the trail stays until you clear it or start a new one.",
+                        symbol: "stop.circle"
                     )
                 }
 
-                Text("While active, location continues when the screen locks with Apple’s visible indicator. Walk It All requests When In Use access only, never tracks passively, and deletes the temporary trail after Apple Health supplies the workout route—or after seven days.")
+                Text("While active, location continues when the screen locks with Apple’s visible indicator. Walk It All requests When In Use access only and never tracks passively. If you want this route in your permanent map, separately record a supported outdoor workout that saves a GPS route to Apple Health.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

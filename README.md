@@ -2,15 +2,16 @@
 
 **See what you’ve covered. Walk it all.**
 
-Walk It All is a private iPhone app that turns outdoor walking and hiking routes from Apple Health into one lifetime map. It opens on Manhattan and can display recorded routes anywhere in the world.
+Walk It All is a private iPhone app that turns outdoor walking, hiking, running, and cycling routes from Apple Health into one lifetime map. It opens on Manhattan and can display recorded routes anywhere in the world.
 
 ## Product scope
 
 - Native SwiftUI app for iOS 17 and later
-- Read-only walking and hiking workout-route import from Apple Health
+- Read-only walking, hiking, running, and cycling workout-route import from Apple Health
 - Conservative filtering of inaccurate locations, GPS gaps, large jumps, and implausible speeds
 - Smooth Apple Maps rendering with subtle deepening where routes repeat
-- Optional explicit Live Trail for seeing the current walk immediately, with Pause/Resume and locked-screen recording
+- One optional temporary Live Trail with Start, Pause, Resume, Finish, Start New, and Clear
+- Native position, compass, and heading-follow behavior for outdoor orientation
 - Incremental foreground refresh, including Health route replacements and deletions
 - Protected, backup-excluded SwiftData cache rebuilt from Apple Health
 - No passive tracking, account, backend, analytics, advertising, CloudKit, or route upload
@@ -32,7 +33,7 @@ The bundle identifier is provisionally `com.arminnajafi.walkitall` and the deplo
 ## Repository guide
 
 - `WalkItAll/`: iOS app, HealthKit adapter, protected persistence, map renderer, and SwiftUI views
-- `Packages/WalkItAllCore/`: portable route filtering, simplification, and temporary-session association
+- `Packages/WalkItAllCore/`: portable route filtering, simplification, and temporary-session processing
 - `Documentation/`: product, architecture, privacy, and validation decisions
 - `LocalRouteFixtures/`: ignored private device evidence; never commit its contents
 
@@ -42,3 +43,4 @@ The bundle identifier is provisionally `com.arminnajafi.walkitall` and the deplo
 - [Architecture](Documentation/ARCHITECTURE.md)
 - [Privacy and recovery](Documentation/PRIVACY.md)
 - [Validation and release gates](Documentation/VALIDATION.md)
+- [Route-history pivot decision](Documentation/DECISION-ROUTE-HISTORY.md)

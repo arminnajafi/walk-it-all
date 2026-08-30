@@ -19,7 +19,12 @@ public struct LiveTrailProcessor: Sendable {
     public let simplifier: RouteSimplifier
 
     public init(
-        chunker: RouteChunker = RouteChunker(),
+        chunker: RouteChunker = RouteChunker(
+            maximumHorizontalAccuracyMeters: 50,
+            maximumTimeGap: 60,
+            maximumDistanceGapMeters: 500,
+            maximumImpliedSpeedMetersPerSecond: 25
+        ),
         simplifier: RouteSimplifier = RouteSimplifier(toleranceMeters: 3)
     ) {
         self.chunker = chunker
@@ -108,48 +113,11 @@ public struct LiveTrailProcessor: Sendable {
         let compacted = compacting(session)
         return LiveTrailSession(
             id: compacted.id,
-            state: .waitingForHealth,
+            state: .finished,
             start: compacted.start,
             end: max(date, compacted.start),
             routeParts: compacted.routeParts,
             lastUpdate: max(date, compacted.lastUpdate)
         )
-    }
-}
-
-public enum LiveTrailHealthAssociator {
-    /// Finds the route-bearing workout that best covers the temporary trail's
-    /// time interval. This associates sessions only; it never compares streets.
-    public static func matchingWorkoutID(
-        for session: LiveTrailSession,
-        among records: [WorkoutRouteRecord],
-        minimumCoverage: Double = 0.8
-    ) -> UUID? {
-        guard session.state == .waitingForHealth,
-              let end = session.end,
-              end > session.start
-        else { return nil }
-
-        let trailDuration = end.timeIntervalSince(session.start)
-        let candidates = records.compactMap { record -> Candidate? in
-            guard !record.routeParts.isEmpty else { return nil }
-            let overlapStart = max(session.start, record.start)
-            let overlapEnd = min(end, record.end)
-            let overlap = max(0, overlapEnd.timeIntervalSince(overlapStart))
-            guard overlap / trailDuration >= minimumCoverage else { return nil }
-            let excess = max(0, record.duration - overlap)
-            return Candidate(id: record.id, overlap: overlap, excess: excess)
-        }
-        return candidates.max { lhs, rhs in
-            if lhs.overlap != rhs.overlap { return lhs.overlap < rhs.overlap }
-            if lhs.excess != rhs.excess { return lhs.excess > rhs.excess }
-            return lhs.id.uuidString > rhs.id.uuidString
-        }?.id
-    }
-
-    private struct Candidate {
-        let id: UUID
-        let overlap: TimeInterval
-        let excess: TimeInterval
     }
 }

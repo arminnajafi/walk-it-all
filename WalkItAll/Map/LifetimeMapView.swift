@@ -16,6 +16,7 @@ struct LifetimeMapView: UIViewRepresentable {
     let showsUserLocation: Bool
     let viewportCommand: MapViewportCommand
     let mapOrnamentBottomInset: CGFloat
+    let onUserTrackingModeChange: (MapUserTrackingMode) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -26,8 +27,8 @@ struct LifetimeMapView: UIViewRepresentable {
             coordinator?.mapViewDidLayout(mapView)
         }
         mapView.isPitchEnabled = false
-        mapView.isRotateEnabled = false
-        mapView.showsCompass = false
+        mapView.isRotateEnabled = true
+        mapView.showsCompass = true
         mapView.showsScale = false
         mapView.showsUserLocation = showsUserLocation
         let configuration = MKStandardMapConfiguration(elevationStyle: .flat, emphasisStyle: .muted)
@@ -43,6 +44,7 @@ struct LifetimeMapView: UIViewRepresentable {
             showsUserLocation: showsUserLocation,
             viewportCommand: viewportCommand,
             bottomInset: mapOrnamentBottomInset,
+            onUserTrackingModeChange: onUserTrackingModeChange,
             initial: true
         )
         return mapView
@@ -59,6 +61,7 @@ struct LifetimeMapView: UIViewRepresentable {
             showsUserLocation: showsUserLocation,
             viewportCommand: viewportCommand,
             bottomInset: mapOrnamentBottomInset,
+            onUserTrackingModeChange: onUserTrackingModeChange,
             initial: false
         )
     }
@@ -74,6 +77,7 @@ struct LifetimeMapView: UIViewRepresentable {
         private var pendingLiveTrailSession: LiveTrailSession?
         private var pendingBottomInset: CGFloat = 220
         private var appliedBottomInset: CGFloat?
+        private var onUserTrackingModeChange: ((MapUserTrackingMode) -> Void)?
         private var overlayTask: Task<Void, Never>?
         private var viewportTask: Task<Void, Never>?
 
@@ -92,8 +96,10 @@ struct LifetimeMapView: UIViewRepresentable {
             showsUserLocation: Bool,
             viewportCommand: MapViewportCommand,
             bottomInset: CGFloat,
+            onUserTrackingModeChange: @escaping (MapUserTrackingMode) -> Void,
             initial: Bool
         ) {
+            self.onUserTrackingModeChange = onUserTrackingModeChange
             mapView.showsUserLocation = showsUserLocation
             mapView.layoutMargins = UIEdgeInsets(
                 top: 92,
@@ -150,7 +156,7 @@ struct LifetimeMapView: UIViewRepresentable {
                     // recent values because selection or Live Trail can change
                     // while a large history snapshot is being constructed.
                     self.replaceSelection(self.pendingSelection, on: mapView)
-                    // Keep the immediate/provisional trail above the immutable
+                    // Keep the temporary Live Trail above the immutable
                     // history even when a Health refresh replaces that history.
                     self.replaceLiveTrail(self.pendingLiveTrailSession, on: mapView)
                     if initial || self.viewportRevision != viewportCommand.revision {
@@ -189,27 +195,29 @@ struct LifetimeMapView: UIViewRepresentable {
             }
             if let casing = overlay as? LiveTrailCasingPolyline {
                 let renderer = MKPolylineRenderer(polyline: casing)
-                renderer.strokeColor = UIColor.systemBackground.withAlphaComponent(0.92)
+                renderer.strokeColor = UIColor.systemBackground.withAlphaComponent(
+                    casing.isFinished ? 0.72 : 0.92
+                )
                 renderer.lineWidth = 9
                 renderer.lineCap = .round
                 renderer.lineJoin = .round
-                if casing.isPending { renderer.lineDashPattern = [10, 7] }
                 return renderer
             }
             if let route = overlay as? LiveTrailPolyline {
                 let renderer = MKPolylineRenderer(polyline: route)
-                renderer.strokeColor = .systemGreen
+                renderer.strokeColor = UIColor.systemGreen.withAlphaComponent(
+                    route.isFinished ? 0.62 : 1
+                )
                 renderer.lineWidth = 5.5
                 renderer.lineCap = .round
                 renderer.lineJoin = .round
-                if route.isPending { renderer.lineDashPattern = [8, 6] }
                 return renderer
             }
             return MKOverlayRenderer(overlay: overlay)
         }
 
         func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
-            guard pendingViewport.target == .userLocation,
+            guard case .userLocation = pendingViewport.target,
                   viewportRevision != pendingViewport.revision,
                   userLocation.location != nil
             else { return }
@@ -217,6 +225,21 @@ struct LifetimeMapView: UIViewRepresentable {
                 to: mapView,
                 animated: !UIAccessibility.isReduceMotionEnabled
             )
+        }
+
+        func mapView(
+            _ mapView: MKMapView,
+            didChange mode: MKUserTrackingMode,
+            animated: Bool
+        ) {
+            let translatedMode: MapUserTrackingMode
+            switch mode {
+            case .none: translatedMode = .free
+            case .follow: translatedMode = .follow
+            case .followWithHeading: translatedMode = .followWithHeading
+            @unknown default: translatedMode = .free
+            }
+            onUserTrackingModeChange?(translatedMode)
         }
 
         private func addSelection(_ workout: WorkoutRouteRecord, to mapView: MKMapView) {
@@ -249,7 +272,7 @@ struct LifetimeMapView: UIViewRepresentable {
                 $0 is LiveTrailCasingPolyline || $0 is LiveTrailPolyline
             })
             guard let session else { return }
-            let pending = session.state == .waitingForHealth
+            let finished = session.state == .finished
             for part in session.coordinateParts where part.count >= 2 {
                 let coordinates = part.map {
                     CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
@@ -258,10 +281,10 @@ struct LifetimeMapView: UIViewRepresentable {
                     coordinates: coordinates,
                     count: coordinates.count
                 )
-                casing.isPending = pending
+                casing.isFinished = finished
                 mapView.addOverlay(casing, level: .aboveRoads)
                 let route = LiveTrailPolyline(coordinates: coordinates, count: coordinates.count)
-                route.isPending = pending
+                route.isFinished = finished
                 mapView.addOverlay(route, level: .aboveRoads)
             }
         }
@@ -285,20 +308,22 @@ struct LifetimeMapView: UIViewRepresentable {
             let mapRect: MKMapRect
             switch pendingViewport.target {
             case .manhattan:
+                mapView.setUserTrackingMode(.none, animated: false)
                 mapRect = Self.manhattanMapRect
             case let .workout(id):
+                mapView.setUserTrackingMode(.none, animated: false)
                 guard pendingSelection?.id == id,
                       let bounds = pendingSelection?.geographicBounds
                 else { return }
                 mapRect = Self.mapRect(for: bounds)
-            case .userLocation:
-                guard let location = mapView.userLocation.location else { return }
-                let region = MKCoordinateRegion(
-                    center: location.coordinate,
-                    latitudinalMeters: 1_500,
-                    longitudinalMeters: 1_500
-                )
-                mapView.setRegion(region, animated: animated)
+            case let .userLocation(mode):
+                guard mapView.showsUserLocation,
+                      mapView.userLocation.location != nil
+                else { return }
+                let trackingMode: MKUserTrackingMode = mode == .followWithHeading
+                    ? .followWithHeading
+                    : .follow
+                mapView.setUserTrackingMode(trackingMode, animated: animated)
                 viewportRevision = pendingViewport.revision
                 appliedBottomInset = pendingBottomInset
                 return
@@ -357,11 +382,11 @@ private final class SelectedRouteCasingPolyline: MKPolyline {}
 private final class SelectedRoutePolyline: MKPolyline {}
 
 private final class LiveTrailCasingPolyline: MKPolyline {
-    var isPending = false
+    var isFinished = false
 }
 
 private final class LiveTrailPolyline: MKPolyline {
-    var isPending = false
+    var isFinished = false
 }
 
 private struct LiveTrailSignature: Equatable, Sendable {

@@ -81,6 +81,13 @@ public struct RoutePoint: Codable, Hashable, Sendable {
     }
 }
 
+public enum RouteActivityKind: String, Codable, CaseIterable, Hashable, Sendable {
+    case walking
+    case hiking
+    case running
+    case cycling
+}
+
 /// A transient, full-resolution route read from Apple Health. The app discards
 /// these points as soon as `RouteProcessor` creates a simplified record.
 public struct WorkoutRoute: Codable, Sendable, Identifiable {
@@ -88,13 +95,22 @@ public struct WorkoutRoute: Codable, Sendable, Identifiable {
     public let start: Date
     public let end: Date
     public let sourceName: String
+    public let activityKind: RouteActivityKind
     public let points: [RoutePoint]
 
-    public init(id: UUID, start: Date, end: Date, sourceName: String, points: [RoutePoint]) {
+    public init(
+        id: UUID,
+        start: Date,
+        end: Date,
+        sourceName: String,
+        activityKind: RouteActivityKind = .walking,
+        points: [RoutePoint]
+    ) {
         self.id = id
         self.start = start
         self.end = end
         self.sourceName = sourceName
+        self.activityKind = activityKind
         self.points = points
     }
 }
@@ -105,6 +121,7 @@ public struct WorkoutRouteRecord: Codable, Hashable, Sendable, Identifiable {
     public let start: Date
     public let end: Date
     public let sourceName: String
+    public let activityKind: RouteActivityKind
     public let routeParts: [[GeoCoordinate]]
 
     public init(
@@ -112,12 +129,14 @@ public struct WorkoutRouteRecord: Codable, Hashable, Sendable, Identifiable {
         start: Date,
         end: Date,
         sourceName: String,
+        activityKind: RouteActivityKind = .walking,
         routeParts: [[GeoCoordinate]]
     ) {
         self.id = id
         self.start = start
         self.end = end
         self.sourceName = sourceName
+        self.activityKind = activityKind
         self.routeParts = routeParts.filter {
             $0.count >= 2 && $0.allSatisfy(\.isValid)
         }
@@ -147,6 +166,10 @@ public struct WorkoutRouteBatch: Sendable {
     public let deletedWorkoutIDs: [UUID]
     public let routeInvalidatedWorkoutIDs: [UUID]
     public let processedWorkouts: [ProcessedWorkout]
+    /// Present only at the end of a complete supported-activity reconciliation.
+    /// The app uses it to remove stale cached workouts after the replacement
+    /// scope has been read successfully.
+    public let authoritativeWorkoutIDs: Set<UUID>?
     public let checkpoint: Data?
     public let completedCount: Int
     public let totalCount: Int
@@ -156,6 +179,7 @@ public struct WorkoutRouteBatch: Sendable {
         deletedWorkoutIDs: [UUID] = [],
         routeInvalidatedWorkoutIDs: [UUID] = [],
         processedWorkouts: [ProcessedWorkout] = [],
+        authoritativeWorkoutIDs: Set<UUID>? = nil,
         checkpoint: Data? = nil,
         completedCount: Int = 0,
         totalCount: Int = 0
@@ -164,6 +188,7 @@ public struct WorkoutRouteBatch: Sendable {
         self.deletedWorkoutIDs = deletedWorkoutIDs
         self.routeInvalidatedWorkoutIDs = routeInvalidatedWorkoutIDs
         self.processedWorkouts = processedWorkouts
+        self.authoritativeWorkoutIDs = authoritativeWorkoutIDs
         self.checkpoint = checkpoint
         self.completedCount = completedCount
         self.totalCount = totalCount
@@ -193,14 +218,36 @@ public protocol WalkHistoryRepository: Sendable {
     func reset() async throws
 }
 
-public enum LiveTrailState: String, Codable, Hashable, Sendable {
+public enum LiveTrailState: String, Hashable, Sendable {
     case active
     case paused
-    case waitingForHealth
+    case finished
+}
+
+extension LiveTrailState: Codable {
+    public init(from decoder: any Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        // Preserve a temporary trail created by the previous Health-coupled
+        // model while removing the coupling itself.
+        if value == "waitingForHealth" {
+            self = .finished
+        } else if let state = Self(rawValue: value) {
+            self = state
+        } else {
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: decoder.codingPath, debugDescription: "Unknown Live Trail state")
+            )
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// The sole temporary route owned by Walk It All. It exists only while a user
-/// is explicitly tracking or waiting for the corresponding Health workout.
+/// is explicitly tracking, paused, or retained after finishing.
 public struct LiveTrailSession: Codable, Hashable, Sendable, Identifiable {
     public let id: UUID
     public let state: LiveTrailState

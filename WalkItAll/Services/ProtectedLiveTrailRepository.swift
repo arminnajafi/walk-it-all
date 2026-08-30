@@ -84,7 +84,7 @@ actor ProtectedLiveTrailRepository: LiveTrailRepository {
         switch session.state {
         case .active, .paused:
             guard session.end == nil else { return false }
-        case .waitingForHealth:
+        case .finished:
             guard let end = session.end, end >= session.start else { return false }
         }
 
