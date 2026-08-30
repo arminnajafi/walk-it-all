@@ -168,7 +168,7 @@ struct MapScreen: View {
 
     private var locationLabel: String {
         switch model.mapUserTrackingMode {
-        case .free: "Follow current location"
+        case .free: "Follow current location with heading"
         case .follow: "Follow current location with heading"
         case .followWithHeading: "Follow current location north up"
         }

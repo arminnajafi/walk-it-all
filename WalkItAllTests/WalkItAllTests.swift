@@ -1008,7 +1008,7 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
-    func testLocationButtonCyclesNorthUpHeadingAndReturnsToNorthUpAfterHeading() async {
+    func testLocationButtonShowsHeadingFirstAndOffersNorthUpOnSecondTap() async {
         let model = makeModel(
             source: TestRouteSource(batches: []),
             repository: TestHistoryRepository()
@@ -1016,17 +1016,17 @@ final class WalkItAllTests: XCTestCase {
 
         XCTAssertEqual(model.mapUserTrackingMode, .free)
         model.showUserLocation()
-        XCTAssertEqual(model.mapUserTrackingMode, .follow)
-        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.follow))
-
-        model.mapUserTrackingDidChange(.follow)
-        model.showUserLocation()
         XCTAssertEqual(model.mapUserTrackingMode, .followWithHeading)
         XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.followWithHeading))
 
         model.mapUserTrackingDidChange(.followWithHeading)
         model.showUserLocation()
         XCTAssertEqual(model.mapUserTrackingMode, .follow)
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.follow))
+
+        model.mapUserTrackingDidChange(.follow)
+        model.showUserLocation()
+        XCTAssertEqual(model.mapUserTrackingMode, .followWithHeading)
         model.mapUserTrackingDidChange(.free)
         XCTAssertEqual(model.mapUserTrackingMode, .free)
     }

@@ -253,9 +253,11 @@ final class AppModel {
 
     func showUserLocation() {
         liveTrail.requestCurrentLocation()
-        let mode: MapUserTrackingMode = mapUserTrackingMode == .follow
-            ? .followWithHeading
-            : .follow
+        // Direction is the useful default while choosing the next gap to
+        // cover. A second tap offers the calmer north-up alternative.
+        let mode: MapUserTrackingMode = mapUserTrackingMode == .followWithHeading
+            ? .follow
+            : .followWithHeading
         requestUserTracking(mode)
     }
 
