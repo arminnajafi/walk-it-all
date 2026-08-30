@@ -130,9 +130,11 @@ final class AppModel {
 
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("-resetOnboarding") {
-            UserDefaults.standard.removeObject(forKey: Self.onboardingKey)
-            UserDefaults.standard.removeObject(forKey: Self.connectedHealthKey)
-            UserDefaults.standard.removeObject(forKey: Self.liveTrailExplainedKey)
+            // Write explicit false values so UI-test resets also override any
+            // simulator-level defaults injected during manual visual QA.
+            UserDefaults.standard.set(false, forKey: Self.onboardingKey)
+            UserDefaults.standard.set(false, forKey: Self.connectedHealthKey)
+            UserDefaults.standard.set(false, forKey: Self.liveTrailExplainedKey)
         }
         hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Self.onboardingKey)
             || arguments.contains("-skipOnboarding")

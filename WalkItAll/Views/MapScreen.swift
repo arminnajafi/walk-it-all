@@ -89,8 +89,8 @@ struct MapScreen: View {
             "Finish Live Trail?",
             isPresented: $confirmFinishLiveTrail
         ) {
-            Button("Finish Live Trail", role: .destructive, action: model.finishLiveTrail)
-            Button("Keep Trail", role: .cancel) {}
+            Button("Finish Live Trail", action: model.finishLiveTrail)
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text("Finish stops tracking. This trail will remain on the map until you clear it or start a new one.")
         }
@@ -137,10 +137,18 @@ struct MapScreen: View {
 
     private var manhattanButton: some View {
         Button(action: model.showAllManhattan) {
-            Label("Manhattan", systemImage: "map.fill")
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 14)
-                .frame(minHeight: 44)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    Image(systemName: "map.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                } else {
+                    Label("Manhattan", systemImage: "map.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                }
+            }
         }
         .accessibilityLabel("Show Manhattan")
         .accessibilityHint("Recenters the map on Manhattan")
@@ -150,7 +158,7 @@ struct MapScreen: View {
     private var locationButton: some View {
         Button(action: model.showUserLocation) {
             Image(systemName: locationSymbol)
-                .font(.title3.weight(.semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .frame(width: 44, height: 44)
         }
         .accessibilityLabel(locationLabel)
@@ -187,7 +195,7 @@ struct MapScreen: View {
             model.presentedSheet = .details
         } label: {
             Image(systemName: "info.circle")
-                .font(.title3.weight(.semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .frame(width: 44, height: 44)
         }
         .accessibilityLabel("About Walk It All")
@@ -206,8 +214,7 @@ struct MapScreen: View {
             } else if model.liveTrail.isPaused {
                 PausedLiveTrailCard(
                     resume: model.resumeLiveTrail,
-                    finish: { confirmFinishLiveTrail = true },
-                    clear: { confirmClearLiveTrail = true }
+                    finish: { confirmFinishLiveTrail = true }
                 )
             } else if model.liveTrail.isFinished {
                 FinishedLiveTrailCard(

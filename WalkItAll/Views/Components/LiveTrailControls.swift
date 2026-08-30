@@ -7,12 +7,14 @@ struct StartLiveTrailButton: View {
     var body: some View {
         Group {
             if #available(iOS 26.0, *) {
-                button.buttonStyle(.glassProminent)
+                button
+                    .buttonStyle(.glassProminent)
+                    .tint(.indigo)
             } else {
                 button
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 4)
-                    .walkItAllControlSurface()
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
+                    .tint(.indigo)
             }
         }
         .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
@@ -22,7 +24,7 @@ struct StartLiveTrailButton: View {
         Button(action: action) {
             Label("Start Live Trail", systemImage: "location.fill")
                 .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .frame(minHeight: 48)
         }
         .accessibilityHint("Temporarily draws your route while you move")
@@ -35,41 +37,32 @@ struct ActiveLiveTrailCard: View {
     let finish: () -> Void
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(.green)
-                    .frame(width: 10, height: 10)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Live Trail on")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Tracking continues when the screen locks")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 8)
+        LiveTrailControlCard(
+            title: "Live Trail",
+            detail: "Active · continues when your screen locks",
+            symbol: "location.fill",
+            tint: .green
+        ) {
+            LiveTrailActionRow {
+                LiveTrailActionButton(
+                    "Pause",
+                    symbol: "pause.fill",
+                    style: .primary,
+                    action: pause
+                )
+                .accessibilityHint("Stops location until you resume")
+                .accessibilityIdentifier("pause-live-trail")
+            } secondary: {
+                LiveTrailActionButton(
+                    "Finish",
+                    symbol: "stop.fill",
+                    style: .secondary,
+                    action: finish
+                )
+                .accessibilityHint("Stops tracking and keeps the trail on the map")
+                .accessibilityIdentifier("finish-live-trail")
             }
-
-            HStack(spacing: 10) {
-                Button("Pause", systemImage: "pause.fill", action: pause)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.indigo)
-                    .accessibilityHint("Stops location until you resume")
-                    .accessibilityIdentifier("pause-live-trail")
-                Button("Finish", systemImage: "stop.fill", action: finish)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .buttonStyle(.bordered)
-                    .tint(.red)
-                    .accessibilityHint("Stops tracking and keeps the trail on the map")
-                    .accessibilityIdentifier("finish-live-trail")
-            }
-            .font(.subheadline.weight(.semibold))
         }
-        .padding(14)
-        .walkItAllContentSurface(cornerRadius: 20)
-        .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("active-live-trail")
     }
@@ -78,48 +71,34 @@ struct ActiveLiveTrailCard: View {
 struct PausedLiveTrailCard: View {
     let resume: () -> Void
     let finish: () -> Void
-    let clear: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Live Trail paused")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Tracking is off")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } icon: {
-                Image(systemName: "pause.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(.orange)
+        LiveTrailControlCard(
+            title: "Live Trail",
+            detail: "Paused · location is off",
+            symbol: "pause.fill",
+            tint: .orange
+        ) {
+            LiveTrailActionRow {
+                LiveTrailActionButton(
+                    "Resume",
+                    symbol: "play.fill",
+                    style: .primary,
+                    action: resume
+                )
+                .accessibilityHint("Starts location again in a new trail part")
+                .accessibilityIdentifier("resume-live-trail")
+            } secondary: {
+                LiveTrailActionButton(
+                    "Finish",
+                    symbol: "stop.fill",
+                    style: .secondary,
+                    action: finish
+                )
+                .accessibilityHint("Stops tracking and keeps the trail on the map")
+                .accessibilityIdentifier("finish-paused-live-trail")
             }
-
-            HStack(spacing: 10) {
-                Button("Resume", systemImage: "play.fill", action: resume)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.green)
-                    .accessibilityHint("Starts location again in a new trail part")
-                    .accessibilityIdentifier("resume-live-trail")
-                Button("Finish", systemImage: "stop.fill", action: finish)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .buttonStyle(.bordered)
-                    .tint(.red)
-                    .accessibilityHint("Stops tracking and keeps the trail on the map")
-                    .accessibilityIdentifier("finish-paused-live-trail")
-            }
-            .font(.subheadline.weight(.semibold))
-
-            Button("Clear Trail", systemImage: "trash", role: .destructive, action: clear)
-                .font(.footnote.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .accessibilityIdentifier("clear-paused-live-trail")
         }
-        .padding(14)
-        .walkItAllContentSurface(cornerRadius: 20)
-        .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("paused-live-trail")
     }
@@ -130,43 +109,163 @@ struct FinishedLiveTrailCard: View {
     let clear: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 11) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+        LiveTrailControlCard(
+            title: "Live Trail",
+            detail: "Finished · stays until cleared",
+            symbol: "checkmark",
+            tint: .green
+        ) {
+            LiveTrailActionRow {
+                LiveTrailActionButton(
+                    "Start New",
+                    symbol: "location.fill",
+                    style: .primary,
+                    action: startNew
+                )
+                .accessibilityIdentifier("start-new-live-trail")
+            } secondary: {
+                LiveTrailActionButton(
+                    "Clear Trail",
+                    symbol: "trash",
+                    role: .destructive,
+                    style: .destructive,
+                    action: clear
+                )
+                .accessibilityIdentifier("clear-finished-live-trail")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("finished-live-trail")
+    }
+}
+
+private enum LiveTrailControlMetrics {
+    static let actionSpacing: CGFloat = 8
+    static let cardSpacing: CGFloat = 12
+    static let controlHeight: CGFloat = 44
+}
+
+private struct LiveTrailControlCard<Actions: View>: View {
+    let title: String
+    let detail: String
+    let symbol: String
+    let tint: Color
+    @ViewBuilder let actions: Actions
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LiveTrailControlMetrics.cardSpacing) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(tint)
+                    .frame(width: 28, height: 28)
+                    .background(tint.opacity(0.14), in: Circle())
+                    .accessibilityHidden(true)
+
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Trail finished")
+                    Text(title)
                         .font(.subheadline.weight(.semibold))
-                    Text("Tracking is off")
+                    Text(detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
+                Spacer(minLength: 8)
             }
 
-            Text("This temporary trail stays on the map until you clear it or start a new one.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 10) {
-                Button("Start New", systemImage: "location.fill", action: startNew)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.green)
-                    .accessibilityIdentifier("start-new-live-trail")
-                Button("Clear Trail", systemImage: "trash", role: .destructive, action: clear)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("clear-finished-live-trail")
-            }
-            .font(.subheadline.weight(.semibold))
+            actions
         }
         .padding(14)
         .walkItAllContentSurface(cornerRadius: 20)
         .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("finished-live-trail")
+    }
+}
+
+private struct LiveTrailActionRow<PrimaryAction: View, SecondaryAction: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let primaryAction: PrimaryAction
+    let secondaryAction: SecondaryAction
+
+    init(
+        @ViewBuilder _ primaryAction: () -> PrimaryAction,
+        @ViewBuilder secondary secondaryAction: () -> SecondaryAction
+    ) {
+        self.primaryAction = primaryAction()
+        self.secondaryAction = secondaryAction()
+    }
+
+    var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: LiveTrailControlMetrics.actionSpacing) {
+                    primaryAction
+                    secondaryAction
+                }
+            } else {
+                HStack(spacing: LiveTrailControlMetrics.actionSpacing) {
+                    primaryAction
+                    secondaryAction
+                }
+            }
+        }
+    }
+}
+
+private struct LiveTrailActionButton: View {
+    enum Style {
+        case primary
+        case secondary
+        case destructive
+    }
+
+    let title: String
+    let symbol: String
+    let role: ButtonRole?
+    let style: Style
+    let action: () -> Void
+
+    init(
+        _ title: String,
+        symbol: String,
+        role: ButtonRole? = nil,
+        style: Style,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.symbol = symbol
+        self.role = role
+        self.style = style
+        self.action = action
+    }
+
+    var body: some View {
+        Group {
+            switch style {
+            case .primary:
+                button
+                    .buttonStyle(.borderedProminent)
+                    .tint(.indigo)
+            case .secondary:
+                button
+                    .buttonStyle(.bordered)
+                    .tint(.primary)
+            case .destructive:
+                button
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+            }
+        }
+        .buttonBorderShape(.capsule)
+    }
+
+    private var button: some View {
+        Button(role: role, action: action) {
+            Label(title, systemImage: symbol)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity)
+                .frame(height: LiveTrailControlMetrics.controlHeight)
+        }
     }
 }
 

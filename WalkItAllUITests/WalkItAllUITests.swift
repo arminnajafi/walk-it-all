@@ -145,6 +145,26 @@ final class WalkItAllUITests: XCTestCase {
     }
 
     @MainActor
+    func testActiveLiveTrailUsesTheSharedControlLayout() {
+        let app = launch(arguments: [
+            "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
+            "-uiTestActiveLiveTrail",
+        ])
+
+        XCTAssertTrue(app.descendants(matching: .any)["active-live-trail"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["Live Trail"].exists)
+        XCTAssertTrue(app.staticTexts["Active · continues when your screen locks"].exists)
+        let pause = app.buttons["pause-live-trail"]
+        let finish = app.buttons["finish-live-trail"]
+        XCTAssertTrue(pause.isHittable)
+        XCTAssertTrue(finish.isHittable)
+        XCTAssertEqual(pause.frame.width, finish.frame.width, accuracy: 1)
+        XCTAssertEqual(pause.frame.height, finish.frame.height, accuracy: 1)
+        XCTAssertEqual(pause.frame.minY, finish.frame.minY, accuracy: 1)
+        attachScreenshot(named: "09-live-trail-active", app: app)
+    }
+
+    @MainActor
     func testPausedLiveTrailClearlyOffersResumeOrFinalFinish() {
         let app = launch(arguments: [
             "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
@@ -152,17 +172,22 @@ final class WalkItAllUITests: XCTestCase {
         ])
 
         XCTAssertTrue(app.descendants(matching: .any)["paused-live-trail"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.staticTexts["Live Trail paused"].exists)
-        XCTAssertTrue(app.staticTexts["Tracking is off"].exists)
-        XCTAssertTrue(app.buttons["resume-live-trail"].isHittable)
-        XCTAssertTrue(app.buttons["finish-paused-live-trail"].isHittable)
-        XCTAssertTrue(app.buttons["clear-paused-live-trail"].isHittable)
+        XCTAssertTrue(app.staticTexts["Live Trail"].exists)
+        XCTAssertTrue(app.staticTexts["Paused · location is off"].exists)
+        let resume = app.buttons["resume-live-trail"]
+        let finish = app.buttons["finish-paused-live-trail"]
+        XCTAssertTrue(resume.isHittable)
+        XCTAssertTrue(finish.isHittable)
+        XCTAssertEqual(resume.frame.width, finish.frame.width, accuracy: 1)
+        XCTAssertEqual(resume.frame.height, finish.frame.height, accuracy: 1)
+        XCTAssertEqual(resume.frame.minY, finish.frame.minY, accuracy: 1)
+        XCTAssertFalse(app.buttons["clear-paused-live-trail"].exists)
         attachScreenshot(named: "09-live-trail-paused", app: app)
 
-        app.buttons["finish-paused-live-trail"].tap()
+        finish.tap()
         XCTAssertTrue(app.staticTexts["Finish Live Trail?"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Finish stops tracking. This trail will remain on the map until you clear it or start a new one."].exists)
-        app.buttons["Keep Trail"].tap()
+        app.buttons["Cancel"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["paused-live-trail"].waitForExistence(timeout: 5))
     }
 
@@ -174,10 +199,15 @@ final class WalkItAllUITests: XCTestCase {
         ])
 
         XCTAssertTrue(app.descendants(matching: .any)["finished-live-trail"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.staticTexts["Trail finished"].exists)
-        XCTAssertTrue(app.staticTexts["Tracking is off"].exists)
-        XCTAssertTrue(app.buttons["start-new-live-trail"].isHittable)
-        XCTAssertTrue(app.buttons["clear-finished-live-trail"].isHittable)
+        XCTAssertTrue(app.staticTexts["Live Trail"].exists)
+        XCTAssertTrue(app.staticTexts["Finished · stays until cleared"].exists)
+        let startNew = app.buttons["start-new-live-trail"]
+        let clear = app.buttons["clear-finished-live-trail"]
+        XCTAssertTrue(startNew.isHittable)
+        XCTAssertTrue(clear.isHittable)
+        XCTAssertEqual(startNew.frame.width, clear.frame.width, accuracy: 1)
+        XCTAssertEqual(startNew.frame.height, clear.frame.height, accuracy: 1)
+        XCTAssertEqual(startNew.frame.minY, clear.frame.minY, accuracy: 1)
         attachScreenshot(named: "10-live-trail-finished", app: app)
     }
 

@@ -78,7 +78,9 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
             if ProcessInfo.processInfo.arguments.contains("-uiTestResetLiveTrail") {
                 try await repository.delete()
             }
-            if ProcessInfo.processInfo.arguments.contains("-uiTestPausedLiveTrail") {
+            if ProcessInfo.processInfo.arguments.contains("-uiTestActiveLiveTrail") {
+                try await repository.save(Self.uiTestSession(state: .active, now: now))
+            } else if ProcessInfo.processInfo.arguments.contains("-uiTestPausedLiveTrail") {
                 try await repository.save(Self.uiTestSession(state: .paused, now: now))
             } else if ProcessInfo.processInfo.arguments.contains("-uiTestFinishedLiveTrail") {
                 try await repository.save(Self.uiTestSession(state: .finished, now: now))
