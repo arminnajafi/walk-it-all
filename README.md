@@ -30,7 +30,7 @@ Walk It All combines walking, hiking, running, and cycling routes from Apple Hea
   </tr>
 </table>
 
-<sub>The screenshots use synthetic demo routes. No personal Health data or private coordinates are stored in this repository.</sub>
+<sub>Screenshots show demo routes.</sub>
 
 ## The idea
 
@@ -61,15 +61,15 @@ Walk It All checks Apple Health when the app launches, returns to the foreground
 
 Recent workouts are safely rechecked because Apple Health may deliver or replace their routes later. The app reports only routes that actually changed, so an unchanged refresh says **Apple Health is up to date**.
 
-## Current status
+## Availability
 
-Walk It All is a personal MVP, not currently distributed through the App Store or TestFlight. The repository is public so the product, privacy model, and implementation can be reviewed and shared. Installing it currently requires building it with Xcode and signing it with your own Apple development team.
+Walk It All is not yet available on the App Store. You can build it from source on a Mac and install it on your own iPhone with Xcode.
 
-## Install on your own iPhone with a coding agent
+## Install with Codex or Claude Code
 
-Because Walk It All is unpublished, this GitHub repository is source code—not a one-tap installation link. Codex or Claude Code can automate most of a personal installation on a Mac, but Apple still requires the iPhone owner to sign in to Xcode with their own Apple Account, trust the Mac, enable Developer Mode, and approve permissions on the phone.
+An AI coding agent can guide most of the installation. Apple still requires you to sign in to Xcode with your own Apple Account, trust the Mac from your iPhone, enable Developer Mode, and approve the app's permissions.
 
-With a free Xcode Personal Team, Apple currently allows up to 10 App IDs, 3 test devices per platform, and 3 apps per device. These registrations and the provisioning profile expire after 7 days, so the app must be rebuilt and reinstalled periodically. The three-device allowance belongs to each Apple Account: friends who sign their own clone with their own Personal Team do **not** use your three-device allowance. See Apple’s [Personal Team limits](https://developer.apple.com/help/account/basics/about-your-developer-account).
+A free Xcode Personal Team can sign the app for personal use. Apple currently allows up to 10 App IDs, 3 test devices per platform, and 3 apps per device; these registrations and the provisioning profile expire after 7 days. The limits apply separately to each Apple Account. See Apple’s [Personal Team limits](https://developer.apple.com/help/account/basics/about-your-developer-account).
 
 <details>
 <summary><strong>Copy this prompt into Codex or Claude Code</strong></summary>
@@ -93,8 +93,6 @@ This app is not on the App Store or TestFlight. If I use a free Personal Team, r
 ```
 
 </details>
-
-For genuinely easy sharing, the cleaner next step is the paid Apple Developer Program and TestFlight. Membership is currently [US$99 per year](https://developer.apple.com/programs/whats-included/); [TestFlight builds](https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview) remain available for up to 90 days and external testing may require beta review. That is not necessary for personal use or source review.
 
 ## Build and verify
 
