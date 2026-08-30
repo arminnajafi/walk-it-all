@@ -235,7 +235,7 @@ struct LifetimeMapView: UIViewRepresentable {
             let translatedMode: MapUserTrackingMode
             switch mode {
             case .none: translatedMode = .free
-            case .follow: translatedMode = .follow
+            case .follow: translatedMode = .followNorthUp
             case .followWithHeading: translatedMode = .followWithHeading
             @unknown default: translatedMode = .free
             }
@@ -320,10 +320,7 @@ struct LifetimeMapView: UIViewRepresentable {
                 guard mapView.showsUserLocation,
                       mapView.userLocation.location != nil
                 else { return }
-                let trackingMode: MKUserTrackingMode = mode == .followWithHeading
-                    ? .followWithHeading
-                    : .follow
-                mapView.setUserTrackingMode(trackingMode, animated: animated)
+                Self.applyUserTracking(mode, to: mapView, animated: animated)
                 viewportRevision = pendingViewport.revision
                 appliedBottomInset = pendingBottomInset
                 return
@@ -335,6 +332,31 @@ struct LifetimeMapView: UIViewRepresentable {
             )
             viewportRevision = pendingViewport.revision
             appliedBottomInset = pendingBottomInset
+        }
+
+        static func applyUserTracking(
+            _ mode: MapUserTrackingMode,
+            to mapView: MKMapView,
+            animated: Bool
+        ) {
+            switch mode {
+            case .free:
+                mapView.setUserTrackingMode(.none, animated: animated)
+            case .followNorthUp:
+                mapView.setCamera(northUpCamera(from: mapView.camera), animated: animated)
+                mapView.setUserTrackingMode(.follow, animated: animated)
+            case .followWithHeading:
+                mapView.setUserTrackingMode(.followWithHeading, animated: animated)
+            }
+        }
+
+        static func northUpCamera(from camera: MKMapCamera) -> MKMapCamera {
+            MKMapCamera(
+                lookingAtCenter: camera.centerCoordinate,
+                fromDistance: camera.centerCoordinateDistance,
+                pitch: camera.pitch,
+                heading: 0
+            )
         }
 
         private static let manhattanMapRect = mapRect(for: GeoBounds(

@@ -1016,22 +1016,63 @@ final class WalkItAllTests: XCTestCase {
 
         XCTAssertEqual(model.mapUserTrackingMode, .free)
         model.showUserLocation()
-        XCTAssertEqual(model.mapUserTrackingMode, .follow)
-        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.follow))
+        XCTAssertEqual(model.mapUserTrackingMode, .followNorthUp)
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.followNorthUp))
 
         let firstRevision = model.mapViewportCommand.revision
-        model.mapUserTrackingDidChange(.follow)
+        model.mapUserTrackingDidChange(.followNorthUp)
         model.showUserLocation()
         XCTAssertEqual(model.mapUserTrackingMode, .followWithHeading)
         XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.followWithHeading))
         XCTAssertGreaterThan(model.mapViewportCommand.revision, firstRevision)
 
         model.showUserLocation()
-        XCTAssertEqual(model.mapUserTrackingMode, .follow)
-        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.follow))
+        XCTAssertEqual(model.mapUserTrackingMode, .followNorthUp)
+        XCTAssertEqual(model.mapViewportCommand.target, .userLocation(.followNorthUp))
 
         model.mapUserTrackingDidChange(.free)
         XCTAssertEqual(model.mapUserTrackingMode, .free)
+    }
+
+    @MainActor
+    func testNorthUpCameraUsesTrueNorthWithoutChangingTheViewpoint() {
+        let camera = MKMapCamera(
+            lookingAtCenter: CLLocationCoordinate2D(latitude: 40.783, longitude: -73.966),
+            fromDistance: 1_250,
+            pitch: 18,
+            heading: 127
+        )
+
+        let northUp = LifetimeMapView.Coordinator.northUpCamera(from: camera)
+
+        XCTAssertEqual(northUp.heading, 0, accuracy: 0.001)
+        XCTAssertEqual(northUp.centerCoordinate.latitude, camera.centerCoordinate.latitude, accuracy: 0.000_001)
+        XCTAssertEqual(northUp.centerCoordinate.longitude, camera.centerCoordinate.longitude, accuracy: 0.000_001)
+        XCTAssertEqual(northUp.centerCoordinateDistance, camera.centerCoordinateDistance, accuracy: 0.001)
+        XCTAssertEqual(northUp.pitch, camera.pitch, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testApplyingNorthUpFollowResetsRotationAndKeepsLocationTracking() {
+        let mapView = MKMapView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        mapView.setCamera(
+            MKMapCamera(
+                lookingAtCenter: CLLocationCoordinate2D(latitude: 40.783, longitude: -73.966),
+                fromDistance: 1_250,
+                pitch: 0,
+                heading: 127
+            ),
+            animated: false
+        )
+
+        LifetimeMapView.Coordinator.applyUserTracking(
+            .followNorthUp,
+            to: mapView,
+            animated: false
+        )
+
+        XCTAssertEqual(mapView.camera.heading, 0, accuracy: 0.001)
+        XCTAssertEqual(mapView.userTrackingMode, .follow)
     }
 
     @MainActor

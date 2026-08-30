@@ -161,7 +161,7 @@ struct MapScreen: View {
     private var locationSymbol: String {
         switch model.mapUserTrackingMode {
         case .free: "location"
-        case .follow: "location.fill"
+        case .followNorthUp: "location.fill"
         case .followWithHeading: "location.north.line.fill"
         }
     }
@@ -169,7 +169,7 @@ struct MapScreen: View {
     private var locationLabel: String {
         switch model.mapUserTrackingMode {
         case .free: "Follow current location"
-        case .follow: "Follow current location with heading"
+        case .followNorthUp: "Follow current location with heading"
         case .followWithHeading: "Follow current location north up"
         }
     }
@@ -177,7 +177,7 @@ struct MapScreen: View {
     private var locationHint: String {
         switch model.mapUserTrackingMode {
         case .free: "Recenters north up and requests location access if needed"
-        case .follow: "Rotates the map to face the direction you are heading"
+        case .followNorthUp: "Rotates the map to face the direction you are heading"
         case .followWithHeading: "Returns to north-up position following"
         }
     }

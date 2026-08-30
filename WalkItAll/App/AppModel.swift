@@ -31,7 +31,7 @@ enum MapViewportTarget: Equatable, Sendable {
 
 enum MapUserTrackingMode: Equatable, Sendable {
     case free
-    case follow
+    case followNorthUp
     case followWithHeading
 }
 
@@ -253,9 +253,9 @@ final class AppModel {
 
     func showUserLocation() {
         liveTrail.requestCurrentLocation()
-        let mode: MapUserTrackingMode = mapUserTrackingMode == .follow
+        let mode: MapUserTrackingMode = mapUserTrackingMode == .followNorthUp
             ? .followWithHeading
-            : .follow
+            : .followNorthUp
         requestUserTracking(mode)
     }
 

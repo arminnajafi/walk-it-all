@@ -8,7 +8,7 @@ The verification script must pass:
 - Health cursor v3 migration, route association, authoritative reconciliation, and conservative zero-readable-cache preservation tests;
 - repository activity payload compatibility, replacement, deletion, reset, corruption recovery, locked-data deferral, external-support-tree protection, cursor, ledger, and timestamp round trips;
 - synchronization addition, invalidation, deletion, cancellation, generation, and refresh-throttle tests;
-- overlay completeness, worldwide bounds, native spatial culling, repeat opacity, selection viewport, north-up and heading-up tracking state, and selection-without-history-rebuild tests;
+- overlay completeness, worldwide bounds, native spatial culling, repeat opacity, selection viewport, explicit true-north camera reset, north-up and heading-up tracking state, and selection-without-history-rebuild tests;
 - Live Trail filtering, pre-session rejection, discontinuities, Pause/Resume separation, crash-safe final Finish, Clear, exact-file persistence, structural corruption, retained finished state, and locked relaunch ordering tests;
 - onboarding, empty state, restrained populated map, Live Trail explanation, paused and finished states, details, Health help, history, privacy, and Dynamic Type UI tests.
 
