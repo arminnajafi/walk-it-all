@@ -17,7 +17,7 @@ final class WalkItAllTests: XCTestCase {
         let routeID = UUID()
         let workoutID = UUID()
         let cursor = HealthImportCursor(
-            version: 99,
+            version: HealthImportCursor.currentVersion,
             workoutAnchorData: Data([1, 2]),
             routeAnchorData: Data([3, 4]),
             routeToWorkout: [routeID: workoutID]
@@ -25,7 +25,7 @@ final class WalkItAllTests: XCTestCase {
 
         let decoded = HealthImportCursorCodec.decode(try HealthImportCursorCodec.encode(cursor))
 
-        XCTAssertEqual(decoded.version, 99)
+        XCTAssertEqual(decoded.version, HealthImportCursor.currentVersion)
         XCTAssertEqual(decoded.workoutAnchorData, Data([1, 2]))
         XCTAssertEqual(decoded.routeAnchorData, Data([3, 4]))
         XCTAssertEqual(decoded.routeToWorkout[routeID], workoutID)

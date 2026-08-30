@@ -165,6 +165,7 @@ struct FinishedLiveTrailCard: View {
         .padding(14)
         .walkItAllContentSurface(cornerRadius: 20)
         .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("finished-live-trail")
     }
 }
