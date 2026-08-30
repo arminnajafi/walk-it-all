@@ -47,7 +47,7 @@ enum ImportPhase: Equatable {
     case readingRoutes(completed: Int, total: Int)
     case processingRoutes(completed: Int, total: Int)
     case preparingMap
-    case complete(imported: Int)
+    case complete(HealthImportCompletion)
     case failed(String)
 
     var isWorking: Bool {
@@ -67,9 +67,55 @@ enum ImportPhase: Equatable {
         case let .readingRoutes(completed, total): "Reading routes \(completed) of \(total)…"
         case let .processingRoutes(completed, total): "Preparing routes \(completed) of \(total)…"
         case .preparingMap: "Updating your map…"
-        case let .complete(imported): "Updated \(imported) workout\(imported == 1 ? "" : "s")"
+        case let .complete(completion): completion.title
         case .failed: "Refresh needs attention"
         }
+    }
+}
+
+enum HealthImportCompletion: Equatable, Sendable {
+    case refreshed(added: Int, updated: Int, removed: Int)
+    case rebuilt(Int)
+
+    static func refreshed(
+        comparing previousRecords: [WorkoutRouteRecord],
+        with currentRecords: [WorkoutRouteRecord]
+    ) -> Self {
+        let previous = Dictionary(uniqueKeysWithValues: previousRecords.map { ($0.id, $0) })
+        let current = Dictionary(uniqueKeysWithValues: currentRecords.map { ($0.id, $0) })
+        let previousIDs = Set(previous.keys)
+        let currentIDs = Set(current.keys)
+        let sharedIDs = previousIDs.intersection(currentIDs)
+        return .refreshed(
+            added: currentIDs.subtracting(previousIDs).count,
+            updated: sharedIDs.count { previous[$0] != current[$0] },
+            removed: previousIDs.subtracting(currentIDs).count
+        )
+    }
+
+    var title: String {
+        switch self {
+        case let .rebuilt(count):
+            return "Rebuilt \(Self.workoutCount(count))"
+        case let .refreshed(added, updated, removed):
+            let changes = [
+                Self.changeDescription(count: added, action: "added"),
+                Self.changeDescription(count: updated, action: "updated"),
+                Self.changeDescription(count: removed, action: "removed"),
+            ].compactMap(\.self)
+            return changes.isEmpty
+                ? "Apple Health is up to date"
+                : changes.joined(separator: " · ")
+        }
+    }
+
+    private static func workoutCount(_ count: Int) -> String {
+        "\(count) workout\(count == 1 ? "" : "s")"
+    }
+
+    private static func changeDescription(count: Int, action: String) -> String? {
+        guard count > 0 else { return nil }
+        return "\(workoutCount(count)) \(action)"
     }
 }
 
@@ -377,7 +423,7 @@ final class AppModel {
                     clearSelectedWorkout()
                     routeRenderRevision &+= 1
                 }
-                await performImport(generation: generation)
+                await performImport(generation: generation, isRebuild: resetFirst)
             } catch is CancellationError {
                 guard generation == importGeneration else { return }
                 importPhase = .idle
@@ -390,17 +436,17 @@ final class AppModel {
         }
     }
 
-    private func performImport(generation: Int) async {
+    private func performImport(generation: Int, isRebuild: Bool) async {
         guard generation == importGeneration else { return }
         importPhase = .findingWorkouts
         do {
+            let recordsBeforeImport = try await repository.loadRecords()
             let checkpoint = try await repository.loadCheckpoint()
             let processedWorkoutIDs = try await repository.loadProcessedWorkoutIDs()
             let batches = await routeSource.routeBatches(
                 since: checkpoint,
                 excluding: processedWorkoutIDs
             )
-            var imported = 0
             var pendingCheckpoint: Data?
             var authoritativeWorkoutIDs: Set<UUID>?
 
@@ -427,7 +473,6 @@ final class AppModel {
                     )
                     if let record = await Self.process(route, with: routeProcessor) {
                         try await repository.save(record: record)
-                        imported += 1
                     } else {
                         try await repository.removeRouteRecords(workoutIDs: [route.id])
                     }
@@ -471,7 +516,11 @@ final class AppModel {
             lastSuccessfulImport = successfulRefreshDate
             clearSelectionIfMissing()
             routeRenderRevision &+= 1
-            importPhase = .complete(imported: imported)
+            importPhase = .complete(
+                isRebuild
+                    ? .rebuilt(records.count)
+                    : .refreshed(comparing: recordsBeforeImport, with: records)
+            )
 
         } catch is CancellationError {
             guard generation == importGeneration else { return }

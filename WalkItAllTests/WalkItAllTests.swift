@@ -1156,6 +1156,90 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
+    func testRecheckingAnUnchangedRecentWorkoutReportsHealthUpToDate() async throws {
+        let route = workoutRoute()
+        let record = try XCTUnwrap(RouteProcessor().process(route))
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(
+            routes: [route],
+            processedWorkouts: [.init(id: route.id, end: route.end)]
+        )])
+        let repository = TestHistoryRepository(
+            records: [record],
+            processedIDs: [route.id]
+        )
+        let model = makeModel(source: source, repository: repository)
+        await model.bootstrap()
+
+        model.refresh()
+        try await waitForImportToFinish(model)
+
+        XCTAssertEqual(model.importPhase, .complete(.refreshed(added: 0, updated: 0, removed: 0)))
+        XCTAssertEqual(model.importPhase.title, "Apple Health is up to date")
+    }
+
+    @MainActor
+    func testRefreshReportsOnlyActualMapChanges() async throws {
+        let updatedRoute = workoutRoute()
+        let addedRoute = workoutRoute()
+        let removedRoute = workoutRoute()
+        let updatedRecord = try XCTUnwrap(RouteProcessor().process(updatedRoute))
+        let removedRecord = try XCTUnwrap(RouteProcessor().process(removedRoute))
+        let staleUpdatedRecord = WorkoutRouteRecord(
+            id: updatedRecord.id,
+            start: updatedRecord.start,
+            end: updatedRecord.end,
+            sourceName: "Previous Source",
+            activityKind: updatedRecord.activityKind,
+            routeParts: updatedRecord.routeParts
+        )
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(
+            routes: [updatedRoute, addedRoute],
+            deletedWorkoutIDs: [removedRoute.id],
+            processedWorkouts: [
+                .init(id: updatedRoute.id, end: updatedRoute.end),
+                .init(id: addedRoute.id, end: addedRoute.end),
+            ]
+        )])
+        let repository = TestHistoryRepository(
+            records: [staleUpdatedRecord, removedRecord],
+            processedIDs: [updatedRoute.id, removedRoute.id]
+        )
+        let model = makeModel(source: source, repository: repository)
+        await model.bootstrap()
+
+        model.refresh()
+        try await waitForImportToFinish(model)
+
+        XCTAssertEqual(model.importPhase, .complete(.refreshed(added: 1, updated: 1, removed: 1)))
+        XCTAssertEqual(
+            model.importPhase.title,
+            "1 workout added · 1 workout updated · 1 workout removed"
+        )
+    }
+
+    @MainActor
+    func testFullRebuildReportsTheRebuiltRouteCount() async throws {
+        let route = workoutRoute()
+        let existingRecord = try XCTUnwrap(RouteProcessor().process(route))
+        let source = TestRouteSource(batches: [WorkoutRouteBatch(
+            routes: [route],
+            processedWorkouts: [.init(id: route.id, end: route.end)]
+        )])
+        let repository = TestHistoryRepository(
+            records: [existingRecord],
+            processedIDs: [route.id]
+        )
+        let model = makeModel(source: source, repository: repository)
+        await model.bootstrap()
+
+        model.rebuildFromHealth()
+        try await waitForImportToFinish(model)
+
+        XCTAssertEqual(model.importPhase, .complete(.rebuilt(1)))
+        XCTAssertEqual(model.importPhase.title, "Rebuilt 1 workout")
+    }
+
+    @MainActor
     func testCancellationPreventsOldAuthorizationTaskFromPublishing() async throws {
         let source = SuspendingRouteSource()
         let repository = TestHistoryRepository()

@@ -20,6 +20,8 @@ The source emits one workout at a time. Deleted workouts remove the route and pr
 
 After the user has connected Health, the app refreshes at launch, on foreground entry, and every five minutes while active, subject to the five-minute success/attempt throttle. Manual refresh bypasses the throttle. Health background delivery is not enabled.
 
+Every incremental refresh reconciles the most recent seven days as a safety window for delayed or replaced route samples. Completion copy compares the stored route records before and after that work: unchanged rechecks report that Apple Health is up to date, while added, updated, and removed counts describe only actual map changes. A deliberate full rebuild reports the final rebuilt route count separately.
+
 ## Live Trail
 
 `LiveTrailController` starts location only after an explicit user action. It consumes `CLLocationUpdate.liveUpdates(.fitness)` and owns a `CLBackgroundActivitySession`, allowing an active session to continue through backgrounding and screen lock with Apple’s visible privacy indicator. The app requests When In Use authorization only and never requests Always access.

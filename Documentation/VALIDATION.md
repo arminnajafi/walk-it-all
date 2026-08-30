@@ -47,7 +47,7 @@ On a real device, confirm complete protection for permanent history, complete-un
 
 Verified on 2026-08-30:
 
-- The complete local verification gate passed 22 core tests, 54 app/storage/map tests, and 10 UI tests. Project regeneration also produced no committed-project diff.
+- The complete local verification gate passed 22 core tests, 57 app/storage/map tests, and 10 UI tests. Project regeneration also produced no committed-project diff.
 - Generic iOS Simulator test builds, Debug static analysis, and a Release simulator build completed without errors.
 - A signed Release build was installed and launched wirelessly on the personal iPhone with bundle identifier `com.arminnajafi.walkitall` and team `47F6V2R9AA` after the final automated gate.
 - The activity-scope reconciliation completed on that iPhone with 220 drawable route records and a 240-workout processed ledger while preserving the existing map.
