@@ -24,7 +24,7 @@ Walk It All combines walking, hiking, running, and cycling routes from Apple Hea
     <td align="center"><strong>Live Trail</strong></td>
   </tr>
   <tr>
-    <td><picture><source media="(prefers-color-scheme: dark)" srcset="Documentation/Screenshots/lifetime-map-dark.png"><img src="Documentation/Screenshots/lifetime-map.png" alt="Lifetime workout routes across Manhattan"></picture></td>
+    <td><img src="Documentation/Screenshots/lifetime-map.png" alt="Manhattan workout routes in deep berry on a light map"></td>
     <td><img src="Documentation/Screenshots/selected-workout.png" alt="A selected walking workout in Central Park"></td>
     <td><img src="Documentation/Screenshots/live-trail-paused.png" alt="Paused Live Trail with Resume and Finish controls"></td>
   </tr>
@@ -37,7 +37,7 @@ Walk It All combines walking, hiking, running, and cycling routes from Apple Hea
 Apple Fitness is good at showing one workout at a time. Walk It All answers a different question: **where have all of my recorded outdoor workouts taken me?**
 
 - Permanent routes come from read-only Apple Health access.
-- Walking, hiking, running, and cycling appear together in indigo.
+- The map always uses day mode. A single recorded visit marks a path with a solid deep berry line. Walking, hiking, running, and cycling all count.
 - Selecting a workout highlights it in orange and shows its activity, source, date, and duration.
 - **Live Trail** draws one temporary green trail while you explore. It can continue through screen lock, but remains independent of Apple Health and stays only until you clear or replace it.
 - The map starts on Manhattan, including parks and waterfront paths, but imported routes can appear anywhere.

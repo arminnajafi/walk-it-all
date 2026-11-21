@@ -43,7 +43,7 @@ private struct WorkoutRow: View {
         HStack(spacing: 12) {
             Image(systemName: isSelected ? "checkmark.circle.fill" : record.activityKind.systemImage)
                 .font(.title2)
-                .foregroundStyle(isSelected ? .indigo : .secondary)
+                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
             VStack(alignment: .leading, spacing: 4) {
                 Text(record.start.formatted(date: .abbreviated, time: .shortened))
                     .font(.body.weight(.semibold))

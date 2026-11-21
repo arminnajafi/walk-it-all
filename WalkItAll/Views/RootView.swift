@@ -68,7 +68,7 @@ private struct LaunchPlaceholder: View {
             VStack(spacing: 14) {
                 Image(systemName: "map.fill")
                     .font(.system(size: 42))
-                    .foregroundStyle(.indigo)
+                    .foregroundStyle(Color.accentColor)
                 ProgressView("Opening your map…")
             }
         }

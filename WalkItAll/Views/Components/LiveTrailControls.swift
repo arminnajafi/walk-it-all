@@ -9,12 +9,12 @@ struct StartLiveTrailButton: View {
             if #available(iOS 26.0, *) {
                 button
                     .buttonStyle(.glassProminent)
-                    .tint(.indigo)
+                    .tint(.accentColor)
             } else {
                 button
                     .buttonStyle(.borderedProminent)
                     .buttonBorderShape(.capsule)
-                    .tint(.indigo)
+                    .tint(.accentColor)
             }
         }
         .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
@@ -243,7 +243,7 @@ private struct LiveTrailActionButton: View {
             case .primary:
                 button
                     .buttonStyle(.borderedProminent)
-                    .tint(.indigo)
+                    .tint(.accentColor)
             case .secondary:
                 button
                     .buttonStyle(.bordered)

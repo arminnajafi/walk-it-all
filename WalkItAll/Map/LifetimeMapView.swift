@@ -23,7 +23,7 @@ struct LifetimeMapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let mapView = LayoutAwareMapView(frame: .zero)
         mapView.delegate = context.coordinator
-        mapView.registerForTraitChanges([UITraitUserInterfaceStyle.self, UITraitAccessibilityContrast.self]) {
+        mapView.registerForTraitChanges([UITraitAccessibilityContrast.self]) {
             (map: MKMapView, _: UITraitCollection) in
             for case let overlay as LifetimeWorkoutRouteOverlay in map.overlays {
                 guard let renderer = map.renderer(for: overlay) as? MKMultiPolylineRenderer else { continue }

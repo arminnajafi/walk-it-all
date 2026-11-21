@@ -780,23 +780,24 @@ final class WalkItAllTests: XCTestCase {
     }
 
     @MainActor
-    func testSinglePassHistoryUsesStrongAdaptiveStrokeAndHonorsIncreaseContrast() throws {
+    func testDayModeKeepsSingleVisitsOpaqueAndHonorsIncreaseContrast() throws {
         let overlay = try XCTUnwrap(LifetimeWorkoutRouteOverlay(record: record(id: UUID(), latitude: 40.75)))
         let light = UITraitCollection(userInterfaceStyle: .light)
         let dark = UITraitCollection(userInterfaceStyle: .dark)
         let daylight = LifetimeRouteRenderer.make(overlay: overlay, traits: light)
         let night = LifetimeRouteRenderer.make(overlay: overlay, traits: dark)
-        XCTAssertNotEqual(daylight.strokeColor, night.strokeColor)
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "UIUserInterfaceStyle") as? String, "Light")
+        XCTAssertEqual(daylight.strokeColor, night.strokeColor)
         for renderer in [daylight, night] {
             let color = try XCTUnwrap(renderer.strokeColor)
-            XCTAssertGreaterThanOrEqual(renderer.lineWidth, 4)
-            XCTAssertGreaterThanOrEqual(color.cgColor.alpha, 0.8)
-            XCTAssertLessThan(color.cgColor.alpha, 1)
+            XCTAssertGreaterThanOrEqual(renderer.lineWidth, 5)
+            XCTAssertEqual(color.cgColor.alpha, 1)
         }
         for base in [light, dark] {
             let highContrast = base.modifyingTraits { $0.accessibilityContrast = .high }
             let renderer = LifetimeRouteRenderer.make(overlay: overlay, traits: highContrast)
             XCTAssertEqual(renderer.strokeColor?.cgColor.alpha, 1)
+            XCTAssertNotEqual(renderer.strokeColor, LifetimeRouteRenderer.historyColor.resolvedColor(with: base))
         }
     }
 

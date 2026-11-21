@@ -9,7 +9,7 @@ struct OnboardingView: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.indigo.opacity(0.15), Color(.systemBackground)],
+                colors: [Color.accentColor.opacity(0.15), Color(.systemBackground)],
                 startPoint: .topLeading,
                 endPoint: .center
             )
@@ -48,7 +48,7 @@ struct OnboardingView: View {
 
     private var valuePage: some View {
         VStack(spacing: pageSpacing) {
-            pageIcon("map.fill", color: .indigo)
+            pageIcon("map.fill", color: .accentColor)
             VStack(spacing: 12) {
                 Text("See everywhere you’ve covered.")
                     .font(pageTitleFont)
@@ -64,7 +64,7 @@ struct OnboardingView: View {
 
     private var privacyPage: some View {
         VStack(spacing: pageSpacing) {
-            pageIcon("hand.raised.fill", color: .indigo)
+            pageIcon("hand.raised.fill", color: .accentColor)
             VStack(spacing: 12) {
                 Text("Private by design.")
                     .font(pageTitleFont)
@@ -99,10 +99,10 @@ struct OnboardingView: View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
                 Capsule()
-                    .fill(page == 0 ? Color.indigo : Color.secondary.opacity(0.3))
+                    .fill(page == 0 ? Color.accentColor : Color.secondary.opacity(0.3))
                     .frame(width: page == 0 ? 24 : 8, height: 8)
                 Capsule()
-                    .fill(page == 1 ? Color.indigo : Color.secondary.opacity(0.3))
+                    .fill(page == 1 ? Color.accentColor : Color.secondary.opacity(0.3))
                     .frame(width: page == 1 ? 24 : 8, height: 8)
             }
             .animation(reduceMotion ? nil : .snappy, value: page)

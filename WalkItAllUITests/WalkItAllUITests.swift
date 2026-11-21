@@ -1,3 +1,4 @@
+import CoreImage.CIFilterBuiltins
 import XCTest
 
 final class WalkItAllUITests: XCTestCase {
@@ -196,17 +197,30 @@ final class WalkItAllUITests: XCTestCase {
     }
 
     @MainActor
-    func testPopulatedMapRendersInDarkAppearance() {
+    func testMapStaysLightWhenPhoneUsesDarkMode() throws {
         let previousAppearance = XCUIDevice.shared.appearance
         XCUIDevice.shared.appearance = .dark
         defer { XCUIDevice.shared.appearance = previousAppearance }
 
         let app = launch(arguments: [
-            "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated", "-AppleInterfaceStyle", "Dark",
+            "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
         ])
         XCTAssertTrue(app.buttons["start-live-trail"].waitForExistence(timeout: 30))
         XCTAssertFalse(app.staticTexts["2 walks mapped"].exists)
-        attachScreenshot(named: "11-populated-dark", app: app)
+        let screenshot = app.screenshot()
+        let image = CIImage(cgImage: try XCTUnwrap(screenshot.image.cgImage))
+        let average = CIFilter.areaAverage()
+        average.inputImage = image
+        average.extent = image.extent.insetBy(dx: image.extent.width / 4, dy: image.extent.height / 4)
+        var rgba = [UInt8](repeating: 0, count: 4)
+        CIContext().render(try XCTUnwrap(average.outputImage), toBitmap: &rgba, rowBytes: 4,
+                           bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8,
+                           colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        XCTAssertGreaterThan(rgba[1], 160, "The map should stay light with the phone in Dark Mode.")
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "11-day-map-with-dark-system"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     @MainActor

@@ -8,7 +8,7 @@ The verification script must pass:
 - Health cursor v3 migration, route association, authoritative reconciliation, and conservative zero-readable-cache preservation tests;
 - repository activity payload compatibility, replacement, deletion, reset, corruption recovery, locked-data deferral, external-support-tree protection, cursor, ledger, and timestamp round trips;
 - synchronization addition, invalidation, deletion, cancellation, generation, and refresh-throttle tests;
-- overlay completeness, worldwide bounds, native spatial culling, repeat opacity, selection viewport, explicit true-north camera reset, north-up and heading-up tracking state, and selection-without-history-rebuild tests;
+- overlay completeness, worldwide bounds, native spatial culling, single-visit opacity, selection viewport, explicit true-north camera reset, north-up and heading-up tracking state, and selection-without-history-rebuild tests;
 - Live Trail filtering, pre-session rejection, discontinuities, Pause/Resume separation, crash-safe final Finish, Clear, exact-file persistence, structural corruption, retained finished state, and locked relaunch ordering tests;
 - onboarding, empty state, restrained populated map, Live Trail explanation, consistent equal-width Live Trail actions, paused and finished states, details, Health help, history, privacy, and Dynamic Type UI tests.
 
@@ -19,7 +19,7 @@ Before signoff:
 1. Record the current drawable-route and processed-workout counts, run the activity-scope reconciliation, and confirm existing walks/hikes remain while supported runs and rides appear. Counts are intentionally not fixed because they grow as new workouts sync.
 2. Compare representative walk, hike, run, and ride routes with Apple Fitness. Confirm that inaccurate points, transit, outages, and implausible jumps are not bridged.
 3. Start Live Trail, lock the phone, walk several blocks, and confirm the solid green trail is continuous after reopening. Pause and confirm background trail tracking and its system indicator stop; Resume and confirm a new trail part begins without bridging the break. Finish and confirm the state is final across relaunch.
-4. Confirm Start New replaces a finished trail only after confirmation when it has geometry, and Clear removes it. Record a supported Watch workout separately and verify its indigo Health route imports without altering the green trail.
+4. Confirm Start New replaces a finished trail only after confirmation when it has geometry, and Clear removes it. Record a supported Watch workout separately and verify its berry-colored Health route imports without altering the green trail.
 5. Verify outdoors that the first location-button tap follows north-up, the second enters MapKit's heading-up view with an accurate native direction presentation, the third returns north-up, and panning or rotating releases position follow.
 6. Exercise denied permission, interruption/relaunch, stationary time, implausible movement, 12-hour timeout, and Health route replacement/deletion.
 7. Reinstall after Health synchronization and rebuild the same permanent history; confirm the backup-excluded temporary Live Trail is not restored.
@@ -35,17 +35,17 @@ Use a Release build and realistic synthetic history of at least 1,500 workouts w
 - no unbounded growth during a multi-hour Live Trail and no excessive map-overlay churn;
 - acceptable battery use during at least one two-hour real walk.
 
-Check that a route recorded once is legible over streets, parkland, and water in both appearances. Switch appearance while the map is open and verify the displayed paths change shade.
+Check that a route recorded once is legible over streets, parkland, and water in day mode. Switch the iPhone to Dark Mode and confirm that the map and controls still use their light appearance.
 
 ## Privacy and accessibility gate
 
-Verify light and dark appearance, high contrast, reduced transparency, reduced motion, VoiceOver, and all Dynamic Type sizes. Confirm 44-point controls and that normal-size layouts remain compact.
+Verify day mode under both iPhone appearances, high contrast, reduced transparency, reduced motion, VoiceOver, and all Dynamic Type sizes. Confirm 44-point controls and that normal-size layouts remain compact.
 
 On a real device, confirm complete protection for permanent history, complete-until-first-user-authentication protection for the locked-screen Live Trail checkpoint, backup exclusion on both stores, redacted logs, and no app-originated network activity beyond Apple MapKit.
 
 ## Current status
 
-On 2026-11-21, 22 core tests and 70 app and UI tests passed on the Mac and iOS 26.5 Simulator respectively. The unsigned iPhone Release build and static analysis passed. The light and dark map previews show the same synthetic routes after switching appearance with the map open. The physical iPhone was unavailable for this pass.
+On 2026-11-21, 22 core tests and 70 app and UI tests passed on the Mac and iOS 26.5 Simulator respectively. The unsigned iPhone Release build passed. With the simulator set to Dark Mode, the populated map and paused Live Trail both displayed the light basemap and solid berry paths. The physical iPhone was unavailable for this pass.
 
 ### Earlier personal-device validation
 
