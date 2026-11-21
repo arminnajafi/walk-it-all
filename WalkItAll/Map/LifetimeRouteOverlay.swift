@@ -49,7 +49,7 @@ enum LifetimeRouteRenderer {
     static func make(overlay: LifetimeWorkoutRouteOverlay, traits: UITraitCollection) -> MKMultiPolylineRenderer {
         let renderer = MKMultiPolylineRenderer(multiPolyline: overlay)
         renderer.strokeColor = historyColor.resolvedColor(with: traits)
-        renderer.lineWidth = 4
+        renderer.lineWidth = 3
         // Preserve darker street detail without building up opacity on repeat visits.
         renderer.blendMode = .darken
         renderer.lineCap = .round
