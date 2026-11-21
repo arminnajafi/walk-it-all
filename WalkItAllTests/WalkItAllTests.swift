@@ -790,7 +790,7 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(daylight.strokeColor, night.strokeColor)
         for renderer in [daylight, night] {
             let color = try XCTUnwrap(renderer.strokeColor)
-            XCTAssertEqual(renderer.lineWidth, 3)
+            XCTAssertEqual(renderer.lineWidth, 4)
             XCTAssertEqual(renderer.blendMode, .darken)
             XCTAssertEqual(color.cgColor.alpha, 1)
         }
