@@ -24,7 +24,7 @@ Walk It All combines walking, hiking, running, and cycling routes from Apple Hea
     <td align="center"><strong>Live Trail</strong></td>
   </tr>
   <tr>
-    <td><img src="Documentation/Screenshots/lifetime-map.png" alt="Lifetime workout routes across Manhattan"></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="Documentation/Screenshots/lifetime-map-dark.png"><img src="Documentation/Screenshots/lifetime-map.png" alt="Lifetime workout routes across Manhattan"></picture></td>
     <td><img src="Documentation/Screenshots/selected-workout.png" alt="A selected walking workout in Central Park"></td>
     <td><img src="Documentation/Screenshots/live-trail-paused.png" alt="Paused Live Trail with Resume and Finish controls"></td>
   </tr>
@@ -93,6 +93,8 @@ This app is not on the App Store or TestFlight. If I use a free Personal Team, r
 ```
 
 </details>
+
+To renew an existing personal installation, connect and unlock the same iPhone and run `./Scripts/renew-iphone.sh` on your Mac. Keep the original signing team and bundle identifier. The script installs over the existing copy, shows the signing expiry, and opens the app.
 
 ## Build and verify
 
