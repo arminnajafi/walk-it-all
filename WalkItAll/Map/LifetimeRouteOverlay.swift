@@ -44,12 +44,19 @@ final class LifetimeWorkoutRouteOverlay: MKMultiPolyline, @unchecked Sendable {
 
 enum LifetimeRouteRenderer {
     static let usesNativeSpatialCulling = true
-    static let strokeAlpha: CGFloat = 0.42
+    static let strokeAlpha: CGFloat = 0.86
+    static let historyColor = UIColor { traits in
+        let dark = traits.userInterfaceStyle == .dark
+        let color = dark
+            ? UIColor(red: 0.72, green: 0.70, blue: 1, alpha: 1)
+            : UIColor(red: 0.23, green: 0.16, blue: 0.70, alpha: 1)
+        return color.withAlphaComponent(traits.accessibilityContrast == .high ? 1 : strokeAlpha)
+    }
 
-    static func make(overlay: LifetimeWorkoutRouteOverlay) -> MKMultiPolylineRenderer {
+    static func make(overlay: LifetimeWorkoutRouteOverlay, traits: UITraitCollection) -> MKMultiPolylineRenderer {
         let renderer = MKMultiPolylineRenderer(multiPolyline: overlay)
-        renderer.strokeColor = UIColor.systemIndigo.withAlphaComponent(strokeAlpha)
-        renderer.lineWidth = 2.5
+        renderer.strokeColor = historyColor.resolvedColor(with: traits)
+        renderer.lineWidth = 4
         renderer.lineCap = .round
         renderer.lineJoin = .round
         return renderer

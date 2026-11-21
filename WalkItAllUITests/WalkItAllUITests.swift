@@ -33,6 +33,7 @@ final class WalkItAllUITests: XCTestCase {
         let app = launch(arguments: ["-resetOnboarding"])
         XCTAssertTrue(app.buttons["Continue"].waitForExistence(timeout: 30))
         app.buttons["Continue"].tap()
+        XCTAssertTrue(app.buttons["Not now"].waitForExistence(timeout: 5))
         app.buttons["Not now"].tap()
 
         XCTAssertTrue(app.staticTexts["No outdoor routes mapped yet"].waitForExistence(timeout: 10))
@@ -86,6 +87,7 @@ final class WalkItAllUITests: XCTestCase {
         XCTAssertTrue(limitation.exists)
         attachScreenshot(named: "05-about-map", app: app)
         app.navigationBars["About This Map"].buttons["Walk It All"].tap()
+        XCTAssertTrue(app.navigationBars["Walk It All"].waitForExistence(timeout: 5))
 
         let privacy = app.buttons["Privacy and recovery"]
         scrollUntilHittable(privacy, in: app)
@@ -94,6 +96,7 @@ final class WalkItAllUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No route uploads"].exists)
         attachScreenshot(named: "06-privacy-recovery", app: app)
         app.navigationBars["Privacy and Recovery"].buttons["Walk It All"].tap()
+        XCTAssertTrue(app.navigationBars["Walk It All"].waitForExistence(timeout: 5))
 
         let healthAccess = app.buttons["Review Health access"]
         scrollUntilHittable(healthAccess, in: app)
@@ -199,7 +202,7 @@ final class WalkItAllUITests: XCTestCase {
         defer { XCUIDevice.shared.appearance = previousAppearance }
 
         let app = launch(arguments: [
-            "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated",
+            "-resetOnboarding", "-skipOnboarding", "-uiTestPopulated", "-AppleInterfaceStyle", "Dark",
         ])
         XCTAssertTrue(app.buttons["start-live-trail"].waitForExistence(timeout: 30))
         XCTAssertFalse(app.staticTexts["2 walks mapped"].exists)

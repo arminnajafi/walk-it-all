@@ -100,7 +100,7 @@ struct MapDetailsSheet: View {
             Button("Rebuild history", role: .destructive, action: model.rebuildFromHealth)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the rebuildable local map and imports your authorized outdoor workout routes again.")
+            Text("This checks your full workout history in Apple Health and updates the routes on your map.")
         }
     }
 }

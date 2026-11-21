@@ -566,7 +566,7 @@ final class WalkItAllTests: XCTestCase {
         let controller = LiveTrailController(repository: repository)
 
         await controller.bootstrap(now: now)
-        await repository.save(LiveTrailSession(
+        try await repository.save(LiveTrailSession(
             state: .finished,
             start: now.addingTimeInterval(-300),
             end: now,
@@ -598,6 +598,24 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(controller.session?.end, pauseDate)
         let stored = await repository.load()
         XCTAssertEqual(stored?.end, pauseDate)
+    }
+
+    @MainActor
+    func testClearingImmediatelyAfterFinishRemovesTheFinalCheckpoint() async throws {
+        let paused = liveTrailSession(state: .paused)
+        let repository = TestLiveTrailRepository(session: paused, saveDelay: .milliseconds(30))
+        let controller = LiveTrailController(repository: repository)
+        await controller.bootstrap(now: paused.lastUpdate)
+        let finishing = Task { await controller.finish(at: paused.lastUpdate) }
+        for _ in 0..<100 where !controller.isFinished {
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        XCTAssertTrue(controller.isFinished)
+        await controller.clear()
+        await finishing.value
+        XCTAssertNil(controller.session)
+        let stored = await repository.load()
+        XCTAssertNil(stored)
     }
 
     @MainActor
@@ -759,7 +777,27 @@ final class WalkItAllTests: XCTestCase {
         XCTAssertEqual(snapshot.polylineCount, 2)
         XCTAssertGreaterThan(MKCoordinateRegion(snapshot.boundingMapRect).span.longitudeDelta, 70)
         XCTAssertTrue(LifetimeRouteRenderer.usesNativeSpatialCulling)
-        XCTAssertLessThan(LifetimeRouteRenderer.strokeAlpha, 1)
+    }
+
+    @MainActor
+    func testSinglePassHistoryUsesStrongAdaptiveStrokeAndHonorsIncreaseContrast() throws {
+        let overlay = try XCTUnwrap(LifetimeWorkoutRouteOverlay(record: record(id: UUID(), latitude: 40.75)))
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        let dark = UITraitCollection(userInterfaceStyle: .dark)
+        let daylight = LifetimeRouteRenderer.make(overlay: overlay, traits: light)
+        let night = LifetimeRouteRenderer.make(overlay: overlay, traits: dark)
+        XCTAssertNotEqual(daylight.strokeColor, night.strokeColor)
+        for renderer in [daylight, night] {
+            let color = try XCTUnwrap(renderer.strokeColor)
+            XCTAssertGreaterThanOrEqual(renderer.lineWidth, 4)
+            XCTAssertGreaterThanOrEqual(color.cgColor.alpha, 0.8)
+            XCTAssertLessThan(color.cgColor.alpha, 1)
+        }
+        for base in [light, dark] {
+            let highContrast = base.modifyingTraits { $0.accessibilityContrast = .high }
+            let renderer = LifetimeRouteRenderer.make(overlay: overlay, traits: highContrast)
+            XCTAssertEqual(renderer.strokeColor?.cgColor.alpha, 1)
+        }
     }
 
     @MainActor
@@ -1005,6 +1043,32 @@ final class WalkItAllTests: XCTestCase {
         guard case .failed = model.importPhase else {
             return XCTFail("An unreadable Health scope should ask for attention")
         }
+        model.rebuildFromHealth()
+        try await waitForImportToFinish(model)
+        let retainedCheckpoint = try await repository.loadCheckpoint()
+        XCTAssertEqual(retainedCheckpoint, oldCheckpoint)
+        XCTAssertEqual(model.routeRecords.map(\.id), [id])
+        guard case .failed = model.importPhase else { return XCTFail("Empty rebuild must ask for attention") }
+    }
+
+    @MainActor
+    func testRebuildKeepsPathsWhenOnlyWorkoutMetadataIsReadable() async throws {
+        let id = UUID()
+        let oldCheckpoint = Data([3])
+        let repository = TestHistoryRepository(records: [record(id: id, latitude: 40.75)],
+                                               processedIDs: [id], checkpoint: oldCheckpoint)
+        let source = TestRouteSource(batches: [
+            WorkoutRouteBatch(routes: [], routeInvalidatedWorkoutIDs: [id]),
+            WorkoutRouteBatch(routes: [], authoritativeWorkoutIDs: [id], checkpoint: Data([9])),
+        ])
+        let model = makeModel(source: source, repository: repository)
+        await model.bootstrap()
+        model.rebuildFromHealth()
+        try await waitForImportToFinish(model)
+        guard case .failed = model.importPhase else { return XCTFail("Expected a route access message") }
+        XCTAssertEqual(model.routeRecords.map(\.id), [id])
+        let checkpoint = try await repository.loadCheckpoint()
+        XCTAssertEqual(checkpoint, oldCheckpoint)
     }
 
     @MainActor
@@ -1170,9 +1234,11 @@ final class WalkItAllTests: XCTestCase {
         let model = makeModel(source: source, repository: repository)
         await model.bootstrap()
 
+        let revision = model.routeRenderRevision
         model.refresh()
         try await waitForImportToFinish(model)
 
+        XCTAssertEqual(model.routeRenderRevision, revision)
         XCTAssertEqual(model.importPhase, .complete(.refreshed(added: 0, updated: 0, removed: 0)))
         XCTAssertEqual(model.importPhase.title, "Apple Health is up to date")
     }
@@ -1429,13 +1495,18 @@ private actor FailingHistoryRepository: WalkHistoryRepository {
 
 private actor TestLiveTrailRepository: LiveTrailRepository {
     private var session: LiveTrailSession?
+    private let saveDelay: Duration
 
-    init(session: LiveTrailSession? = nil) {
+    init(session: LiveTrailSession? = nil, saveDelay: Duration = .zero) {
         self.session = session
+        self.saveDelay = saveDelay
     }
 
     func load() -> LiveTrailSession? { session }
-    func save(_ session: LiveTrailSession) { self.session = session }
+    func save(_ session: LiveTrailSession) async throws {
+        if saveDelay > .zero { try await Task.sleep(for: saveDelay) }
+        self.session = session
+    }
     func delete() { session = nil }
 }
 

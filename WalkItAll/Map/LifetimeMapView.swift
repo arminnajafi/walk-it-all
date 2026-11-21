@@ -23,6 +23,14 @@ struct LifetimeMapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let mapView = LayoutAwareMapView(frame: .zero)
         mapView.delegate = context.coordinator
+        mapView.registerForTraitChanges([UITraitUserInterfaceStyle.self, UITraitAccessibilityContrast.self]) {
+            (map: MKMapView, _: UITraitCollection) in
+            for case let overlay as LifetimeWorkoutRouteOverlay in map.overlays {
+                guard let renderer = map.renderer(for: overlay) as? MKMultiPolylineRenderer else { continue }
+                renderer.strokeColor = LifetimeRouteRenderer.historyColor.resolvedColor(with: map.traitCollection)
+                renderer.setNeedsDisplay()
+            }
+        }
         mapView.onLayout = { [weak coordinator = context.coordinator] mapView in
             coordinator?.mapViewDidLayout(mapView)
         }
@@ -159,9 +167,6 @@ struct LifetimeMapView: UIViewRepresentable {
                     // Keep the temporary Live Trail above the immutable
                     // history even when a Health refresh replaces that history.
                     self.replaceLiveTrail(self.pendingLiveTrailSession, on: mapView)
-                    if initial || self.viewportRevision != viewportCommand.revision {
-                        self.scheduleViewport(on: mapView, animated: false)
-                    }
                 }
             }
         }
@@ -175,7 +180,7 @@ struct LifetimeMapView: UIViewRepresentable {
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let history = overlay as? LifetimeWorkoutRouteOverlay {
-                return LifetimeRouteRenderer.make(overlay: history)
+                return LifetimeRouteRenderer.make(overlay: history, traits: mapView.traitCollection)
             }
             if let casing = overlay as? SelectedRouteCasingPolyline {
                 let renderer = MKPolylineRenderer(polyline: casing)
@@ -317,6 +322,12 @@ struct LifetimeMapView: UIViewRepresentable {
                 else { return }
                 mapRect = Self.mapRect(for: bounds)
             case let .userLocation(mode):
+                // A status card can resize after the user has panned away.
+                // Only a new location command should resume following.
+                if viewportRevision == pendingViewport.revision {
+                    appliedBottomInset = pendingBottomInset
+                    return
+                }
                 guard mapView.showsUserLocation,
                       mapView.userLocation.location != nil
                 else { return }

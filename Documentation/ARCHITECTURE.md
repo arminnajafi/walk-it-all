@@ -20,7 +20,7 @@ The source emits one workout at a time. Deleted workouts remove the route and pr
 
 After the user has connected Health, the app refreshes at launch, on foreground entry, and every five minutes while active, subject to the five-minute success/attempt throttle. Manual refresh bypasses the throttle. Health background delivery is not enabled.
 
-Every incremental refresh reconciles the most recent seven days as a safety window for delayed or replaced route samples. Completion copy compares the stored route records before and after that work: unchanged rechecks report that Apple Health is up to date, while added, updated, and removed counts describe only actual map changes. A deliberate full rebuild reports the final rebuilt route count separately.
+Every incremental refresh checks the most recent seven days for delayed or replaced route samples. The app reports how many mapped workouts were added, updated, or removed. A full rebuild starts with fresh Health anchors. If Health returns cached workouts without any readable routes, the rebuild keeps the saved paths and previous checkpoint so the user can review access and try again.
 
 ## Live Trail
 
@@ -66,10 +66,10 @@ The file and directory use complete-until-first-user-authentication protection a
 
 `LifetimeRouteSnapshot` is built immutably away from the main actor and contains one native `MKMultiPolyline` overlay per workout. Each overlay has tight local bounds, so MapKit performs its own viewport culling and does not treat worldwide history as one enormous drawing surface. This also avoids maintaining a parallel custom spatial index and renderer.
 
-Every workout receives a translucent indigo stroke, so a single route remains legible while repeated routes deepen naturally through normal alpha compositing. Selected workout parts use an orange stroke with a contrasting casing. Active and paused Live Trail parts use solid green with a casing; finished parts retain the same semantics at lower opacity. The standard MapKit user-location annotation remains the blue position indicator.
+Historical paths use a four-point indigo stroke. The renderer uses a deep shade on a light map and a lighter shade on a dark map. Repeated routes deepen through alpha compositing. Increase Contrast makes even a single pass fully opaque. Selected workouts use outlined orange strokes, Live Trail uses outlined green strokes, and MapKit supplies the blue position indicator.
 
 The map uses MapKit's native user-tracking modes. From a freely panned map, the location button first enters north-up position following; a second tap enters heading-up following, which rotates the map using MapKit's standard heading presentation; the next tap returns north-up. Because MapKit's plain `follow` mode promises position tracking but does not promise orientation, the adapter first resets `MKMapCamera.heading` to its documented true-north value of zero and then enables `follow`. Starting or resuming Live Trail enters heading-up following. Normal map gestures return the camera to free mode through MapKit's tracking delegate, so the camera never fights the user. No parallel compass service or custom direction annotation is maintained.
 
 The location control remains visually in its free state while initial authorization is pending. It enters north-up following only after that request succeeds; denied, restricted, or revoked access never leaves a misleading active-follow indicator.
 
-Historical overlay construction and Health route processing run away from the main actor; the app replaces a complete history overlay after import completion, cancellation, or failure rather than rebuilding per workout. Selecting or clearing one workout changes only the selected overlay and preserves the immutable history. The temporary overlay has an independent revision and is updated at a bounded cadence, preserving the history snapshot and map interaction performance.
+Historical overlay construction, Health route processing, and the successful-refresh comparison run off the main actor. An unchanged refresh updates the date and keeps the rendered history in place. A full rebuild starts with fresh Health anchors and retains the previous history while reading workouts. Selecting or clearing one workout changes only the selected overlay. Live Trail has an independent revision and updates at a bounded cadence.

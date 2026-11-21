@@ -271,7 +271,8 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
                                     || requiresFullRouteReconciliation)
                         }
                         .sorted { $0.startDate < $1.startDate }
-                    let authoritativeWorkoutIDs = requiresFullRouteReconciliation
+                    // An unanchored workout query also enumerates the full readable history.
+                    let authoritativeWorkoutIDs = (requiresFullRouteReconciliation || checkpoint == nil)
                         ? Set(candidates.keys).subtracting(deletedWorkoutIDs)
                         : nil
 
@@ -307,7 +308,7 @@ actor HealthKitWorkoutRouteSource: WorkoutRouteSource {
 
                         let routeWasInvalidated = loaded.route == nil
                             && (routeAffectedWorkoutIDs.contains(workout.uuid)
-                                || requiresFullRouteReconciliation)
+                                || requiresFullRouteReconciliation || checkpoint == nil)
                         var invalidatedWorkoutIDs = routeWasInvalidated
                             ? Set([workout.uuid])
                             : Set<UUID>()

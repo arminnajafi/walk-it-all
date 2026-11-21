@@ -28,12 +28,8 @@ struct RootView: View {
             }
         }
         .task { await model.bootstrap() }
-        .task(id: scenePhase) {
-            guard scenePhase == .active else { return }
-            if case .failed = model.launchState {
-                await model.bootstrap()
-            }
-            guard model.launchState == .ready else { return }
+        .task(id: scenePhase == .active && model.launchState == .ready) {
+            guard scenePhase == .active, model.launchState == .ready else { return }
             while !Task.isCancelled {
                 model.refreshIfNeeded()
                 do { try await Task.sleep(for: .seconds(5 * 60)) } catch { return }
@@ -51,13 +47,7 @@ struct RootView: View {
             guard newPhase == .active else { return }
             if case .failed = model.launchState {
                 Task { await model.bootstrap() }
-            } else {
-                model.refreshIfNeeded()
             }
-        }
-        .onChange(of: model.launchState) { _, newState in
-            guard newState == .ready, scenePhase == .active else { return }
-            model.refreshIfNeeded()
         }
         .fullScreenCover(
             isPresented: Binding(

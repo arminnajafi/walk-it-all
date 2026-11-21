@@ -35,7 +35,7 @@ Use a Release build and realistic synthetic history of at least 1,500 workouts w
 - no unbounded growth during a multi-hour Live Trail and no excessive map-overlay churn;
 - acceptable battery use during at least one two-hour real walk.
 
-If the density pass misses the gate, retain the same renderer with only the baseline stroke. Do not add a raster-tile system for the MVP.
+Check that a route recorded once is legible over streets, parkland, and water in both appearances. Switch appearance while the map is open and verify the displayed paths change shade.
 
 ## Privacy and accessibility gate
 
@@ -44,6 +44,10 @@ Verify light and dark appearance, high contrast, reduced transparency, reduced m
 On a real device, confirm complete protection for permanent history, complete-until-first-user-authentication protection for the locked-screen Live Trail checkpoint, backup exclusion on both stores, redacted logs, and no app-originated network activity beyond Apple MapKit.
 
 ## Current status
+
+On 2026-11-21, 22 core tests and 70 app and UI tests passed on the Mac and iOS 26.5 Simulator respectively. The unsigned iPhone Release build and static analysis passed. The light and dark map previews show the same synthetic routes after switching appearance with the map open. The physical iPhone was unavailable for this pass.
+
+### Earlier personal-device validation
 
 Verified on 2026-08-30:
 

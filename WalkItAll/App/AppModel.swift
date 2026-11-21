@@ -121,11 +121,14 @@ enum HealthImportCompletion: Equatable, Sendable {
 
 enum HealthImportApplicationError: LocalizedError {
     case noReadableWorkouts
+    case noReadableRoutes
 
     var errorDescription: String? {
         switch self {
         case .noReadableWorkouts:
             "Apple Health returned no readable workouts. Your existing map was kept. Review Health access or try again."
+        case .noReadableRoutes:
+            "Apple Health returned workouts without readable routes. Your saved paths were kept. Review Workout Routes access or try again."
         }
     }
 }
@@ -242,12 +245,12 @@ final class AppModel {
 
     func refresh() {
         guard !importPhase.isWorking else { return }
-        beginAuthorizedImport(resetFirst: false, isAutomatic: false)
+        beginAuthorizedImport(isRebuild: false, isAutomatic: false)
     }
 
     func rebuildFromHealth() {
         guard !importPhase.isWorking, !liveTrail.hasInProgressSession else { return }
-        beginAuthorizedImport(resetFirst: true, isAutomatic: false)
+        beginAuthorizedImport(isRebuild: true, isAutomatic: false)
     }
 
     func refreshIfNeeded(now: Date = Date()) {
@@ -265,7 +268,7 @@ final class AppModel {
         else { return }
 
         lastAutomaticRefreshAttempt = now
-        beginAuthorizedImport(resetFirst: false, isAutomatic: true)
+        beginAuthorizedImport(isRebuild: false, isAutomatic: true)
     }
 
     func cancelImport() {
@@ -273,7 +276,8 @@ final class AppModel {
         importTask?.cancel()
         importTask = nil
         importPhase = .idle
-        publishStoredHistory()
+        let generation = importGeneration
+        Task { await publishStoredHistory(for: generation) }
     }
 
     func selectWorkout(_ id: UUID) {
@@ -334,7 +338,9 @@ final class AppModel {
     }
 
     private func followUserHeading() {
-        liveTrail.requestCurrentLocation()
+        // Start and Resume already request authorization. A second location
+        // request must not replace the pending trail start.
+        guard liveTrail.isActive || liveTrail.accessState == .notDetermined else { return }
         requestUserTracking(.followWithHeading)
     }
 
@@ -404,26 +410,19 @@ final class AppModel {
         followUserHeading()
     }
 
-    private func beginAuthorizedImport(resetFirst: Bool, isAutomatic: Bool) {
+    private func beginAuthorizedImport(isRebuild: Bool, isAutomatic: Bool) {
         importGeneration &+= 1
         let generation = importGeneration
         importTask?.cancel()
+        importPhase = .requestingHealthAccess
         importTask = Task { [weak self] in
-            guard let self else { return }
-            importPhase = .requestingHealthAccess
+            guard let self, !Task.isCancelled else { return }
             do {
                 try await routeSource.requestReadAuthorization()
                 try Task.checkCancellation()
                 guard generation == importGeneration else { return }
                 UserDefaults.standard.set(true, forKey: Self.connectedHealthKey)
-                if resetFirst {
-                    try await repository.reset()
-                    routeRecords = []
-                    lastSuccessfulImport = nil
-                    clearSelectedWorkout()
-                    routeRenderRevision &+= 1
-                }
-                await performImport(generation: generation, isRebuild: resetFirst)
+                await performImport(generation: generation, isRebuild: isRebuild)
             } catch is CancellationError {
                 guard generation == importGeneration else { return }
                 importPhase = .idle
@@ -440,22 +439,26 @@ final class AppModel {
         guard generation == importGeneration else { return }
         importPhase = .findingWorkouts
         do {
-            let recordsBeforeImport = try await repository.loadRecords()
-            let checkpoint = try await repository.loadCheckpoint()
-            let processedWorkoutIDs = try await repository.loadProcessedWorkoutIDs()
+            let recordsBeforeImport = routeRecords
+            let checkpoint = isRebuild ? nil : try await repository.loadCheckpoint()
+            let processedWorkoutIDs: Set<UUID> = isRebuild ? [] : try await repository.loadProcessedWorkoutIDs()
             let batches = await routeSource.routeBatches(
                 since: checkpoint,
                 excluding: processedWorkoutIDs
             )
             var pendingCheckpoint: Data?
             var authoritativeWorkoutIDs: Set<UUID>?
+            var rebuildInvalidations = Set<UUID>()
+            var receivedRoute = false
 
             for try await batch in batches {
                 try Task.checkCancellation()
                 if !batch.deletedWorkoutIDs.isEmpty {
                     try await repository.removeWorkouts(workoutIDs: batch.deletedWorkoutIDs)
                 }
-                if !batch.routeInvalidatedWorkoutIDs.isEmpty {
+                if isRebuild {
+                    rebuildInvalidations.formUnion(batch.routeInvalidatedWorkoutIDs)
+                } else if !batch.routeInvalidatedWorkoutIDs.isEmpty {
                     try await repository.removeRouteRecords(
                         workoutIDs: batch.routeInvalidatedWorkoutIDs
                     )
@@ -467,11 +470,13 @@ final class AppModel {
                 )
                 for route in batch.routes {
                     try Task.checkCancellation()
+                    receivedRoute = true
                     importPhase = .processingRoutes(
                         completed: batch.completedCount,
                         total: batch.totalCount
                     )
                     if let record = await Self.process(route, with: routeProcessor) {
+                        try Task.checkCancellation()
                         try await repository.save(record: record)
                     } else {
                         try await repository.removeRouteRecords(workoutIDs: [route.id])
@@ -490,9 +495,13 @@ final class AppModel {
             guard generation == importGeneration else { return }
 
             if let authoritativeWorkoutIDs {
-                let existingWorkoutIDs = try await repository.loadProcessedWorkoutIDs()
+                let storedIDs = Set(recordsBeforeImport.map(\.id))
+                let existingWorkoutIDs = try await repository.loadProcessedWorkoutIDs().union(storedIDs)
                 if authoritativeWorkoutIDs.isEmpty, !existingWorkoutIDs.isEmpty {
                     throw HealthImportApplicationError.noReadableWorkouts
+                }
+                if isRebuild, !receivedRoute, !storedIDs.isDisjoint(with: authoritativeWorkoutIDs) {
+                    throw HealthImportApplicationError.noReadableRoutes
                 }
                 let staleWorkoutIDs = existingWorkoutIDs.subtracting(authoritativeWorkoutIDs)
                 if !staleWorkoutIDs.isEmpty {
@@ -500,6 +509,9 @@ final class AppModel {
                         workoutIDs: staleWorkoutIDs.sorted { $0.uuidString < $1.uuidString }
                     )
                 }
+            }
+            if !rebuildInvalidations.isEmpty {
+                try await repository.removeRouteRecords(workoutIDs: Array(rebuildInvalidations))
             }
             if let pendingCheckpoint {
                 try await repository.saveCheckpoint(pendingCheckpoint)
@@ -512,40 +524,42 @@ final class AppModel {
             let successfulRefreshDate = Date()
             try await repository.saveLastSuccessfulImport(successfulRefreshDate)
             try protectStorage()
-            routeRecords = records
+            guard generation == importGeneration else { return }
+            let completion = await Task.detached {
+                HealthImportCompletion.refreshed(comparing: recordsBeforeImport, with: records)
+            }.value
+            guard generation == importGeneration else { return }
+            if completion != .refreshed(added: 0, updated: 0, removed: 0) {
+                routeRecords = records
+                routeRenderRevision &+= 1
+            }
             lastSuccessfulImport = successfulRefreshDate
             clearSelectionIfMissing()
-            routeRenderRevision &+= 1
-            importPhase = .complete(
-                isRebuild
-                    ? .rebuilt(records.count)
-                    : .refreshed(comparing: recordsBeforeImport, with: records)
-            )
+            importPhase = .complete(isRebuild ? .rebuilt(records.count) : completion)
 
         } catch is CancellationError {
             guard generation == importGeneration else { return }
-            await publishStoredHistory()
+            await publishStoredHistory(for: generation)
+            guard generation == importGeneration else { return }
             importPhase = .idle
         } catch {
             guard generation == importGeneration else { return }
-            await publishStoredHistory()
+            await publishStoredHistory(for: generation)
+            guard generation == importGeneration else { return }
             logger.error("Health import failed: \(error.localizedDescription, privacy: .private)")
             importPhase = .failed(error.localizedDescription)
         }
     }
 
-    private func publishStoredHistory() {
-        Task { [weak self] in
-            guard let self else { return }
-            await publishStoredHistory()
-        }
-    }
-
-    private func publishStoredHistory() async {
+    private func publishStoredHistory(for generation: Int) async {
         do {
-            routeRecords = try await repository.loadRecords()
+            let records = try await repository.loadRecords()
+            guard generation == importGeneration else { return }
+            if records != routeRecords {
+                routeRecords = records
+                routeRenderRevision &+= 1
+            }
             clearSelectionIfMissing()
-            routeRenderRevision &+= 1
             try protectStorage()
         } catch {
             logger.error("Could not publish stored history: \(error.localizedDescription, privacy: .private)")

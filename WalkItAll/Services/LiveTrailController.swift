@@ -44,6 +44,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     @ObservationIgnored private var lastPersistenceDate: Date?
     @ObservationIgnored private var lastRenderDate: Date?
     @ObservationIgnored private var persistenceTask: Task<Void, Never>?
+    @ObservationIgnored private var isClearing = false
     /// Accumulates every accepted point without invalidating SwiftUI for each
     /// GPS update. `session` receives immutable snapshots at render cadence.
     @ObservationIgnored private var workingSession: LiveTrailSession?
@@ -118,7 +119,6 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     }
 
     func requestCurrentLocation() {
-        pendingStart = false
         requestAuthorizationIfNeeded()
     }
 
@@ -168,7 +168,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     }
 
     func resume(now: Date = Date()) {
-        guard let session, session.state == .paused else { return }
+        guard !isClearing, let session, session.state == .paused else { return }
         if now.timeIntervalSince(session.start) >= Self.maximumSessionDuration {
             Task { [weak self] in
                 await self?.finish(at: session.start.addingTimeInterval(Self.maximumSessionDuration))
@@ -192,7 +192,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     }
 
     func finish(at date: Date = Date()) async {
-        guard let session = workingSession ?? self.session,
+        guard !isClearing, let session = workingSession ?? self.session,
               session.state == .active || session.state == .paused
         else { return }
         stopLocationDelivery()
@@ -212,9 +212,16 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
         workingSession = finishingSnapshot
         self.session = finishingSnapshot
         renderRevision &+= 1
-        await persistenceTask?.value
-        persistenceTask = nil
+        let previous = persistenceTask
+        let checkpoint = Task {
+            await previous?.value
+            await persistFinished(finishingSnapshot)
+        }
+        persistenceTask = checkpoint
+        await checkpoint.value
+    }
 
+    private func persistFinished(_ finishingSnapshot: LiveTrailSession) async {
         // Commit the terminal state before compaction. If the app is killed
         // during the heavier processing below, recovery must never resurrect
         // an explicitly finished session and restart background location.
@@ -235,10 +242,12 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
 
         let processor = processor
         let finished = await Task.detached(priority: .userInitiated) {
-            processor.finishing(session, at: effectiveEnd)
+            processor.compacting(finishingSnapshot)
         }.value
-        workingSession = finished
-        self.session = finished
+        if session?.id == finished.id {
+            workingSession = finished
+            session = finished
+        }
         do {
             try await repository.save(finished)
         } catch {
@@ -250,6 +259,9 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     }
 
     func clear() async {
+        guard !isClearing else { return }
+        isClearing = true
+        defer { isClearing = false }
         stopLocationDelivery()
         pendingStart = false
         pendingStartNew = false
@@ -268,7 +280,7 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
     }
 
     func startNew(now: Date = Date()) async {
-        guard isFinished else { return }
+        guard !isClearing, isFinished else { return }
         pendingStartNew = true
         switch accessState {
         case .authorized:
@@ -405,16 +417,18 @@ final class LiveTrailController: NSObject, @preconcurrency CLLocationManagerDele
                     guard let self, !Task.isCancelled else { return }
                     if let location = update.location {
                         await self.consume(location)
+                    } else {
+                        self.requiresNewPart = true
                     }
                 }
             } catch is CancellationError {
                 return
             } catch {
-                guard let self else { return }
-                self.logger.error("Live location delivery failed: \(error.localizedDescription, privacy: .private)")
-                await self.pause()
-                self.issueMessage = "Live Trail paused because location updates stopped unexpectedly."
+                self?.logger.error("Live location delivery failed: \(error.localizedDescription, privacy: .private)")
             }
+            guard let self, !Task.isCancelled, self.isActive else { return }
+            await self.pause()
+            self.issueMessage = "Live Trail paused because location updates stopped unexpectedly."
         }
     }
 
