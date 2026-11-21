@@ -5,7 +5,7 @@ struct AboutMapSheet: View {
         List {
             Section("What appears") {
                 Text("Walk It All shows walking, hiking, running, and cycling workouts that include a GPS route in Apple Health. Routes can be anywhere in the world.")
-                Text("A solid berry-colored line means a recorded workout took you there at least once. One visit gets the same line as ten.")
+                Text("A rose line means a recorded workout took you there at least once. One visit gets the same line as ten.")
             }
             Section("How routes are prepared") {
                 Text("Locations with poor accuracy are omitted. A route is separated at long pauses, GPS outages, large jumps, or speeds that are implausible for its activity so the map does not draw an artificial line between them.")

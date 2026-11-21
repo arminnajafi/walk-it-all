@@ -784,19 +784,22 @@ final class WalkItAllTests: XCTestCase {
         let overlay = try XCTUnwrap(LifetimeWorkoutRouteOverlay(record: record(id: UUID(), latitude: 40.75)))
         let light = UITraitCollection(userInterfaceStyle: .light)
         let dark = UITraitCollection(userInterfaceStyle: .dark)
-        let daylight = LifetimeRouteRenderer.make(overlay: overlay, traits: light)
-        let night = LifetimeRouteRenderer.make(overlay: overlay, traits: dark)
+        let overviewWidth = LifetimeRouteRenderer.lineWidth(cameraDistance: 12_000)
+        let streetWidth = LifetimeRouteRenderer.lineWidth(cameraDistance: 1_000)
+        let daylight = LifetimeRouteRenderer.make(overlay: overlay, traits: light, width: overviewWidth)
+        let night = LifetimeRouteRenderer.make(overlay: overlay, traits: dark, width: streetWidth)
+        XCTAssertEqual(daylight.lineWidth, 1.25)
+        XCTAssertEqual(night.lineWidth, 2)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "UIUserInterfaceStyle") as? String, "Light")
         XCTAssertEqual(daylight.strokeColor, night.strokeColor)
         for renderer in [daylight, night] {
             let color = try XCTUnwrap(renderer.strokeColor)
-            XCTAssertEqual(renderer.lineWidth, 3)
             XCTAssertEqual(renderer.blendMode, .darken)
             XCTAssertEqual(color.cgColor.alpha, 1)
         }
         for base in [light, dark] {
             let highContrast = base.modifyingTraits { $0.accessibilityContrast = .high }
-            let renderer = LifetimeRouteRenderer.make(overlay: overlay, traits: highContrast)
+            let renderer = LifetimeRouteRenderer.make(overlay: overlay, traits: highContrast, width: streetWidth)
             XCTAssertEqual(renderer.strokeColor?.cgColor.alpha, 1)
             XCTAssertNotEqual(renderer.strokeColor, LifetimeRouteRenderer.historyColor.resolvedColor(with: base))
         }

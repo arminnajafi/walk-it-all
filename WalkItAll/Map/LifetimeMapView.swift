@@ -22,6 +22,7 @@ struct LifetimeMapView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = LayoutAwareMapView(frame: .zero)
+        mapView.tintColor = .systemBlue
         mapView.delegate = context.coordinator
         mapView.registerForTraitChanges([UITraitAccessibilityContrast.self]) {
             (map: MKMapView, _: UITraitCollection) in
@@ -77,6 +78,7 @@ struct LifetimeMapView: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, MKMapViewDelegate {
         private var historyRevision: Int?
+        private var appliedHistoryWidth: CGFloat?
         private var selectedWorkoutID: UUID?
         private var liveTrailSignature: LiveTrailSignature?
         private var viewportRevision: Int?
@@ -180,7 +182,8 @@ struct LifetimeMapView: UIViewRepresentable {
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let history = overlay as? LifetimeWorkoutRouteOverlay {
-                return LifetimeRouteRenderer.make(overlay: history, traits: mapView.traitCollection)
+                let width = appliedHistoryWidth ?? LifetimeRouteRenderer.lineWidth(cameraDistance: mapView.camera.centerCoordinateDistance)
+                return LifetimeRouteRenderer.make(overlay: history, traits: mapView.traitCollection, width: width)
             }
             if let casing = overlay as? SelectedRouteCasingPolyline {
                 let renderer = MKPolylineRenderer(polyline: casing)
@@ -219,6 +222,18 @@ struct LifetimeMapView: UIViewRepresentable {
                 return renderer
             }
             return MKOverlayRenderer(overlay: overlay)
+        }
+
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            let width = LifetimeRouteRenderer.lineWidth(cameraDistance: mapView.camera.centerCoordinateDistance)
+            guard width != appliedHistoryWidth else { return }
+            appliedHistoryWidth = width
+            for case let overlay as LifetimeWorkoutRouteOverlay in mapView.overlays {
+                guard let renderer = mapView.renderer(for: overlay) as? MKMultiPolylineRenderer,
+                      renderer.lineWidth != width else { continue }
+                renderer.lineWidth = width
+                renderer.setNeedsDisplay()
+            }
         }
 
         func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {

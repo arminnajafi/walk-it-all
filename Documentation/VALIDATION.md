@@ -19,7 +19,7 @@ Before signoff:
 1. Record the current drawable-route and processed-workout counts, run the activity-scope reconciliation, and confirm existing walks/hikes remain while supported runs and rides appear. Counts are intentionally not fixed because they grow as new workouts sync.
 2. Compare representative walk, hike, run, and ride routes with Apple Fitness. Confirm that inaccurate points, transit, outages, and implausible jumps are not bridged.
 3. Start Live Trail, lock the phone, walk several blocks, and confirm the solid green trail is continuous after reopening. Pause and confirm background trail tracking and its system indicator stop; Resume and confirm a new trail part begins without bridging the break. Finish and confirm the state is final across relaunch.
-4. Confirm Start New replaces a finished trail only after confirmation when it has geometry, and Clear removes it. Record a supported Watch workout separately and verify its berry-colored Health route imports without altering the green trail.
+4. Confirm Start New replaces a finished trail only after confirmation when it has geometry, and Clear removes it. Record a supported Watch workout separately and verify its rose Health route imports without altering the green trail.
 5. Verify outdoors that the first location-button tap follows north-up, the second enters MapKit's heading-up view with an accurate native direction presentation, the third returns north-up, and panning or rotating releases position follow.
 6. Exercise denied permission, interruption/relaunch, stationary time, implausible movement, 12-hour timeout, and Health route replacement/deletion.
 7. Reinstall after Health synchronization and rebuild the same permanent history; confirm the backup-excluded temporary Live Trail is not restored.
@@ -35,7 +35,7 @@ Use a Release build and realistic synthetic history of at least 1,500 workouts w
 - no unbounded growth during a multi-hour Live Trail and no excessive map-overlay churn;
 - acceptable battery use during at least one two-hour real walk.
 
-Check that a route recorded once is legible over streets, parkland, and water in day mode. Switch the iPhone to Dark Mode and confirm that the map and controls still use their light appearance.
+Use a dense demo history at city scale and a single route at street scale. Check that gaps between routes stay visible in the overview and a single visit is legible when zoomed in. Switch the iPhone to Dark Mode and confirm that the map and controls still use their light appearance.
 
 ## Privacy and accessibility gate
 

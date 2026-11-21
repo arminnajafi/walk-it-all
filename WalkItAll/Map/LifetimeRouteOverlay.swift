@@ -44,12 +44,25 @@ final class LifetimeWorkoutRouteOverlay: MKMultiPolyline, @unchecked Sendable {
 
 enum LifetimeRouteRenderer {
     static let usesNativeSpatialCulling = true
-    static let historyColor = UIColor(resource: .accent)
+    static let historyColor = UIColor { traits in
+        if traits.accessibilityContrast == .high {
+            return UIColor(resource: .accent).resolvedColor(with: traits)
+        }
+        return UIColor(red: 0.59, green: 0.39, blue: 0.49, alpha: 1)
+    }
 
-    static func make(overlay: LifetimeWorkoutRouteOverlay, traits: UITraitCollection) -> MKMultiPolylineRenderer {
+    static func lineWidth(cameraDistance: CLLocationDistance) -> CGFloat {
+        cameraDistance > 4_500 ? 1.25 : 2
+    }
+
+    static func make(
+        overlay: LifetimeWorkoutRouteOverlay,
+        traits: UITraitCollection,
+        width: CGFloat
+    ) -> MKMultiPolylineRenderer {
         let renderer = MKMultiPolylineRenderer(multiPolyline: overlay)
         renderer.strokeColor = historyColor.resolvedColor(with: traits)
-        renderer.lineWidth = 3
+        renderer.lineWidth = width
         // Preserve darker street detail without building up opacity on repeat visits.
         renderer.blendMode = .darken
         renderer.lineCap = .round
